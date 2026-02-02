@@ -3,8 +3,6 @@
 
 O **UniEventos** é uma plataforma completa para gerenciamento de eventos acadêmicos, workshops e aulas magnas. O sistema gerencia todo o ciclo de vida do evento: desde a criação e inscrição até o controle de presença via **QR Code Dinâmico** e emissão automática de certificados em PDF.
 
-> **Versão:** 
-
 ---
 
 ## Funcionalidades Principais
