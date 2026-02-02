@@ -2,17 +2,17 @@
 
 Sistema completo para gerenciamento de eventos acadêmicos, controle de frequência via QR Code dinâmico e emissão automática de certificados.
 
-## 🚀 Funcionalidades Principais
+## Funcionalidades Principais
 
 ### 1. Hierarquia de Usuários
-* *Admin:* Acesso total. Pode editar dados de qualquer usuário e promover participantes a professores ou coordenadores.
+* **Admin:** Acesso total. Pode editar dados de qualquer usuário e promover participantes a professores ou coordenadores.
 * **Coordenador:** Pode gerenciar eventos e visualizar usuários.
 * **Professor:** Pode criar e gerenciar seus próprios eventos e atividades.
 * **Participante (Aluno):** Pode se inscrever em atividades, escanear presença e baixar certificados.
 
 ### 2. Gestão de Eventos e Atividades
 * **Evento Padrão:** Permite criar múltiplas atividades internas (palestras, workshops), cada uma com sua data, horário, local, palestrante e carga horária específica.
-* **Evento Rápido (⚡):** Criação simplificada para lista de presença única. Gera automaticamente uma atividade oculta de check-in sem carga horária (ideal para reuniões ou aulas rápidas).
+* **Evento Rápido:** Criação simplificada para lista de presença única. Gera automaticamente uma atividade oculta de check-in sem carga horária (ideal para reuniões ou aulas rápidas).
 * **Controle de Vagas:** Opção para limitar a quantidade de inscritos por atividade ou deixar ilimitado (∞).
 * **Validação de Datas:** O sistema impede a criação de eventos com datas no passado ou datas de fim anteriores ao início.
 
@@ -28,7 +28,7 @@ Sistema completo para gerenciamento de eventos acadêmicos, controle de frequên
 
 ---
 
-## 🛠️ Instalação e Execução
+## Instalação e Execução
 
 1.  **Instale as dependências:**
     ```bash
@@ -44,7 +44,7 @@ Sistema completo para gerenciamento de eventos acadêmicos, controle de frequên
     * O sistema rodará em: `http://127.0.0.1:5000`
     * **Nota:** Para testar o Scanner em celulares na mesma rede, você precisará servir a aplicação via HTTPS ou usar o IP da máquina local (ex: `http://192.168.0.X:5000`), mas navegadores mobile podem bloquear a câmera se não houver HTTPS seguro.
 
-### 🔐 Usuários Padrão (Para Teste)
+### Usuários Padrão (Para Teste)
 O banco de dados é criado automaticamente com estes usuários na primeira execução:
 
 | Usuário | Senha | Perfil |
@@ -55,7 +55,7 @@ O banco de dados é criado automaticamente com estes usuários na primeira execu
 
 ---
 
-## 🗄️ Estrutura do Banco de Dados (SQLite)
+## Estrutura do Banco de Dados (SQLite)
 
 O sistema utiliza o SQLite (`sistema_academico.db`), que é gerado automaticamente pelo arquivo `app.py`. Não é necessário instalar nenhum servidor de banco de dados.
 
@@ -88,7 +88,7 @@ O sistema utiliza o SQLite (`sistema_academico.db`), que é gerado automaticamen
 
 ---
 
-## 🔒 Segurança do Token QR Code
+## Segurança do Token QR Code
 
 A lógica de geração do QR Code segue este padrão para evitar fraudes:
 
