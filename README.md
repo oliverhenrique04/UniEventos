@@ -1,99 +1,147 @@
+
 # UniEventos - Sistema de Gestão Acadêmica
 
-Sistema completo para gerenciamento de eventos acadêmicos, controle de frequência via QR Code dinâmico e emissão automática de certificados.
+O **UniEventos** é uma plataforma completa para gerenciamento de eventos acadêmicos, workshops e aulas magnas. O sistema gerencia todo o ciclo de vida do evento: desde a criação e inscrição até o controle de presença via **QR Code Dinâmico** e emissão automática de certificados em PDF.
+
+---
 
 ## Funcionalidades Principais
 
-### 1. Hierarquia de Usuários
-* **Admin:** Acesso total. Pode editar dados de qualquer usuário e promover participantes a professores ou coordenadores.
-* **Coordenador:** Pode gerenciar eventos e visualizar usuários.
-* **Professor:** Pode criar e gerenciar seus próprios eventos e atividades.
-* **Participante (Aluno):** Pode se inscrever em atividades, escanear presença e baixar certificados.
+### Controle de Acesso e Perfis
+* **Admin:** Acesso total ao sistema. Pode promover usuários, gerenciar todos os eventos e visualizar relatórios globais.
+* **Professor/Coordenador:** Cria e edita eventos, projeta QR Codes para chamada e monitora inscritos.
+* **Participante (Aluno):** Inscreve-se em atividades, registra presença via câmera (QR Code) e baixa certificados.
 
-### 2. Gestão de Eventos e Atividades
-* **Evento Padrão:** Permite criar múltiplas atividades internas (palestras, workshops), cada uma com sua data, horário, local, palestrante e carga horária específica.
-* **Evento Rápido:** Criação simplificada para lista de presença única. Gera automaticamente uma atividade oculta de check-in sem carga horária (ideal para reuniões ou aulas rápidas).
-* **Controle de Vagas:** Opção para limitar a quantidade de inscritos por atividade ou deixar ilimitado (∞).
-* **Validação de Datas:** O sistema impede a criação de eventos com datas no passado ou datas de fim anteriores ao início.
+### Gestão de Eventos Inteligente
+* **Evento Padrão:** Para congressos ou semanas acadêmicas. Permite múltiplas atividades internas (palestras, minicursos), cada uma com sua própria carga horária e local.
+* **Evento Rápido:** Criação expressa para reuniões ou aulas únicas. Gera automaticamente uma atividade de "Check-in Geral" oculta.
+* **Controle de Vagas:** Defina limites de participantes ou marque como ilimitado (∞).
+* **Validação de Datas:** Bloqueio automático de datas passadas e validação de cronologia (Início < Fim).
 
-### 3. Sistema de Presença Anti-Fraude
-* **QR Code Dinâmico:** O código projetado no telão muda a cada 30 segundos.
-* **Validação de Token:** O link contido no QR Code possui um hash criptografado vinculado ao tempo. Um aluno não pode tirar foto do código e enviar para um colega que está em casa, pois o código expira rapidamente.
-* **Scanner Integrado:** O sistema possui um leitor de QR Code embutido na interface do aluno (usa a câmera do celular), sem necessidade de apps externos.
+### Sistema de Presença Anti-Fraude
+* **QR Code Dinâmico:** O código projetado no telão muda seu *hash* criptográfico a cada **30 segundos**. Fotos ou prints antigos não funcionam.
+* **Scanner Integrado (Turbo):** O aluno usa a câmera do próprio celular/computador dentro do sistema.
+    * *Tecnologia:* Html5QrcodeScanner otimizado para leitura rápida.
+    * *Feedback:* Avisos visuais e sonoros de sucesso ou erro.
 
-### 4. Certificação e Relatórios
-* **Cálculo de Horas:** O certificado soma automaticamente apenas a carga horária das atividades onde o aluno teve presença confirmada.
-* **Certificado PDF:** Gerado instantaneamente com layout profissional usando a biblioteca `ReportLab`.
-* **Relatório de Gestão:** O criador do evento pode visualizar a lista de inscritos e quem estava presente/ausente em tempo real.
+### Certificação Automática
+* **Cálculo de Horas:** O sistema soma apenas as horas das atividades onde o aluno *realmente* esteve presente.
+* **PDF Instantâneo:** Geração de certificado profissional usando a biblioteca `ReportLab`.
+* **Lógica Inteligente:** Se o evento for "Rápido" (0 horas), o certificado omite a linha de carga horária, servindo apenas como comprovante de presença.
+
+---
+
+## Estrutura do Projeto (MVC)
+
+O projeto foi refatorado para garantir escalabilidade e organização:
+
+```text
+/UniEventos
+│
+├── run.py                  # Ponto de entrada da aplicação
+├── config.py               # Configurações globais
+├── requirements.txt        # Dependências do Python
+│
+└── app/
+    ├── __init__.py         # Fábrica da Aplicação (App Factory)
+    ├── db.py               # Conexão Singleton com SQLite
+    │
+    ├── models/             # MODEL: Definição e criação das tabelas
+    │   └── database.py
+    │
+    ├── controllers/        # CONTROLLER: Lógica de Negócios (Blueprints)
+    │   ├── auth.py         # Login e Registro
+    │   ├── admin.py        # Gestão de Usuários
+    │   ├── events.py       # CRUD de Eventos
+    │   └── participant.py  # Lógica de Presença e Scanner
+    │
+    └── templates/          # VIEW: Interface Gráfica (HTML/Jinja2)
+        ├── base.html       # Layout base (Navbar, Footer, Imports)
+        ├── login.html      # Tela de Login/Cadastro
+        └── dashboard.html  # Painel Principal (Single Page Application feel)
+
+```
 
 ---
 
 ## Instalação e Execução
 
-1.  **Instale as dependências:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+### 1. Pré-requisitos
 
-2.  **Execute a aplicação:**
-    ```bash
-    python app.py
-    ```
+* Python 3.x instalado.
+* Navegador moderno com suporte a câmera (Chrome, Firefox, Safari).
 
-3.  **Acesse no navegador:**
-    * O sistema rodará em: `http://127.0.0.1:5000`
-    * **Nota:** Para testar o Scanner em celulares na mesma rede, você precisará servir a aplicação via HTTPS ou usar o IP da máquina local (ex: `http://192.168.0.X:5000`), mas navegadores mobile podem bloquear a câmera se não houver HTTPS seguro.
+### 2. Instalação
 
-### Usuários Padrão (Para Teste)
-O banco de dados é criado automaticamente com estes usuários na primeira execução:
+Clone o repositório e instale as dependências:
 
-| Usuário | Senha | Perfil |
-| :--- | :--- | :--- |
-| `admin` | `admin` | **Admin** |
-| `prof` | `1234` | **Professor** |
-| `aluno` | `1234` | **Participante** |
+```bash
+# Instalar bibliotecas
+pip install -r requirements.txt
 
----
+```
 
-## Estrutura do Banco de Dados (SQLite)
+### 3. Rodando o Sistema
 
-O sistema utiliza o SQLite (`sistema_academico.db`), que é gerado automaticamente pelo arquivo `app.py`. Não é necessário instalar nenhum servidor de banco de dados.
+Execute o arquivo principal na raiz do projeto:
 
-### Tabelas e Relacionamentos
+```bash
+python run.py
 
-1.  **`users`**
-    * Armazena as credenciais e dados pessoais.
-    * Campos: `username` (PK), `password`, `role` (cargo), `nome`, `cpf`.
+```
 
-2.  **`events`**
-    * Representa o "guarda-chuva" do evento (ex: "Semana da Tecnologia").
-    * Campos: `id`, `owner` (quem criou), `nome`, `descricao`, `tipo` (PADRAO/RAPIDO), datas e horários globais.
+O sistema estará acessível em: `http://127.0.0.1:5000`
 
-3.  **`activities`** (O Coração do Sistema)
-    * Representa o que acontece dentro do evento. É aqui que a presença é registrada.
-    * **Relacionamento:** Vinculada a um `event_id`.
-    * Campos:
-        * `nome`, `palestrante`, `local`, `descricao`.
-        * `data_atv`, `hora_atv`: Agenda específica daquela atividade.
-        * `carga_horaria`: Horas que somam no certificado.
-        * `vagas`: Quantidade limite (ou -1 para infinito).
-
-4.  **`activity_enrollments`** (Tabela Pivô)
-    * Registra a relação entre um **Aluno** e uma **Atividade**.
-    * Campos:
-        * `activity_id`: Qual atividade ele se inscreveu.
-        * `event_id`: Para facilitar buscas.
-        * `cpf`: Identificador do aluno.
-        * `presente`: `0` (Inscrito) ou `1` (Confirmou Presença via QR Code).
+> **Nota:** Ao rodar pela primeira vez, o arquivo `sistema_academico.db` será criado automaticamente com os usuários padrão.
 
 ---
 
-## Segurança do Token QR Code
+## 🔐 Credenciais de Teste
 
-A lógica de geração do QR Code segue este padrão para evitar fraudes:
+O sistema já vem populado com usuários para facilitar os testes:
 
+| Perfil | Usuário | Senha | Descrição |
+| --- | --- | --- | --- |
+| **Admin** | `admin` | `admin` | Acesso total ao sistema. |
+| **Professor** | `prof` | `1234` | Pode criar eventos e projetar QR Codes. |
+| **Aluno** | `aluno` | `1234` | Pode se inscrever e escanear presença. |
+
+---
+
+## Solução de Problemas Comuns
+
+### 1. A câmera não abre no celular
+
+<<<<<<< HEAD
 ```python
 # Pseudo-código da lógica
 timestamp = tempo_atual_segundos / 30  # Janela de 30s
 token_bruto = f"{ID_ATIVIDADE}:{timestamp}:{CHAVE_SECRETA_DO_APP}"
 hash_final = sha256(token_bruto)
+=======
+Navegadores modernos bloqueiam o acesso à câmera em sites que não usam **HTTPS**, a menos que seja `localhost`.
+
+* **Solução Local:** Se estiver testando no PC e acessando pelo celular na mesma rede Wi-Fi, a câmera pode não abrir. Use ferramentas como `ngrok` para criar um túnel HTTPS ou teste no próprio PC.
+* **Solução Codespaces:** O GitHub Codespaces fornece HTTPS automaticamente, então funciona nativamente.
+
+### 2. Erro de Banco de Dados / Tabela não encontrada
+
+Se você mudou de versão recentemente:
+
+* Pare o servidor (`Ctrl + C`).
+* Delete o arquivo `sistema_academico.db`.
+* Reinicie o servidor (`python run.py`). O banco será recriado do zero.
+
+---
+
+## Tecnologias Utilizadas
+
+* **Backend:** Python, Flask (Micro-framework).
+* **Database:** SQLite (SQL nativo, sem ORM pesado).
+* **Frontend:** HTML5, CSS3 (Bootstrap 5), JavaScript (Vanilla).
+* **Libs:** `reportlab` (PDF), `qrcode` (Imagem), `html5-qrcode` (Scanner JS).
+
+---
+
+**Desenvolvido para fins educacionais e acadêmicos.**
+>>>>>>> c63838287d81b748a2f6df4b4b6f2e4a1e2ace9e

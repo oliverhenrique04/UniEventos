@@ -2,49 +2,154 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Acesso UniEventos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        body { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .card-custom { width: 100%; max-width: 400px; border-radius: 15px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .nav-pills .nav-link { color: #555; }
-        .nav-pills .nav-link.active { background-color: #1e3c72; color: white; }
+        :root {
+            --font-main: 'Inter', sans-serif;
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+        }
+
+        body { 
+            background: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            font-family: var(--font-main);
+            height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+        }
+
+        .card-custom { 
+            width: 100%; 
+            max-width: 420px; 
+            border-radius: 24px; 
+            border: 1px solid rgba(255,255,255,0.8); 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.05); 
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .nav-pills {
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .nav-pills .nav-link { 
+            color: #64748b; 
+            font-weight: 500;
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+        
+        .nav-pills .nav-link:hover {
+            color: #1e293b;
+        }
+
+        .nav-pills .nav-link.active { 
+            background-color: white; 
+            color: var(--primary-color); 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-weight: 600;
+        }
+
+        .form-floating > .form-control {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .form-floating > .form-control:focus {
+            background: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 12px;
+            font-weight: 600;
+            padding: 0.8rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
-    <div class="card card-custom bg-white p-4">
-        <h3 class="text-center mb-4 text-primary fw-bold">UniEventos</h3>
+    <div class="card card-custom p-4 p-md-5 mx-3">
+        <div class="text-center mb-4">
+            <i class="fa-solid fa-graduation-cap logo-icon"></i>
+            <h3 class="fw-bold text-dark m-0">UniEventos</h3>
+            <p class="text-muted small">Gestão Acadêmica Simplificada</p>
+        </div>
         
-        <ul class="nav nav-pills nav-fill mb-3" id="pills-tab" role="tablist">
+        <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
             <li class="nav-item">
-                <button class="nav-link active" id="pills-login-tab" data-bs-toggle="pill" data-bs-target="#pills-login">Login</button>
+                <button class="nav-link active" id="pills-login-tab" data-bs-toggle="pill" data-bs-target="#pills-login">Entrar</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" id="pills-register-tab" data-bs-toggle="pill" data-bs-target="#pills-register">Cadastro</button>
+                <button class="nav-link" id="pills-register-tab" data-bs-toggle="pill" data-bs-target="#pills-register">Criar Conta</button>
             </li>
         </ul>
         
         <div class="tab-content">
+            <!-- LOGIN FORM -->
             <div class="tab-pane fade show active" id="pills-login">
                 <form onsubmit="fazerLogin(event)">
                     <div class="form-floating mb-3">
                         <input type="text" class="form-control" id="loginUser" placeholder="Usuário" required>
                         <label>Usuário</label>
                     </div>
-                    <div class="form-floating mb-3">
+                    <div class="form-floating mb-4">
                         <input type="password" class="form-control" id="loginPass" placeholder="Senha" required>
                         <label>Senha</label>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 py-2">Entrar</button>
+                    <button type="submit" class="btn btn-primary w-100 mb-3">
+                        Acessar Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
+                    </button>
+                    <div class="text-center">
+                        <a href="#" class="text-decoration-none small text-muted">Esqueceu a senha?</a>
+                    </div>
                 </form>
             </div>
             
+            <!-- REGISTER FORM -->
             <div class="tab-pane fade" id="pills-register">
                 <form onsubmit="fazerCadastro(event)">
                     <div class="form-floating mb-2">
                         <input type="text" class="form-control" id="regNome" placeholder="Nome Completo" required>
                         <label>Nome Completo</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <input type="email" class="form-control" id="regEmail" placeholder="Email" required>
+                        <label>Email (Para notificações)</label>
                     </div>
                     <div class="form-floating mb-2">
                         <input type="text" class="form-control" id="regCpf" placeholder="CPF" required>
@@ -54,45 +159,107 @@
                         <input type="text" class="form-control" id="regUser" placeholder="Usuário" required>
                         <label>Usuário (Login)</label>
                     </div>
-                    <div class="form-floating mb-3">
+                    <div class="form-floating mb-4">
                         <input type="password" class="form-control" id="regPass" placeholder="Senha" required>
                         <label>Senha</label>
                     </div>
-                    <button type="submit" class="btn btn-success w-100 py-2">Cadastrar</button>
+                    <button type="submit" class="btn btn-primary w-100">
+                        Criar Conta
+                    </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+        });
+
         async function fazerLogin(e) {
             e.preventDefault();
-            const res = await fetch('/api/login', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    username: document.getElementById('loginUser').value,
-                    password: document.getElementById('loginPass').value
-                })
-            });
-            if(res.ok) window.location.reload();
-            else alert("Erro no login");
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Autenticando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: document.getElementById('loginUser').value,
+                        password: document.getElementById('loginPass').value
+                    })
+                });
+                if(res.ok) {
+                    Toast.fire({ icon: 'success', title: 'Bem-vindo de volta!' });
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const json = await res.json();
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Falha na Autenticação',
+                        text: json.message || "Usuário ou senha inválidos",
+                        confirmButtonColor: '#4f46e5'
+                    });
+                }
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: 'Erro de Conexão', text: 'Não foi possível conectar ao servidor.' });
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         }
 
         async function fazerCadastro(e) {
             e.preventDefault();
-            const res = await fetch('/api/registrar', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    nome: document.getElementById('regNome').value,
-                    cpf: document.getElementById('regCpf').value,
-                    username: document.getElementById('regUser').value,
-                    password: document.getElementById('regPass').value
-                })
-            });
-            const json = await res.json();
-            alert(json.mensagem || json.erro);
-            if(res.ok) window.location.reload();
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/registrar', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        nome: document.getElementById('regNome').value,
+                        email: document.getElementById('regEmail').value,
+                        cpf: document.getElementById('regCpf').value,
+                        username: document.getElementById('regUser').value,
+                        password: document.getElementById('regPass').value
+                    })
+                });
+                const json = await res.json();
+                
+                if(res.ok) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Conta Criada!',
+                        text: 'Sua conta foi criada com sucesso. Agora você pode entrar no sistema.',
+                        confirmButtonColor: '#4f46e5'
+                    }).then(() => {
+                        document.getElementById('pills-login-tab').click();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Atenção',
+                        text: json.mensagem || json.erro,
+                        confirmButtonColor: '#4f46e5'
+                    });
+                }
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: 'Erro de Conexão', text: 'Não foi possível realizar o cadastro.' });
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         }
     </script>
 </body>

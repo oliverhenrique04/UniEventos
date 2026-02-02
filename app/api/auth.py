@@ -1,9 +1,9 @@
-from flask import Blueprint, request, jsonify, session, redirect
-from flask_login import login_user, logout_user, login_required, current_user
-from app.models import User
-from app.extensions import db
+from flask import Blueprint, request, jsonify, redirect
+from flask_login import login_user, logout_user
+from app.services.auth_service import AuthService
 
 bp = Blueprint('auth', __name__, url_prefix='/api')
+auth_service = AuthService()
 
 @bp.route('/login', methods=['POST'])
 def login():
@@ -11,9 +11,9 @@ def login():
     username = data.get('username')
     password = data.get('password')
     
-    user = User.query.filter_by(username=username).first()
+    user = auth_service.authenticate_user(username, password)
     
-    if user and user.check_password(password):
+    if user:
         login_user(user)
         return jsonify({"status": "success"})
     
@@ -22,27 +22,15 @@ def login():
 @bp.route('/registrar', methods=['POST'])
 def registrar():
     data = request.json
-    username = data.get('username')
-    
-    if User.query.filter_by(username=username).first():
-        return jsonify({"erro": "Usuário já existe"}), 400
-        
     try:
-        user = User(
-            username=username,
-            role='participante',
-            nome=data.get('nome'),
-            cpf=data.get('cpf')
-        )
-        user.set_password(data.get('password'))
-        db.session.add(user)
-        db.session.commit()
+        auth_service.register_user(data)
         return jsonify({"mensagem": "Cadastrado!"})
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
     except Exception as e:
-        db.session.rollback()
-        return jsonify({"erro": str(e)}), 500
+        return jsonify({"erro": "Erro interno"}), 500
 
-@bp.route('/logout') # Legacy app had /logout as a view, not api. But I can keep it here or in main.
+@bp.route('/logout')
 def logout():
     logout_user()
     return redirect('/')

@@ -1,0 +1,285 @@
+## Phase 2 — Backend Refactoring (Clean Architecture)
+
+### Task 2.1 — Define and Apply Clean Architecture Structure
+
+**Objective:** Reorganizar o projeto seguindo Clean Architecture e SOLID.
+
+* Criar diretórios: `models`, `repositories`, `services`, `controllers` (ou `api`).
+* Garantir separação clara de responsabilidades.
+* Ajustar imports e dependências entre camadas.
+
+**Acceptance Criteria:**
+
+* Estrutura de pastas criada e utilizada.
+* Nenhuma rota acessa diretamente modelos ORM.
+* Serviços não dependem de Flask context.
+
+---
+
+### Task 2.2 — Refactor Domain Models
+
+**Objective:** Garantir que os models representem apenas o domínio.
+
+* Revisar `app/models.py`.
+* Remover lógica de negócio excessiva dos models.
+* Garantir coerência de atributos, relacionamentos e constraints.
+
+**Acceptance Criteria:**
+
+* Models contêm apenas regras mínimas de domínio.
+* Nenhum acesso a request, sessão ou contexto Flask.
+
+---
+
+### Task 2.3 — Implement Repository Layer
+
+**Objective:** Abstrair completamente o acesso ao banco de dados.
+
+* Criar repositórios por entidade (User, Event, Enrollment etc.).
+* Centralizar queries SQLAlchemy nos repositórios.
+* Padronizar métodos CRUD.
+
+**Acceptance Criteria:**
+
+* Todas as queries estão nos repositórios.
+* Services utilizam apenas repositórios.
+* Código duplicado de acesso a dados eliminado.
+
+---
+
+### Task 2.4 — Implement Service Layer
+
+**Objective:** Centralizar regras de negócio.
+
+* Criar serviços correspondentes às funcionalidades existentes.
+* Implementar regras como:
+
+  * Inscrição em eventos
+  * Validação de capacidade
+  * Regras de cadastro
+* Garantir serviços independentes do framework web.
+
+**Acceptance Criteria:**
+
+* Toda regra de negócio está em Services.
+* Controllers apenas orquestram chamadas.
+* Serviços testáveis isoladamente.
+
+---
+
+### Task 2.5 — Refactor Controllers / Routes
+
+**Objective:** Tornar controllers finos e previsíveis.
+
+* Refatorar todas as rotas para usar Services.
+* Remover qualquer lógica de negócio das rotas.
+* Padronizar respostas HTTP.
+
+**Acceptance Criteria:**
+
+* Controllers não acessam ORM diretamente.
+* Respostas HTTP consistentes.
+* Código legível e curto por rota.
+
+---
+
+### Task 2.6 — Refactor All Existing Functionalities
+
+**Objective:** Refatorar 100% das funcionalidades atuais sem alterar comportamento.
+
+* Usuários
+* Autenticação
+* Eventos
+* Inscrições
+* Listagens e consultas
+
+**Acceptance Criteria:**
+
+* Funcionalidades mantêm comportamento original.
+* Nenhuma funcionalidade antiga permanece fora da nova arquitetura.
+* Sistema funcional após refatoração completa.
+
+---
+
+### Task 2.7 — Add Code Documentation
+
+**Objective:** Padronizar documentação do backend.
+
+* Adicionar docstrings (Google Style) em:
+
+  * Models
+  * Repositories
+  * Services
+* Documentar responsabilidades de cada camada.
+
+**Acceptance Criteria:**
+
+* 100% dos arquivos refatorados documentados.
+* Docstrings claras e padronizadas.
+
+---
+
+## Phase 3 — Frontend Refactoring (UI/UX)
+
+### Task 3.1 — Define Visual Identity System
+
+**Objective:** Criar padrão de identidade visual.
+
+* Definir paleta de cores.
+* Definir tipografia.
+* Definir padrões de botões, inputs, cards e alerts.
+* Criar guideline básico de UI.
+
+**Acceptance Criteria:**
+
+* Identidade visual documentada.
+* Padrão reutilizável definido.
+
+---
+
+### Task 3.2 — Refactor Layout to Mobile-First
+
+**Objective:** Tornar todo o frontend mobile-first.
+
+* Refatorar layouts existentes.
+* Garantir responsividade total.
+* Eliminar layouts legados.
+
+**Acceptance Criteria:**
+
+* Interface funcional em mobile, tablet e desktop.
+* Nenhuma quebra visual em telas pequenas.
+
+---
+
+### Task 3.3 — Modernize UI Components
+
+**Objective:** Atualizar aparência visual.
+
+* Substituir componentes antigos.
+* Implementar feedback visual:
+
+  * Loading
+  * Sucesso
+  * Erro
+* Melhorar hierarquia visual.
+
+**Acceptance Criteria:**
+
+* Interface moderna e consistente.
+* Melhor experiência de uso.
+
+---
+
+## Phase 4 — Code Quality & Testing
+
+### Task 4.1 — Setup Testing Infrastructure
+
+**Objective:** Criar base de testes automatizados.
+
+* Configurar pytest.
+* Criar estrutura de testes.
+
+**Acceptance Criteria:**
+
+* Testes executáveis via comando único.
+* Ambiente de teste funcional.
+
+---
+
+### Task 4.2 — Implement Unit Tests
+
+**Objective:** Testar regras de negócio.
+
+* Testar Services.
+* Testar Models.
+
+**Acceptance Criteria:**
+
+* Cobertura mínima de 80%.
+* Testes independentes e previsíveis.
+
+---
+
+### Task 4.3 — Implement Integration Tests
+
+**Objective:** Garantir funcionamento das rotas.
+
+* Testar fluxos principais da aplicação.
+* Validar respostas HTTP.
+
+**Acceptance Criteria:**
+
+* Rotas críticas cobertas por testes.
+* Fluxos principais validados.
+
+---
+
+### Task 4.4 — Code Style and Linting
+
+**Objective:** Padronizar qualidade do código.
+
+* Configurar black.
+* Configurar flake8.
+* Corrigir problemas apontados.
+
+**Acceptance Criteria:**
+
+* Código formatado automaticamente.
+* Zero erros de lint.
+
+---
+
+## Phase 5 — Async Notification System
+
+### Task 5.1 — Setup RabbitMQ Configuration
+
+**Objective:** Preparar infraestrutura de mensageria.
+
+* Adicionar `pika`.
+* Configurar conexão no projeto.
+
+**Acceptance Criteria:**
+
+* Conexão com RabbitMQ funcional.
+
+---
+
+### Task 5.2 — Implement Notification Producer
+
+**Objective:** Publicar eventos de notificação.
+
+* Criar NotificationService.
+* Publicar eventos de cadastro e inscrição.
+
+**Acceptance Criteria:**
+
+* Mensagens publicadas corretamente.
+
+---
+
+### Task 5.3 — Implement Worker and Email System
+
+**Objective:** Processar notificações assíncronas.
+
+* Criar worker.
+* Enviar e-mails.
+* Criar templates HTML.
+
+**Acceptance Criteria:**
+
+* E-mails enviados corretamente via worker.
+
+---
+
+### Task 5.4 — Add Reliability Mechanisms
+
+**Objective:** Garantir resiliência do sistema.
+
+* Implementar retry.
+* Implementar Dead Letter Queue.
+
+**Acceptance Criteria:**
+
+* Falhas não causam perda de mensagens.
+

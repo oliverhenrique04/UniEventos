@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5 fade-in-up">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="text-center mb-5">
+                <i class="fa-solid fa-shield-check fa-3x text-primary mb-3"></i>
+                <h2 class="fw-bold">Validação de Certificados</h2>
+                <p class="text-muted">Verifique a autenticidade de documentos emitidos pela UniEventos.</p>
+            </div>
+
+            {% if success %}
+            <div class="glass-panel border-top border-5 border-success p-5 text-center shadow-lg mb-4">
+                <div class="mb-4">
+                    <i class="fa-solid fa-circle-check fa-4x text-success mb-3 animate__animated animate__bounceIn"></i>
+                    <h3 class="text-success fw-bold">Certificado Autêntico</h3>
+                    <p class="text-muted small">Este documento foi emitido e validado eletronicamente.</p>
+                </div>
+
+                <div class="bg-light p-4 rounded-4 text-start mb-4 border">
+                    <div class="mb-3 border-bottom pb-2">
+                        <label class="small text-muted fw-bold text-uppercase">Participante</label>
+                        <div class="fs-5 fw-bold text-dark">{{ nome }}</div>
+                    </div>
+                    <div class="mb-3 border-bottom pb-2">
+                        <label class="small text-muted fw-bold text-uppercase">Evento</label>
+                        <div class="fw-semibold text-slate-700">{{ evento }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold text-uppercase">Carga Horária</label>
+                            <div class="fw-bold text-primary">{{ horas }} Horas</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold text-uppercase">Data</label>
+                            <div class="fw-bold text-slate-600">{{ data }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-muted x-small">
+                    ID de Validação: <span class="fw-bold text-dark font-monospace">{{ hash }}</span>
+                </div>
+                
+                <a href="/validar" class="btn btn-outline-secondary mt-5 btn-sm">Validar outro código</a>
+            </div>
+            {% else %}
+            <div class="glass-panel p-5 shadow-sm">
+                {% if erro %}
+                <div class="alert alert-danger border-0 rounded-4 mb-4 d-flex align-items-center">
+                    <i class="fa-solid fa-triangle-exclamation me-3 fs-4"></i>
+                    <div>{{ erro }}</div>
+                </div>
+                {% endif %}
+
+                <form onsubmit="handleValidation(event)" class="text-center">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-slate-700">Código de Autenticação</label>
+                        <input type="text" id="inputHash" class="form-control form-control-lg text-center font-monospace" placeholder="EX: A1B2-C3D4-E5F6" required>
+                        <div class="form-text mt-2">O código de 16 caracteres localizado no rodapé do certificado.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100 py-3 rounded-pill shadow-lg">
+                        <i class="fa-solid fa-magnifying-glass me-2"></i> Verificar Autenticidade
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function handleValidation(e) {
+        e.preventDefault();
+        const hash = document.getElementById('inputHash').value.trim().toUpperCase();
+        if (hash) {
+            window.location.href = `/validar/${hash}`;
+        }
+    }
+</script>
+{% endblock %}

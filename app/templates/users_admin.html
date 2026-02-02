@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+
+    <!-- FILTERS -->
+    <div class="glass-panel p-4 mb-4 bg-white border-top border-4 border-primary">
+        <h6 class="fw-bold mb-3 text-uppercase small text-muted">Filtros Avançados</h6>
+        <div class="row g-3">
+            <div class="col-md-2">
+                <label class="small fw-bold">RA</label>
+                <input type="text" id="filtRa" class="form-control form-control-sm" placeholder="Buscar RA...">
+            </div>
+            <div class="col-md-2">
+                <label class="small fw-bold">CPF</label>
+                <input type="text" id="filtCpf" class="form-control form-control-sm" placeholder="000.000.000-00">
+            </div>
+            <div class="col-md-3">
+                <label class="small fw-bold">Nome / E-mail</label>
+                <input type="text" id="filtBusca" class="form-control form-control-sm" placeholder="Nome ou e-mail...">
+            </div>
+            <div class="col-md-3">
+                <label class="small fw-bold">Curso</label>
+                <input type="text" id="filtCurso" class="form-control form-control-sm" placeholder="Filtrar por curso...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button onclick="carregarUsuarios(1)" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-magnifying-glass me-1"></i> Filtrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="glass-panel p-0 overflow-hidden mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Identificação</th>
+                        <th>RA / CPF</th>
+                        <th>Curso</th>
+                        <th>Cargo</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaUsuarios">
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PAGINATION -->
+    <nav>
+        <ul class="pagination justify-content-center" id="paginacao"></ul>
+    </nav>
+</div>
+
+<!-- Modal CRUD User -->
+<div class="modal fade" id="modalUsuario" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold" id="modalTitulo">Usuário</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formUsuario">
+                    <input type="hidden" id="userId">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="small fw-bold">Login (Username)</label>
+                            <input type="text" id="uUsername" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold">Senha (Opcional)</label>
+                            <input type="password" id="uPassword" class="form-control" placeholder="****">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">Nome Completo</label>
+                        <input type="text" id="uNome" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">E-mail</label>
+                        <input type="email" id="uEmail" class="form-control" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="small fw-bold">RA</label>
+                            <input type="text" id="uRa" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold">CPF</label>
+                            <input type="text" id="uCpf" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label class="small fw-bold">Curso</label>
+                            <input type="text" id="uCurso" class="form-control">
+                        </div>
+                        <div class="col-4">
+                            <label class="small fw-bold">Perfil</label>
+                            <select id="uRole" class="form-select">
+                                <option value="participante">Participante</option>
+                                <option value="professor">Professor</option>
+                                <option value="coordenador">Coordenador</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger me-auto d-none" id="btnExcluir" onclick="confirmarExcluir()">Excluir</button>
+                <button onclick="salvarUsuario()" class="btn btn-primary px-4">Salvar Dados</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Manual Enrollment -->
+<div class="modal fade" id="modalInscricaoManual" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Inscrição Manual em Atividade</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Inscreva o participante <strong><span id="labelNomeUser"></span></strong> em uma atividade específica.</p>
+                <input type="hidden" id="insCpf">
+                
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">Selecione o Evento</label>
+                    <select id="selEvento" class="form-select" onchange="carregarAtividadesDoEvento(this.value)">
+                        <option value="">-- Selecione o Evento --</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">Selecione a Atividade</label>
+                    <select id="selAtividade" class="form-select" disabled>
+                        <option value="">-- Selecione a Atividade --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                <button onclick="realizarInscricaoManual()" class="btn btn-primary px-4">Confirmar Inscrição</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let MODO_EDICAO = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarUsuarios(1);
+        carregarEventosParaInscricao();
+    });
+
+    async function carregarUsuarios(page) {
+        const filters = {
+            ra: document.getElementById('filtRa').value,
+            cpf: document.getElementById('filtCpf').value,
+            curso: document.getElementById('filtCurso').value,
+            nome: document.getElementById('filtBusca').value,
+            page: page
+        };
+        
+        const params = new URLSearchParams(filters);
+        const res = await fetch(`/api/listar_usuarios?${params.toString()}`);
+        const data = await res.json();
+        
+        const tbody = document.getElementById('tabelaUsuarios');
+        tbody.innerHTML = '';
+        
+        data.items.forEach(u => {
+            let roleBadge = '';
+            switch(u.role) {
+                case 'admin': roleBadge = '<span class="badge bg-danger">Admin</span>'; break;
+                case 'professor': roleBadge = '<span class="badge bg-warning text-dark">Professor</span>'; break;
+                default: roleBadge = '<span class="badge bg-success bg-slate-200 text-slate-700">Participante</span>';
+            }
+
+            tbody.innerHTML += `
+                <tr class="animate__animated animate__fadeIn">
+                    <td class="ps-4">
+                        <div class="fw-bold text-dark">${u.nome}</div>
+                        <div class="text-muted x-small">${u.email}</div>
+                    </td>
+                    <td>
+                        <div class="text-dark small">RA: ${u.ra || 'N/A'}</div>
+                        <div class="text-muted x-small">CPF: ${u.cpf}</div>
+                    </td>
+                    <td><small>${u.curso || 'Não informado'}</small></td>
+                    <td>${roleBadge}</td>
+                    <td class="text-end pe-4">
+                        <div class="btn-group">
+                            <button class="btn btn-xs btn-outline-primary" onclick="abrirInscricaoManual('${u.cpf}', '${u.nome}')" title="Inscrever Manualmente">
+                                <i class="fa-solid fa-user-plus"></i>
+                            </button>
+                            <button class="btn btn-xs btn-light border" onclick="abrirModalEditarUsuario(${JSON.stringify(u).replace(/"/g, '&quot;')})" title="Editar">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        renderPaginacao(data.current_page, data.pages, 'paginacao', carregarUsuarios);
+    }
+
+    function renderPaginacao(current, total, containerId, callback) {
+        const nav = document.getElementById(containerId);
+        nav.innerHTML = '';
+        if (total <= 1) return;
+
+        const createItem = (page, active = false, disabled = false, text = null) => {
+            const li = document.createElement('li');
+            li.className = `page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.innerText = text || page;
+            if (!disabled) a.onclick = (e) => { e.preventDefault(); callback(page); };
+            li.appendChild(a);
+            return li;
+        };
+
+        // Previous
+        nav.appendChild(createItem(current - 1, false, current === 1, '«'));
+
+        const pages = [];
+        const range = 1; // Number of neighbors to show
+
+        for (let i = 1; i <= total; i++) {
+            if (i === 1 || i === total || (i >= current - range && i <= current + range)) {
+                pages.push(i);
+            } else if (pages[pages.length - 1] !== '...') {
+                pages.push('...');
+            }
+        }
+
+        pages.forEach(p => {
+            if (p === '...') {
+                nav.appendChild(createItem(null, false, true, '...'));
+            } else {
+                nav.appendChild(createItem(p, p === current));
+            }
+        });
+
+        // Next
+        nav.appendChild(createItem(current + 1, false, current === total, '»'));
+    }
+
+    function abrirModalNovoUsuario() {
+        MODO_EDICAO = false;
+        document.getElementById('formUsuario').reset();
+        document.getElementById('userId').value = '';
+        document.getElementById('modalTitulo').innerText = 'Novo Usuário';
+        document.getElementById('btnExcluir').classList.add('d-none');
+        document.getElementById('uUsername').disabled = false;
+        new bootstrap.Modal(document.getElementById('modalUsuario')).show();
+    }
+
+    function abrirModalEditarUsuario(u) {
+        MODO_EDICAO = true;
+        document.getElementById('userId').value = u.username;
+        document.getElementById('uUsername').value = u.username;
+        document.getElementById('uUsername').disabled = true;
+        document.getElementById('uNome').value = u.nome;
+        document.getElementById('uEmail').value = u.email;
+        document.getElementById('uRa').value = u.ra || '';
+        document.getElementById('uCpf').value = u.cpf;
+        document.getElementById('uCurso').value = u.curso || '';
+        document.getElementById('uRole').value = u.role;
+        document.getElementById('modalTitulo').innerText = 'Editar Usuário';
+        document.getElementById('btnExcluir').classList.remove('d-none');
+        new bootstrap.Modal(document.getElementById('modalUsuario')).show();
+    }
+
+    async function salvarUsuario() {
+        const data = {
+            username: document.getElementById('uUsername').value,
+            password: document.getElementById('uPassword').value,
+            nome: document.getElementById('uNome').value,
+            email: document.getElementById('uEmail').value,
+            ra: document.getElementById('uRa').value,
+            cpf: document.getElementById('uCpf').value,
+            curso: document.getElementById('uCurso').value,
+            role: document.getElementById('uRole').value,
+            username_alvo: document.getElementById('userId').value
+        };
+
+        const url = MODO_EDICAO ? '/api/editar_usuario' : '/api/criar_usuario';
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalUsuario')).hide();
+            carregarUsuarios(1);
+            Toast.fire({ icon: 'success', title: 'Operação concluída!' });
+        } else {
+            const json = await res.json();
+            Swal.fire('Erro', json.erro, 'error');
+        }
+    }
+
+    async function confirmarExcluir() {
+        const username = document.getElementById('userId').value;
+        const confirm = await Swal.fire({ title: 'Excluir Usuário?', text: "Esta ação não pode ser desfeita.", icon: 'warning', showCancelButton: true });
+        if (!confirm.isConfirmed) return;
+
+        const res = await fetch(`/api/deletar_usuario/${username}`, { method: 'DELETE' });
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalUsuario')).hide();
+            carregarUsuarios(1);
+            Toast.fire({ icon: 'success', title: 'Usuário removido.' });
+        }
+    }
+
+    // --- MANUAL ENROLLMENT ---
+    let EVENTOS_CACHE = [];
+    async function carregarEventosParaInscricao() {
+        const res = await fetch('/api/eventos');
+        EVENTOS_CACHE = await res.json();
+        const sel = document.getElementById('selEvento');
+        EVENTOS_CACHE.forEach(e => {
+            sel.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+        });
+    }
+
+    function carregarAtividadesDoEvento(eventId) {
+        const selAtv = document.getElementById('selAtividade');
+        selAtv.innerHTML = '<option value="">-- Selecione a Atividade --</option>';
+        selAtv.disabled = true;
+        
+        const evento = EVENTOS_CACHE.find(e => e.id == eventId);
+        if (evento) {
+            evento.atividades.forEach(a => {
+                selAtv.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+            });
+            selAtv.disabled = false;
+        }
+    }
+
+    function abrirInscricaoManual(cpf, nome) {
+        document.getElementById('insCpf').value = cpf;
+        document.getElementById('labelNomeUser').innerText = nome;
+        new bootstrap.Modal(document.getElementById('modalInscricaoManual')).show();
+    }
+
+    async function realizarInscricaoManual() {
+        const data = {
+            cpf: document.getElementById('insCpf').value,
+            activity_id: document.getElementById('selAtividade').value
+        };
+        
+        if (!data.activity_id) { Swal.fire('Atenção', 'Selecione uma atividade.', 'warning'); return; }
+
+        const res = await fetch('/api/inscricao_manual', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalInscricaoManual')).hide();
+            Toast.fire({ icon: 'success', title: 'Inscrição realizada!' });
+        } else {
+            const json = await res.json();
+            Swal.fire('Erro', json.erro, 'error');
+        }
+    }
+</script>
+{% endblock %}

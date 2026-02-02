@@ -1,0 +1,198 @@
+/* UniEventos - Global Stylesheet */
+
+:root {
+    --font-main: 'Inter', sans-serif;
+    
+    /* Primary Colors - Indigo */
+    --primary-50: #eef2ff;
+    --primary-100: #e0e7ff;
+    --primary-200: #c7d2fe;
+    --primary-300: #a5b4fc;
+    --primary-400: #818cf8;
+    --primary-500: #6366f1;
+    --primary-600: #4f46e5;
+    --primary-700: #4338ca;
+    --primary-800: #3730a3;
+    --primary-900: #312e81;
+    
+    --primary-color: var(--primary-600);
+    --primary-hover: var(--primary-700);
+    
+    /* Secondary Colors - Slate */
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+    
+    --bg-color: var(--slate-50);
+    --text-main: var(--slate-800);
+    --text-muted: var(--slate-500);
+    
+    /* Glassmorphism Defaults */
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --glass-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    
+    /* Animations */
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s ease;
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 80px;
+    line-height: 1.5;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+/* Navbar */
+.navbar {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--slate-200);
+    padding: 0.75rem 0;
+}
+
+.navbar-brand {
+    font-weight: 800;
+    color: var(--primary-color) !important;
+    font-size: 1.5rem;
+}
+
+/* Cards & Panels */
+.glass-panel {
+    background: white;
+    border: 1px solid var(--slate-200);
+    border-radius: 20px;
+    box-shadow: var(--glass-shadow);
+    padding: 1.5rem;
+    height: 100%;
+    transition: var(--transition-fast);
+}
+
+.glass-panel:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Custom Card variants */
+.card-event {
+    border-top: 4px solid var(--primary-color);
+}
+
+.card-admin {
+    border-left: 4px solid #ef4444; /* Red 500 */
+}
+
+/* Buttons */
+.btn {
+    border-radius: 12px;
+    font-weight: 600;
+    padding: 0.6rem 1.5rem;
+    transition: var(--transition-fast);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+}
+
+.btn-light {
+    background-color: var(--slate-100);
+    border-color: var(--slate-100);
+    color: var(--slate-700);
+}
+
+/* Forms */
+.form-control, .form-select {
+    border-radius: 12px;
+    border: 1px solid var(--slate-200);
+    padding: 0.8rem 1rem;
+    background-color: var(--slate-50);
+    transition: var(--transition-fast);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+/* Badges */
+.badge {
+    border-radius: 8px;
+    padding: 0.5em 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+}
+
+/* Scanner */
+#reader {
+    border: none !important;
+    background: black;
+}
+
+#reader video {
+    border-radius: 16px;
+}
+
+/* Animation Utilities */
+.fade-in-up {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
+    .navbar-brand {
+        font-size: 1.25rem;
+    }
+    .glass-panel {
+        padding: 1.25rem;
+    }
+    .btn {
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* Utility classes */
+.text-indigo-600 { color: var(--primary-600); }
+.bg-indigo-50 { background-color: var(--primary-50); }
+.border-indigo-100 { border-color: var(--primary-100); }

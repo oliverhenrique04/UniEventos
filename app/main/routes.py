@@ -7,7 +7,7 @@ bp = Blueprint('main', __name__)
 def index():
     if not current_user.is_authenticated:
         return render_template('login_register.html')
-    return render_template('index.html', user=current_user)
+    return render_template('dashboard.html', user=current_user)
 
 @bp.route('/logout')
 def logout():
@@ -19,18 +19,77 @@ def logout():
 
 @bp.route('/inscrever/<token>')
 def inscrever_via_link(token):
-    # This was implicitly handled in legacy?
-    # Ah, legacy `criar_evento` returned link `/inscrever/{token}`.
-    # But there was no route defined for `/inscrever/<token>` in app_legacy.py!
-    # Wait, let me check app_legacy.py again.
-    # ...
-    # I don't see `@app.route('/inscrever/<token>')` in app_legacy.py.
-    # Maybe it was handled by frontend routing? No, it's a Flask app.
-    # Maybe the legacy code provided was incomplete or I missed it?
-    # "return jsonify({"mensagem": "Criado!", "link": f"/inscrever/{token}"})"
-    # If the user clicks that link, they get a 404 in the old app?
-    # Or maybe it's just a generated link for the user to share, and the actual implementation was missing or handled by a catch-all?
-    # There is no catch-all.
-    # I will verify app_legacy.py content.
-    pass
+    # (Existing implementation remains)
     return "Link de inscrição (Não implementado no código original)"
+
+@bp.route('/designer_certificado/<int:event_id>')
+@login_required
+def designer_certificado(event_id):
+    """Page for visually designing and configuring certificates."""
+    if current_user.role not in ['admin', 'professor', 'coordenador']:
+        return "Acesso negado", 403
+    from app.models import Event
+    event = Event.query.get_or_404(event_id)
+    return render_template('certificate_designer.html', user=current_user, event=event)
+
+@bp.route('/gerenciar_entregas/<int:event_id>')
+@login_required
+def gerenciar_entregas(event_id):
+    """Page for managing individual certificate deliveries and status."""
+    if current_user.role not in ['admin', 'professor', 'coordenador']:
+        return "Acesso negado", 403
+    from app.models import Event
+    event = Event.query.get_or_404(event_id)
+    return render_template('certificate_delivery.html', user=current_user, event=event)
+
+@bp.route('/usuarios')
+@login_required
+def gerenciar_usuarios():
+    """Page for full administrative user management CRUD."""
+    if current_user.role != 'admin':
+        return "Acesso negado", 403
+    return render_template('users_admin.html', user=current_user)
+
+@bp.route('/eventos_admin')
+@login_required
+def gerenciar_eventos():
+    """Page for full administrative event management CRUD and participant control."""
+    if current_user.role not in ['admin', 'professor', 'coordenador']:
+        return "Acesso negado", 403
+    return render_template('events_admin.html', user=current_user)
+
+@bp.route('/validar')
+def validar_busca():
+    """Public page to search and validate certificates by hash."""
+    return render_template('validation.html')
+
+@bp.route('/validar/<cert_hash>')
+def validar_hash(cert_hash):
+    """Public page to show validation results for a specific hash."""
+    from app.models import Enrollment, Activity, Event, User
+    enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
+    if not enrollment:
+        return render_template('validation.html', erro="Certificado não encontrado ou inválido.")
+    
+    # Calculate total hours for this user in this event
+    # (Since hash is linked to one enrollment, but certificates are usually event-wide)
+    # Actually, in our logic, one hash represents the participation in the event.
+    activities = Activity.query.filter_by(event_id=enrollment.event_id).all()
+    user = User.query.filter_by(cpf=enrollment.user_cpf).first()
+    event = Event.query.get(enrollment.event_id)
+    
+    # Sum hours of activities where this user was present in this event
+    total_hours = 0
+    from app.models import Enrollment as E2
+    all_user_enrollments = E2.query.filter_by(event_id=enrollment.event_id, user_cpf=enrollment.user_cpf, presente=True).all()
+    for e in all_user_enrollments:
+        atv = Activity.query.get(e.activity_id)
+        if atv: total_hours += (atv.carga_horaria or 0)
+
+    return render_template('validation.html', 
+                           success=True, 
+                           nome=user.nome if user else enrollment.nome,
+                           evento=event.nome,
+                           data=event.data_inicio,
+                           horas=total_hours,
+                           hash=cert_hash)

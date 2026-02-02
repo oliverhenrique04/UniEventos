@@ -5,3 +5,7 @@ qrcode
 reportlab
 Werkzeug
 email-validator
+pytest
+flake8
+black
+pika

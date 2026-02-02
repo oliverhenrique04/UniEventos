@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/designer_certificado/{{ event.id }}" class="text-decoration-none">Designer</a></li>
+                    <li class="breadcrumb-item active">Entregas</li>
+                </ol>
+            </nav>
+            <h3 class="fw-bold m-0"><i class="fa-solid fa-truck-fast text-primary me-2"></i>Gerenciar Entregas</h3>
+            <p class="text-muted mb-0">Controle o envio dos certificados para o evento: <strong>{{ event.nome }}</strong></p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="carregarEntregas()" class="btn btn-light border"><i class="fa-solid fa-sync me-1"></i> Atualizar</button>
+            <button onclick="dispararTodosPendentes()" class="btn btn-primary shadow-sm">
+                <i class="fa-solid fa-paper-plane me-2"></i> Enviar Pendentes
+            </button>
+        </div>
+    </div>
+
+    <div class="glass-panel p-0 overflow-hidden mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Participante</th>
+                        <th>Status de Entrega</th>
+                        <th>E-mail de Destino</th>
+                        <th>Último Envio</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaEntregas">
+                    <tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <nav><ul class="pagination justify-content-center" id="paginacaoEntregas"></ul></nav>
+</div>
+
+<!-- Modal Edit Email -->
+<div class="modal fade" id="modalEditEmail" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Alterar E-mail de Entrega</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editEnrollId">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Novo E-mail</label>
+                    <input type="email" id="newEmail" class="form-control" placeholder="usuario@exemplo.com">
+                    <div class="form-text">Esta alteração afetará apenas o envio do certificado deste evento.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button onclick="salvarNovoEmail()" class="btn btn-primary px-4">Atualizar e Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const eventId = {{ event.id }};
+
+    document.addEventListener('DOMContentLoaded', () => carregarEntregas(1));
+
+    async function carregarEntregas(page = 1) {
+        try {
+            const res = await fetch(`/api/certificates/list_delivery/${eventId}?page=${page}`);
+            const data = await res.json();
+            const tbody = document.getElementById('tabelaEntregas');
+            tbody.innerHTML = '';
+
+            if (data.items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Nenhum participante com presença confirmada.</td></tr>';
+                return;
+            }
+
+            data.items.forEach(item => {
+                const statusBadge = item.entregue 
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="fa-solid fa-check me-1"></i> Enviado</span>' 
+                    : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill"><i class="fa-solid fa-clock me-1"></i> Pendente</span>';
+
+                tbody.innerHTML += `
+                    <tr class="animate__animated animate__fadeIn">
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">${item.nome}</div>
+                            <div class="text-muted x-small">CPF: ${item.cpf}</div>
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span>${item.email_atual}</span>
+                                <button onclick="abrirModalEmail(${item.enrollment_id}, '${item.email_atual}')" class="btn btn-xs btn-link p-0 text-primary">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td><small class="text-muted">${item.data_envio}</small></td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group">
+                                <a href="/api/certificates/download/${item.enrollment_id}" class="btn btn-sm btn-light border" title="Baixar PDF">
+                                    <i class="fa-solid fa-file-pdf text-danger"></i>
+                                </a>
+                                <button onclick="reenviarCertificado(${item.enrollment_id})" class="btn btn-sm btn-outline-primary rounded-end px-3">
+                                    <i class="fa-solid fa-paper-plane me-1"></i> ${item.entregue ? 'Reenviar' : 'Enviar'}
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            renderPaginacao(data.current_page, data.pages, 'paginacaoEntregas', carregarEntregas);
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao carregar lista.' });
+        }
+    }
+
+    function renderPaginacao(current, total, containerId, callback) {
+        const nav = document.getElementById(containerId);
+        if (!nav) return;
+        nav.innerHTML = '';
+        if (total <= 1) return;
+
+        const createItem = (page, active = false, disabled = false, text = null) => {
+            const li = document.createElement('li');
+            li.className = `page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.innerText = text || page;
+            if (!disabled) a.onclick = (e) => { e.preventDefault(); callback(page); };
+            li.appendChild(a);
+            return li;
+        };
+
+        nav.appendChild(createItem(current - 1, false, current === 1, '«'));
+
+        const pages = [];
+        const range = 1;
+        for (let i = 1; i <= total; i++) {
+            if (i === 1 || i === total || (i >= current - range && i <= current + range)) {
+                pages.push(i);
+            } else if (pages[pages.length - 1] !== '...') {
+                pages.push('...');
+            }
+        }
+
+        pages.forEach(p => {
+            if (p === '...') nav.appendChild(createItem(null, false, true, '...'));
+            else nav.appendChild(createItem(p, p === current));
+        });
+
+        nav.appendChild(createItem(current + 1, false, current === total, '»'));
+    }
+
+    function abrirModalEmail(id, current) {
+        document.getElementById('editEnrollId').value = id;
+        document.getElementById('newEmail').value = current;
+        new bootstrap.Modal(document.getElementById('modalEditEmail')).show();
+    }
+
+    async function salvarNovoEmail() {
+        const id = document.getElementById('editEnrollId').value;
+        const email = document.getElementById('newEmail').value;
+        
+        try {
+            const res = await fetch(`/api/certificates/update_email/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email})
+            });
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('modalEditEmail')).hide();
+                carregarEntregas();
+                Toast.fire({ icon: 'success', title: 'E-mail atualizado!' });
+            }
+        } catch (e) {}
+    }
+
+    async function reenviarCertificado(id) {
+        Toast.fire({ icon: 'info', title: 'Processando reenvio...' });
+        try {
+            const res = await fetch(`/api/certificates/resend_single/${id}`, { method: 'POST' });
+            const json = await res.json();
+            if (res.ok) {
+                carregarEntregas();
+                Swal.fire('Sucesso!', json.mensagem, 'success');
+            } else {
+                Swal.fire('Erro', json.erro, 'error');
+            }
+        } catch (e) {}
+    }
+
+    async function dispararTodosPendentes() {
+        const confirm = await Swal.fire({
+            title: 'Enviar todos os pendentes?',
+            text: "Isso disparará o envio para todos os participantes que ainda não receberam.",
+            icon: 'question',
+            showCancelButton: true
+        });
+        if (!confirm.isConfirmed) return;
+
+        Toast.fire({ icon: 'info', title: 'Iniciando lote...' });
+        try {
+            const res = await fetch(`/api/certificates/send_batch/${eventId}`, { method: 'POST' });
+            if (res.ok) {
+                setTimeout(carregarEntregas, 2000);
+                Swal.fire('Iniciado!', 'O processo de lote foi iniciado.', 'success');
+            }
+        } catch (e) {}
+    }
+</script>
+{% endblock %}

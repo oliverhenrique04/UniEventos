@@ -1,0 +1,535 @@
+{% extends 'base.html' %}
+
+{% block head_styles %}
+<style>
+    .designer-container {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    .preview-box {
+        background: #e2e8f0;
+        border-radius: 24px;
+        padding: 3rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 700px;
+        position: relative;
+        overflow: auto;
+        border: 1px solid #cbd5e1;
+    }
+
+    .cert-canvas-container {
+        position: relative;
+        box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.3);
+        background: white;
+        line-height: 1.2;
+    }
+
+    #certCanvas {
+        display: block;
+        max-width: 100%;
+    }
+
+    .canvas-overlay-item {
+        position: absolute;
+        cursor: move;
+        border: 1px dashed transparent;
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        overflow: visible;
+        min-width: 50px;
+        min-height: 20px;
+        outline: none !important;
+    }
+
+    .canvas-overlay-item:hover {
+        border-color: rgba(79, 70, 229, 0.3);
+    }
+
+    .canvas-overlay-item.active {
+        border: 2px solid var(--primary-color);
+        background: rgba(79, 70, 229, 0.03);
+        z-index: 1000;
+    }
+
+    .canvas-overlay-item[data-align="center"] { text-align: center; justify-content: center; }
+    .canvas-overlay-item[data-align="right"] { text-align: right; justify-content: flex-end; }
+    .canvas-overlay-item[data-align="left"] { text-align: left; justify-content: flex-start; }
+
+    /* Floating Toolbar */
+    #floatingToolbar {
+        position: fixed;
+        display: none;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        padding: 6px;
+        z-index: 2000;
+        border: 1px solid #e2e8f0;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .toolbar-btn {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: #475569;
+        transition: all 0.2s;
+    }
+
+    .toolbar-btn:hover { background: #f1f5f9; color: var(--primary-color); }
+    .toolbar-btn.active { background: #e0e7ff; color: var(--primary-color); }
+
+    .toolbar-divider { width: 1px; height: 20px; background: #e2e8f0; margin: 0 4px; }
+
+    .resize-handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border: 2px solid var(--primary-color);
+        right: -6px;
+        bottom: -6px;
+        cursor: nwse-resize;
+        border-radius: 50%;
+        display: none;
+    }
+
+    .canvas-overlay-item.active .resize-handle { display: block; }
+
+    .variable-guide-item {
+        background: var(--slate-50);
+        border: 1px solid var(--slate-200);
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .variable-guide-item:hover {
+        border-color: var(--primary-color);
+        background: var(--primary-50);
+    }
+
+    @media (max-width: 1200px) {
+        .designer-container {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Floating WYSIWYG Toolbar -->
+<div id="floatingToolbar" class="d-flex shadow-lg animate__animated animate__fadeIn">
+    <div class="dropdown">
+        <button class="toolbar-btn" data-bs-toggle="dropdown" title="Inserir Variável"><i class="fa-solid fa-brackets-curly"></i></button>
+        <ul class="dropdown-menu shadow border-0">
+            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{NOME}}')">Nome</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{EVENTO}}')">Evento</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{HORAS}}')">Horas</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{DATA}}')">Data</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{CPF}}')">CPF</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{HASH}}')">Hash</a></li>
+        </ul>
+    </div>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" id="btn-bold" onclick="toggleStyle('bold')" title="Negrito"><i class="fa-solid fa-bold"></i></button>
+    <button class="toolbar-btn" id="btn-italic" onclick="toggleStyle('italic')" title="Itálico"><i class="fa-solid fa-italic"></i></button>
+    <div class="toolbar-divider"></div>
+    <select class="form-select form-select-sm border-0 py-0" style="width: 110px; background: transparent;" onchange="setStyle('font_family', this.value)" id="select-font">
+        <option value="Helvetica">Sans Serif</option>
+        <option value="Times-Roman">Serif</option>
+        <option value="Courier">Monospace</option>
+    </select>
+    <input type="number" class="form-control form-control-sm border-0 py-0 text-center" style="width: 50px; background: transparent;" id="input-size" oninput="setStyle('font', parseInt(this.value))">
+    <div class="toolbar-divider"></div>
+    <input type="color" class="form-control form-control-color border-0 p-0" style="width: 24px; height: 24px;" id="input-color" onchange="setStyle('color', this.value)">
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn text-danger" onclick="deleteSelected()" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+</div>
+
+<div class="container-fluid px-4 fade-in-up">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold m-0 text-slate-900"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Editor de Certificado</h3>
+            <p class="text-muted mb-0">Personalize o design visual e os campos de validação (QR Code e Hash).</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/gerenciar_entregas/{{ event.id }}" class="btn btn-light border">
+                <i class="fa-solid fa-truck-fast me-1"></i> Entregas
+            </a>
+            <button onclick="adicionarTexto()" class="btn btn-light border"><i class="fa-solid fa-plus me-1"></i> Texto</button>
+            <button onclick="resetarLayout()" class="btn btn-light border">Limpar Tudo</button>
+            <button onclick="salvarConfiguracao()" class="btn btn-primary shadow-sm px-4">Salvar Layout</button>
+            <button onclick="confirmarEnvioLote()" class="btn btn-dark shadow-sm px-4">Enviar em Lote</button>
+        </div>
+    </div>
+
+    <div class="designer-container">
+        <div class="preview-box" id="dropZone" onclick="deselectAll(event)">
+            <div class="cert-canvas-container" id="canvasContainer" onclick="event.stopPropagation()">
+                <canvas id="certCanvas"></canvas>
+                <!-- Elements dynamically injected -->
+            </div>
+            
+            <div id="noBgMsg" class="text-center p-5 d-none">
+                <div class="bg-white p-5 rounded-5 shadow-sm border">
+                    <i class="fa-solid fa-file-image fa-4x text-slate-200 mb-4"></i>
+                    <h4 class="fw-bold">Nenhum Background</h4>
+                    <button class="btn btn-primary px-4" onclick="document.getElementById('inputBg').click()">Upload Imagem</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="glass-panel p-4 mb-4 border-top border-4 border-primary">
+                <h6 class="fw-bold mb-3">Template Base</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('inputBg').click()">Alterar Fundo</button>
+                    <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="limparBackground()">Remover</button>
+                </div>
+                <input type="file" id="inputBg" class="d-none" accept="image/*" onchange="handleBgUpload(this)">
+            </div>
+
+            <div class="glass-panel p-4 mb-4">
+                <h6 class="fw-bold mb-3">Guia de Variáveis</h6>
+                <div class="d-flex flex-column gap-1">
+                    <div class="variable-guide-item" onclick="injectVar('{{NOME}}')">
+                        <div class="fw-bold text-primary small">{{ '{{NOME}}' }}</div>
+                        <div class="text-muted x-small">Nome do Participante</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{CPF}}')">
+                        <div class="fw-bold text-primary small">{{ '{{CPF}}' }}</div>
+                        <div class="text-muted x-small">Documento CPF</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{EVENTO}}')">
+                        <div class="fw-bold text-primary small">{{ '{{EVENTO}}' }}</div>
+                        <div class="text-muted x-small">Título do Evento</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{HORAS}}')">
+                        <div class="fw-bold text-primary small">{{ '{{HORAS}}' }}</div>
+                        <div class="text-muted x-small">Carga Horária</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{DATA}}')">
+                        <div class="fw-bold text-primary small">{{ '{{DATA}}' }}</div>
+                        <div class="text-muted x-small">Data de Emissão</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{HASH}}')">
+                        <div class="fw-bold text-primary small">{{ '{{HASH}}' }}</div>
+                        <div class="text-muted x-small">Código de Validação</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel p-4">
+                <h6 class="fw-bold mb-3">Camadas</h6>
+                <div id="elements-list" class="list-group list-group-flush small"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const eventId = {{ event.id }};
+    const canvas = document.getElementById('certCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+    const toolbar = document.getElementById('floatingToolbar');
+    
+    let bgImage = new Image();
+    let selectedId = null;
+    let isDragging = false;
+    let isResizing = false;
+
+    const defaultElements = {
+        txt1: { text: "CERTIFICADO DE PARTICIPAÇÃO", x: 50, y: 20, w: 80, h: 8, font: 35, color: '#1e293b', align: 'center', bold: true, italic: false, font_family: 'Helvetica' },
+        txt2: { text: "Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.", x: 50, y: 50, w: 80, h: 25, font: 22, color: '#334155', align: 'center', bold: false, italic: false, font_family: 'Helvetica' },
+        hash: { text: "Código de Validação: {{HASH}}", x: 50, y: 92, w: 60, h: 5, font: 11, color: '#94a3b8', align: 'center', bold: false, italic: false, font_family: 'Courier' },
+        qrcode: { x: 88, y: 88, w: 12, h: 12, size: 80 }
+    };
+
+    let currentConfig = {
+        bg: "{{ event.cert_bg_path or '' }}",
+        elements: JSON.parse(JSON.stringify(defaultElements))
+    };
+
+    {% if event.cert_template_json %}
+    try { currentConfig.elements = JSON.parse('{{ event.cert_template_json|safe }}'); } catch(e) {}
+    {% endif %}
+
+    function init() {
+        if (currentConfig.bg) {
+            document.getElementById('noBgMsg').classList.add('d-none');
+            bgImage.src = currentConfig.bg.startsWith('/') ? currentConfig.bg : '/static/' + currentConfig.bg;
+            bgImage.onload = () => { renderCanvas(); updateOverlays(); };
+        } else {
+            document.getElementById('noBgMsg').classList.remove('d-none');
+            container.style.display = 'none';
+        }
+        updateElementsList();
+    }
+
+    function renderCanvas() {
+        const ratio = bgImage.height / bgImage.width;
+        canvas.width = 1000;
+        canvas.height = 1000 * ratio;
+        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+        container.style.display = 'block';
+    }
+
+    function updateOverlays() {
+        const existing = container.querySelectorAll('.canvas-overlay-item');
+        existing.forEach(el => { if (!currentConfig.elements[el.id.replace('item-','')]) el.remove(); });
+
+        Object.keys(currentConfig.elements).forEach(key => {
+            const config = currentConfig.elements[key];
+            let el = document.getElementById(`item-${key}`);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = `item-${key}`;
+                el.className = 'canvas-overlay-item';
+                el.innerHTML = '<div class="resize-handle"></div>';
+                container.appendChild(el);
+                setupElementEvents(el, key);
+            }
+
+            el.style.left = `${config.x - (config.w || 10)/2}%`;
+            el.style.top = `${config.y - (config.h || 5)/2}%`;
+            el.style.width = `${config.w || 10}%`;
+            el.style.height = `${config.h || 5}%`;
+
+            if (key === 'qrcode') {
+                el.innerHTML = '<i class="fa-solid fa-qrcode text-dark"></i><div class="resize-handle"></div>';
+                el.style.background = 'white';
+                el.style.justifyContent = 'center';
+                const icon = el.querySelector('i');
+                icon.style.fontSize = `${Math.min(el.offsetWidth, el.offsetHeight) * 0.7}px`;
+                return;
+            }
+
+            el.contentEditable = "true";
+            el.style.fontSize = `${(config.font / 1000) * container.offsetWidth}px`;
+            el.style.color = config.color;
+            el.style.fontWeight = config.bold ? 'bold' : 'normal';
+            el.style.fontStyle = config.italic ? 'italic' : 'normal';
+            el.setAttribute('data-align', config.align || 'center');
+            
+            const fontMap = { 'Helvetica': "'Inter', sans-serif", 'Times-Roman': "'Times New Roman', serif", 'Courier': "'Courier New', monospace" };
+            el.style.fontFamily = fontMap[config.font_family] || fontMap['Helvetica'];
+
+            if (document.activeElement !== el) {
+                let previewText = config.text
+                    .replace('{{NOME}}', 'LUCAS ALUNO')
+                    .replace('{{EVENTO}}', '{{ event.nome }}')
+                    .replace('{{HORAS}}', '10')
+                    .replace('{{DATA}}', '{{ event.data_inicio }}')
+                    .replace('{{HASH}}', 'A1B2-C3D4')
+                    .replace('{{CPF}}', '000.000.000-00');
+                el.innerText = previewText;
+            }
+        });
+    }
+
+    function setupElementEvents(el, key) {
+        el.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('resize-handle')) return;
+            selectElement(key);
+            if (document.activeElement === el) return;
+            
+            isDragging = true;
+            const startX = e.clientX, startY = e.clientY;
+            const initialX = currentConfig.elements[key].x, initialY = currentConfig.elements[key].y;
+
+            const move = (ev) => {
+                const dx = ((ev.clientX - startX) / container.offsetWidth) * 100;
+                const dy = ((ev.clientY - startY) / container.offsetHeight) * 100;
+                currentConfig.elements[key].x = Math.max(0, Math.min(100, initialX + dx));
+                currentConfig.elements[key].y = Math.max(0, Math.min(100, initialY + dy));
+                updateOverlays();
+                positionToolbar();
+            };
+            const stop = () => { isDragging = false; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', stop); };
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', stop);
+        });
+
+        el.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            isResizing = true;
+            const startX = e.clientX, startY = e.clientY;
+            const initialW = currentConfig.elements[key].w || 10, initialH = currentConfig.elements[key].h || 5;
+
+            const move = (ev) => {
+                const dw = ((ev.clientX - startX) / container.offsetWidth) * 100;
+                const dh = ((ev.clientY - startY) / container.offsetHeight) * 100;
+                currentConfig.elements[key].w = Math.max(2, initialW + dw);
+                currentConfig.elements[key].h = Math.max(1, initialH + dh);
+                updateOverlays();
+            };
+            const stop = () => { isResizing = false; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', stop); };
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', stop);
+        });
+
+        el.addEventListener('focus', () => {
+            if (key !== 'qrcode') el.innerText = currentConfig.elements[key].text;
+        });
+
+        el.addEventListener('blur', () => {
+            if (key !== 'qrcode') {
+                currentConfig.elements[key].text = el.innerText;
+                updateOverlays();
+            }
+        });
+    }
+
+    function selectElement(id) {
+        selectedId = id;
+        document.querySelectorAll('.canvas-overlay-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`item-${id}`).classList.add('active');
+        
+        const config = currentConfig.elements[id];
+        toolbar.style.display = 'flex';
+        document.getElementById('btn-bold').classList.toggle('active', !!config.bold);
+        document.getElementById('btn-italic').classList.toggle('active', !!config.italic);
+        document.getElementById('select-font').value = config.font_family || 'Helvetica';
+        document.getElementById('input-size').value = config.font || 20;
+        document.getElementById('input-color').value = config.color || '#000000';
+        
+        positionToolbar();
+    }
+
+    function deselectAll(e) {
+        selectedId = null;
+        document.querySelectorAll('.canvas-overlay-item').forEach(el => el.classList.remove('active'));
+        toolbar.style.display = 'none';
+    }
+
+    function positionToolbar() {
+        if (!selectedId) return;
+        const el = document.getElementById(`item-${selectedId}`);
+        const rect = el.getBoundingClientRect();
+        toolbar.style.top = `${rect.top - 50}px`;
+        toolbar.style.left = `${rect.left + (rect.width/2) - (toolbar.offsetWidth/2)}px`;
+    }
+
+    function setStyle(prop, val) {
+        if (!selectedId) return;
+        currentConfig.elements[selectedId][prop] = val;
+        updateOverlays();
+    }
+
+    function toggleStyle(prop) {
+        if (!selectedId) return;
+        currentConfig.elements[selectedId][prop] = !currentConfig.elements[selectedId][prop];
+        updateOverlays();
+        document.getElementById(`btn-${prop}`).classList.toggle('active', currentConfig.elements[selectedId][prop]);
+    }
+
+    function injectVar(tag) {
+        if (!selectedId || selectedId === 'qrcode') {
+            // If no selection, add to first text block or create one
+            const keys = Object.keys(currentConfig.elements).filter(k => k !== 'qrcode');
+            if (keys.length > 0) selectElement(keys[0]);
+            else return;
+        }
+        const el = document.getElementById(`item-${selectedId}`);
+        el.focus();
+        document.execCommand('insertText', false, tag);
+    }
+
+    function adicionarTexto() {
+        const id = 'txt_' + Date.now();
+        currentConfig.elements[id] = { text: "Clique para editar o conteúdo", x: 50, y: 50, w: 40, h: 8, font: 20, color: '#000000', align: 'center', bold: false, italic: false, font_family: 'Helvetica' };
+        updateOverlays();
+        setTimeout(() => selectElement(id), 50);
+        updateElementsList();
+    }
+
+    function deleteSelected() {
+        if (!selectedId) return;
+        if (['qrcode', 'hash'].includes(selectedId)) { Toast.fire({icon:'warning', title:'Este elemento é obrigatório para validação'}); return; }
+        delete currentConfig.elements[selectedId];
+        deselectAll();
+        updateOverlays();
+        updateElementsList();
+    }
+
+    function updateElementsList() {
+        const list = document.getElementById('elements-list');
+        list.innerHTML = '';
+        Object.keys(currentConfig.elements).forEach(k => {
+            const btn = document.createElement('button');
+            btn.className = 'list-group-item list-group-item-action py-2 border-0 rounded-3 mb-1';
+            btn.innerText = k.toUpperCase();
+            btn.onclick = (e) => { e.stopPropagation(); selectElement(k); };
+            list.appendChild(btn);
+        });
+    }
+
+    async function handleBgUpload(input) {
+        if (!input.files[0]) return;
+        const formData = new FormData();
+        formData.append('background', input.files[0]);
+        formData.append('template', JSON.stringify(currentConfig.elements));
+        Toast.fire({ icon: 'info', title: 'Carregando...' });
+        try {
+            const res = await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
+            const json = await res.json();
+            if (res.ok) { bgImage.src = json.bg_url; init(); Toast.fire({ icon: 'success', title: 'Background pronto' }); }
+        } catch (e) {}
+    }
+
+    async function salvarConfiguracao() {
+        const formData = new FormData();
+        formData.append('template', JSON.stringify(currentConfig.elements));
+        try {
+            await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
+            Toast.fire({ icon: 'success', title: 'Design salvo com sucesso!' });
+        } catch (e) {}
+    }
+
+    function resetarLayout() {
+        Swal.fire({ title: 'Limpar Design?', text: 'Isso removerá todos os textos customizados e manterá apenas os itens de validação.', icon: 'warning', showCancelButton: true }).then(r => {
+            if(r.isConfirmed) { currentConfig.elements = { hash: defaultElements.hash, qrcode: defaultElements.qrcode }; updateOverlays(); updateElementsList(); }
+        });
+    }
+
+    async function confirmarEnvioLote() {
+        Swal.fire({ title: 'Confirmar Envio?', text: 'Os certificados serão enviados agora para todos os participantes presentes.', icon: 'question', showCancelButton: true }).then(async r => {
+            if (r.isConfirmed) {
+                Toast.fire({ icon: 'info', title: 'Agendando...' });
+                await fetch(`/api/certificates/send_batch/${eventId}`, { method: 'POST' });
+                Swal.fire('Processando', 'A fila de e-mails foi iniciada no servidor.', 'success');
+            }
+        });
+    }
+
+    async function limparBackground() {
+        const confirm = await Swal.fire({ title: 'Remover Background?', icon: 'warning', showCancelButton: true });
+        if (!confirm.isConfirmed) return;
+        const formData = new FormData();
+        formData.append('remove_bg', 'true');
+        await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
+        currentConfig.bg = ''; init();
+    }
+
+    window.addEventListener('resize', updateOverlays);
+    init();
+</script>
+{% endblock %}
