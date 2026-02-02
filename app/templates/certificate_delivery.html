@@ -44,6 +44,21 @@
     <nav><ul class="pagination justify-content-center" id="paginacaoEntregas"></ul></nav>
 </div>
 
+<!-- Modal Preview Certificado -->
+<div class="modal fade" id="modalPreviewCert" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="height: 90vh;">
+            <div class="modal-header border-0 bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-certificate me-2"></i>Visualização de Certificado</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-secondary">
+                <iframe id="framePreview" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Edit Email -->
 <div class="modal fade" id="modalEditEmail" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -109,7 +124,10 @@
                         </td>
                         <td><small class="text-muted">${item.data_envio}</small></td>
                         <td class="text-end pe-4">
-                            <div class="btn-group">
+                            <div class="btn-group shadow-sm">
+                                <button onclick="abrirPreview(${item.enrollment_id})" class="btn btn-sm btn-light border" title="Visualizar Certificado">
+                                    <i class="fa-solid fa-eye text-primary"></i>
+                                </button>
                                 <a href="/api/certificates/download/${item.enrollment_id}" class="btn btn-sm btn-light border" title="Baixar PDF">
                                     <i class="fa-solid fa-file-pdf text-danger"></i>
                                 </a>
@@ -164,6 +182,12 @@
         });
 
         nav.appendChild(createItem(current + 1, false, current === total, '»'));
+    }
+
+    function abrirPreview(enrollId) {
+        const frame = document.getElementById('framePreview');
+        frame.src = `/api/certificates/preview/${enrollId}`;
+        new bootstrap.Modal(document.getElementById('modalPreviewCert')).show();
     }
 
     function abrirModalEmail(id, current) {

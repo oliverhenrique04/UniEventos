@@ -1,5 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for
 from flask_login import current_user, login_required
+from datetime import datetime
+
 
 bp = Blueprint('main', __name__)
 
@@ -86,10 +88,13 @@ def validar_hash(cert_hash):
         atv = Activity.query.get(e.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
 
+    data_iso = event.data_inicio
+    data_br = datetime.strptime(data_iso, "%Y-%m-%d").strftime("%d/%m/%Y")
+
     return render_template('validation.html', 
                            success=True, 
                            nome=user.nome if user else enrollment.nome,
                            evento=event.nome,
-                           data=event.data_inicio,
+                           data=data_br,
                            horas=total_hours,
                            hash=cert_hash)

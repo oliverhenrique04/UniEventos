@@ -135,7 +135,25 @@ def resend_single(enrollment_id):
 @bp.route('/download/<int:enrollment_id>')
 @login_required
 def download_single(enrollment_id):
-    """Generates and serves a single certificate PDF for immediate download."""
+    # ... (Keep existing download_single code)
+    from app.models import Enrollment, Event, User, Activity
+    enrollment = Enrollment.query.get_or_404(enrollment_id)
+    event = Event.query.get(enrollment.event_id)
+    user = User.query.filter_by(cpf=enrollment.user_cpf).first()
+    if not user: return "Usuário não encontrado", 404
+    total_hours = 0
+    presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
+    for p in presences:
+        atv = Activity.query.get(p.activity_id)
+        if atv: total_hours += (atv.carga_horaria or 0)
+    from flask import send_file
+    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    return send_file(pdf_path, as_attachment=True, download_name=f"Certificado_{user.nome.replace(' ', '_')}.pdf")
+
+@bp.route('/preview/<int:enrollment_id>')
+@login_required
+def preview_single(enrollment_id):
+    """Generates and serves a certificate PDF for inline viewing (preview)."""
     from app.models import Enrollment, Event, User, Activity
     enrollment = Enrollment.query.get_or_404(enrollment_id)
     event = Event.query.get(enrollment.event_id)
@@ -143,15 +161,14 @@ def download_single(enrollment_id):
     
     if not user: return "Usuário não encontrado", 404
     
-    # Calculate total hours
     total_hours = 0
     presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
     for p in presences:
         atv = Activity.query.get(p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
 
-    # Generate PDF using the professional engine (respects the WYSIWYG design)
     from flask import send_file
     pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
     
-    return send_file(pdf_path, as_attachment=True, download_name=f"Certificado_{user.nome.replace(' ', '_')}.pdf")
+    # Send file without as_attachment=True to allow browser rendering
+    return send_file(pdf_path, mimetype='application/pdf')

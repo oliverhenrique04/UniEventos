@@ -1,5 +1,6 @@
 import os
 import json
+import secrets
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, letter
 from app.repositories.event_repository import EventRepository
