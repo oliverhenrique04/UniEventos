@@ -105,6 +105,10 @@ h6 {
   border-color: #bfa24d !important;
 }
 
+.glass-panel .bg-primary {
+  background-color: #bfa24d !important;
+}
+
 .glass-panel:hover {
   transform: translateY(-4px);
   box-shadow:
@@ -290,13 +294,19 @@ h6 {
 
 }
 
-
-
 .pagination .page-item.active .page-link {
   background-color: #044d84;
   border-color: #044d84;
 }
 
 .text-primary {
-  color: #bfa24d !important;
+  color: #044d84 !important;
+}
+
+.text-color-primary {
+  color: #044d84 !important;
+}
+
+.border-primary {
+  border-color: #044d84 !important;
 }

@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-5 px-2">
+        <div>
+            <h2 class="fw-bold m-0"><i class="fa-solid fa-award text-primary me-2"></i>Minhas Participações</h2>
+            <p class="text-muted mb-0">Confira os eventos que você já participou e emita seus certificados.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/" class="btn btn-light border"><i class="fa-solid fa-house me-1"></i> Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Event History List -->
+    <div id="lista-participados" class="row row-cols-1 g-4">
+        <!-- Loader Skeleton -->
+        <div class="col text-center py-5">
+            <div class="spinner-border text-primary"></div>
+            <p class="text-muted mt-2">Carregando seu histórico acadêmico...</p>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <nav class="mt-5"><ul class="pagination justify-content-center" id="pag-participados"></ul></nav>
+</div>
+
+<!-- Modal Certificates for Event -->
+<div class="modal fade" id="modalCertificadosEvento" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-certificate me-2"></i>Certificados Disponíveis</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="corpo-certificados-evento">
+                <!-- Conteúdo via JS -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarParticipados(1);
+    });
+
+    async function carregarParticipados(page) {
+        const res = await fetch(`/api/me/history?type=participated&page=${page}`);
+        const data = await res.json();
+        
+        const div = document.getElementById('lista-participados');
+        div.innerHTML = '';
+
+        if (data.items.length === 0) {
+            div.innerHTML = `
+                <div class="col-12 text-center py-5 px-4 glass-panel border-dashed">
+                    <i class="fa-solid fa-graduation-cap fa-3x mb-3 text-slate-200"></i>
+                    <h4 class="fw-bold">Nenhuma participação confirmada</h4>
+                    <p class="text-muted">Participe de eventos e valide sua presença via QR Code para aparecer aqui.</p>
+                    <a href="/" class="btn btn-primary rounded-pill px-4 mt-2">Ver Próximos Eventos</a>
+                </div>`;
+            return;
+        }
+
+        data.items.forEach(ev => {
+            div.innerHTML += `
+                <div class="col animate__animated animate__fadeInUp">
+                    <div class="glass-panel p-0 overflow-hidden border-0 shadow-sm bg-white d-flex flex-column flex-md-row">
+                        <div class="p-4 bg-primary text-white d-flex flex-column justify-content-center align-items-center text-center" style="min-width: 180px;">
+                            <div class="small opacity-75 text-uppercase fw-bold letter-spacing-1 mb-1">DATA</div>
+                            <h4 class="fw-bold m-0">${ev.data.split('-').reverse().slice(0,2).join('/')}</h4>
+                            <div class="small opacity-75 fw-bold">${ev.data.split('-')[0]}</div>
+                        </div>
+                        <div class="p-4 flex-grow-1 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h4 class="fw-bold text-slate-900 m-0">${ev.nome}</h4>
+                                    <span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>
+                                </div>
+                                <p class="text-muted mb-0 small">Você conquistou <strong>${ev.horas} horas</strong> acadêmicas neste evento.</p>
+                            </div>
+                            <div class="d-flex gap-2 mt-4 pt-3 border-top">
+                                <button onclick="abrirCertificadosEvento(${ev.id})" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                                    <i class="fa-solid fa-stamp me-2"></i> Emitir Certificados
+                                </button>
+                                <a href="/inscrever/${ev.token}" class="btn btn-light border rounded-pill px-4">
+                                    <i class="fa-solid fa-circle-info me-2"></i> Detalhes
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        });
+
+        renderPaginacao(data.current_page, data.pages, 'pag-participados', carregarParticipados);
+    }
+
+    async function abrirCertificadosEvento(eventId) {
+        const modal = new bootstrap.Modal(document.getElementById('modalCertificadosEvento'));
+        const corpo = document.getElementById('corpo-certificados-evento');
+        corpo.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
+        modal.show();
+
+        try {
+            // Reuse the certificates filter but for a specific event
+            const res = await fetch(`/api/me/history?type=certificates&per_page=100`);
+            const data = await res.json();
+            const eventCerts = data.items.filter(c => c.event_id == eventId);
+
+            let html = '<div class="list-group list-group-flush">';
+            eventCerts.forEach(cert => {
+                html += `
+                    <div class="list-group-item p-4 d-flex justify-content-between align-items-center animate__animated animate__fadeIn">
+                        <div>
+                            <h6 class="fw-bold text-dark mb-1">${cert.atv_nome}</h6>
+                            <div class="text-muted x-small d-flex align-items-center gap-2">
+                                <span><i class="fa-solid fa-clock me-1"></i>${cert.horas} Horas</span>
+                                <span>|</span>
+                                <span class="font-monospace">HASH: ${cert.hash || '---'}</span>
+                            </div>
+                        </div>
+                        <a href="/api/certificates/download/${cert.enrollment_id}" class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm">
+                            <i class="fa-solid fa-download me-1"></i> Download
+                        </a>
+                    </div>`;
+            });
+            html += '</div>';
+            
+            if (eventCerts.length === 0) html = '<div class="p-5 text-center text-muted">Nenhum certificado disponível para as atividades deste evento.</div>';
+            
+            corpo.innerHTML = html;
+        } catch (e) {
+            corpo.innerHTML = '<div class="alert alert-danger m-3">Falha ao carregar certificados.</div>';
+        }
+    }
+
+    function renderPaginacao(current, total, containerId, callback) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        if (total <= 1) return;
+
+        const ul = document.createElement('ul');
+        ul.className = 'pagination pagination-sm m-0';
+
+        const createItem = (page, active = false, disabled = false, text = null) => {
+            const li = document.createElement('li');
+            li.className = `page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.innerText = text || page;
+            if (!disabled) a.onclick = (e) => { e.preventDefault(); callback(page); };
+            li.appendChild(a);
+            return li;
+        };
+
+        ul.appendChild(createItem(current - 1, false, current === 1, '«'));
+        const pages = [];
+        const range = 1;
+        for (let i = 1; i <= total; i++) {
+            if (i === 1 || i === total || (i >= current - range && i <= current + range)) pages.push(i);
+            else if (pages[pages.length - 1] !== '...') pages.push('...');
+        }
+        pages.forEach(p => {
+            if (p === '...') ul.appendChild(createItem(null, false, true, '...'));
+            else ul.appendChild(createItem(p, p === current));
+        });
+        ul.appendChild(createItem(current + 1, false, current === total, '»'));
+        container.appendChild(ul);
+    }
+</script>
+{% endblock %}

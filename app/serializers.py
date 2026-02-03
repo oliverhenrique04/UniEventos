@@ -49,6 +49,9 @@ def serialize_event(event, current_user=None):
         total_inscritos += len(a.enrollments)
         total_presentes += len([e for e in a.enrollments if e.presente])
 
+    # Sort activities chronologically
+    sorted_activities = sorted(event.activities, key=lambda a: (a.data_atv or '', a.hora_atv or ''))
+    
     return {
         'id': event.id,
         'owner': event.owner_username,
@@ -63,5 +66,5 @@ def serialize_event(event, current_user=None):
         'status': event.status,
         'total_inscritos': total_inscritos,
         'total_presentes': total_presentes,
-        'atividades': [serialize_activity(a, current_user) for a in event.activities]
+        'atividades': [serialize_activity(a, current_user) for a in sorted_activities]
     }

@@ -90,12 +90,13 @@ class EventService:
         return event, "Atualizado!"
 
     def get_events_for_user_paginated(self, user, page=1, per_page=10):
-        """Lists events visible to a specific user with pagination."""
+        """Lists events visible to a specific user with chronological sorting."""
         query = Event.query
         if user.role not in ['admin', 'participante']:
             query = query.filter_by(owner_username=user.username)
         
-        return query.order_by(Event.data_inicio.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        # Chronological sorting: earliest first
+        return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
     def _create_default_checkin_activity(self, event):
         """Creates a default check-in activity for 'RAPIDO' events."""
@@ -276,3 +277,55 @@ class EventService:
                 f"Parabéns {user.nome}! Sua presença na atividade {activity.nome} foi registrada com sucesso."
             )
         return True, "Presença confirmada!", enrollment
+
+    def confirm_attendance(self, user, activity_id, event_id):
+        """
+        Confirms user attendance in an activity.
+        If no enrollment exists and it's a default check-in, creates one.
+        """
+        activity = self.get_activity(activity_id)
+        if not activity: return False, "Atividade não encontrada", None
+        enrollment = self.get_enrollment(activity_id, user.cpf)
+
+        if not enrollment:
+            if activity.nome == "Check-in Presença":
+                enrollment = Enrollment(
+                    activity_id=activity_id,
+                    event_id=event_id,
+                    user_cpf=user.cpf,
+                    nome=user.nome,
+                    presente=True
+                )
+                self.enrollment_repo.save(enrollment)
+            else:
+                return False, "Você não se inscreveu nesta atividade.", None
+        else:
+            enrollment.presente = True
+            self.enrollment_repo.save(enrollment)
+
+        # Notify via RabbitMQ
+        if user.email:
+            self.notification_service.send_email_task(
+                user.email,
+                f"Presença Confirmada: {activity.nome}",
+                f"Parabéns {user.nome}! Sua presença na atividade {activity.nome} foi registrada com sucesso."
+            )
+        return True, "Presença confirmada!", enrollment
+
+    def get_user_events_paginated(self, user_cpf, page=1, per_page=10):
+        """Retrieves events the user is participating in."""
+        from app.models import Event, Enrollment
+        query = Event.query.join(Enrollment, Event.id == Enrollment.event_id).filter(Enrollment.user_cpf == user_cpf).distinct()
+        return query.order_by(Event.data_inicio.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    def get_user_activities_paginated(self, user_cpf, page=1, per_page=10):
+        """Retrieves individual activity enrollments for a user."""
+        from app.models import Enrollment, Activity
+        query = Enrollment.query.filter_by(user_cpf=user_cpf).join(Activity)
+        return query.order_by(Activity.data_atv.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    def get_user_certificates_paginated(self, user_cpf, page=1, per_page=10):
+        """Retrieves activities where the user's presence was confirmed (certificates)."""
+        from app.models import Enrollment, Activity
+        query = Enrollment.query.filter_by(user_cpf=user_cpf, presente=True).join(Activity)
+        return query.order_by(Activity.data_atv.desc()).paginate(page=page, per_page=per_page, error_out=False)

@@ -60,6 +60,18 @@ def gerenciar_eventos():
         return "Acesso negado", 403
     return render_template('events_admin.html', user=current_user)
 
+@bp.route('/perfil')
+@login_required
+def perfil_usuario():
+    """Page for user participation history and certificate collection."""
+    return render_template('profile.html', user=current_user)
+
+@bp.route('/meus_eventos')
+@login_required
+def meus_eventos():
+    """Dedicated page for participants to see events they've already attended."""
+    return render_template('my_events.html', user=current_user)
+
 @bp.route('/criar_evento')
 @login_required
 def criar_evento_page():

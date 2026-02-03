@@ -131,6 +131,83 @@ def remover_inscricao(enrollment_id):
     db.session.commit()
     return jsonify({"mensagem": "Inscrição removida!"})
 
+@bp.route('/me/history', methods=['GET'])
+@login_required
+def meu_historico():
+    """Endpoint for the current user to retrieve their participation history and stats."""
+    type = request.args.get('type', 'events') 
+    page = request.args.get('page', 1, type=int)
+    
+    if type == 'stats':
+        from app.models import Enrollment, Activity
+        presences = Enrollment.query.filter_by(user_cpf=current_user.cpf, presente=True).all()
+        total_hours = sum([Activity.query.get(p.activity_id).carga_horaria for p in presences if Activity.query.get(p.activity_id)])
+        event_count = db.session.query(Enrollment.event_id).filter_by(user_cpf=current_user.cpf).distinct().count()
+        return jsonify({"total_hours": total_hours, "total_events": event_count})
+
+    if type == 'participated':
+        from app.models import Event, Enrollment, Activity
+        # Join Events with Enrollments where presente=True
+        query = db.session.query(Event).join(Enrollment, Event.id == Enrollment.event_id)\
+            .filter(Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).distinct()
+        
+        pagination = query.order_by(Event.data_inicio.desc()).paginate(page=page, per_page=10, error_out=False)
+        
+        items = []
+        for ev in pagination.items:
+            # Sum hours for this user in this event
+            ev_hours = db.session.query(db.func.sum(Activity.carga_horaria))\
+                .join(Enrollment, Activity.id == Enrollment.activity_id)\
+                .filter(Enrollment.event_id == ev.id, Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).scalar() or 0
+            
+            items.append({
+                "id": ev.id,
+                "nome": ev.nome,
+                "data": ev.data_inicio,
+                "horas": int(ev_hours),
+                "tipo": ev.tipo,
+                "token": ev.token_publico
+            })
+        
+        return jsonify({
+            "items": items,
+            "total": pagination.total,
+            "pages": pagination.pages,
+            "current_page": pagination.page
+        })
+
+    if type == 'events':
+        pagination = event_service.get_user_events_paginated(current_user.cpf, page=page)
+        items = [serialize_event(e, current_user) for e in pagination.items]
+    elif type == 'activities':
+        pagination = event_service.get_user_activities_paginated(current_user.cpf, page=page)
+        items = [{
+            "id": e.id,
+            "atv_nome": e.activity.nome,
+            "event_nome": e.activity.event.nome,
+            "data": e.activity.data_atv,
+            "horas": e.activity.carga_horaria,
+            "presente": e.presente
+        } for e in pagination.items]
+    else: # certificates
+        pagination = event_service.get_user_certificates_paginated(current_user.cpf, page=page)
+        items = [{
+            "enrollment_id": e.id,
+            "atv_nome": e.activity.nome,
+            "event_id": e.event_id,
+            "event_nome": e.activity.event.nome,
+            "data": e.activity.data_atv,
+            "horas": e.activity.carga_horaria,
+            "hash": e.cert_hash
+        } for e in pagination.items]
+
+    return jsonify({
+        "items": items,
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": pagination.page
+    })
+
 @bp.route('/eventos', methods=['GET'])
 @login_required
 def listar_eventos():

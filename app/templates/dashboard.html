@@ -524,39 +524,50 @@
                 
                 let vagasStatus = '';
                 if (a.vagas == -1) {
-                    vagasStatus = '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>';
+                    vagasStatus = '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>';
                 } else {
                     const perc = Math.round((a.total_inscritos / a.vagas) * 100);
                     const color = perc > 90 ? 'danger' : (perc > 70 ? 'warning' : 'primary');
-                    vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle">${a.vagas - a.total_inscritos} vagas</span>`;
+                    vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle rounded-pill px-2">${a.vagas - a.total_inscritos} vagas</span>`;
                 }
                 
                 htmlAtividades += `
-                    <div class="p-3 bg-slate-50 rounded-4 mb-3 border ${a.inscrito ? 'border-primary shadow-sm bg-white' : ''}">
+                    <div class="p-3 bg-white rounded-4 mb-3 border shadow-sm transition-fast ${a.inscrito ? 'border-primary' : ''}">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div class="pe-2">
-                                <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : ''}">${a.nome}</h6>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <span class="me-2"><i class="fa-regular fa-clock me-1"></i>${a.carga_horaria}h</span>
-                                    <span><i class="fa-solid fa-location-dot me-1"></i>${a.local || 'Auditório'}</span>
+                                <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : 'text-slate-800'}">${a.nome}</h6>
+                                <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
+                                    <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.carga_horaria}h</span>
+                                    <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${a.local || 'Auditório'}</span>
+                                    ${a.palestrante ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${a.palestrante}</span>` : ''}
                                 </div>
                             </div>
                             ${vagasStatus}
                         </div>
-                        <button onclick="toggleInscricao(${a.id}, '${acao}')" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase" style="font-size: 0.7rem;">${btnText}</button>
+                        <button onclick="toggleInscricao(${a.id}, '${acao}')" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;">${btnText}</button>
                     </div>`;
             }); 
             
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
-                    <div class="glass-panel h-100 p-4 border-top border-4 border-primary">
-                        <div class="mb-4">
-                            <h5 class="fw-bold text-slate-900 mb-1">${ev.nome}</h5>
-                            <p class="text-muted small mb-0">${ev.descricao || 'Participe deste evento.'}</p>
+                    <div class="glass-panel h-100 p-0 border-0 shadow-lg overflow-hidden d-flex flex-column">
+                        <div class="p-4 bg-primary text-white">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-white bg-opacity-20 text-color-primary border-0 small text-uppercase fw-bold" style="letter-spacing: 1px;">EVENTO</span>
+                                <small class="fw-bold opacity-75"><i class="fa-regular fa-calendar-days me-1"></i>${ev.data_inicio.split('-').reverse().join('/')}</small>
+                            </div>
+                            <h5 class="fw-bold m-0 fs-5">${ev.nome}</h5>
                         </div>
-                        <div class="atividades-list">
-                            <label class="small fw-bold text-slate-400 text-uppercase letter-spacing-1 mb-3 d-block">Atividades</label>
-                            ${htmlAtividades}
+                        <div class="p-4 flex-grow-1 bg-slate-50">
+                            <p class="text-muted small mb-4" style="line-height: 1.6;">${ev.descricao || 'Participe deste evento acadêmico e emita seu certificado de horas complementares.'}</p>
+                            
+                            <div class="atividades-list">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <label class="small fw-bold text-slate-400 text-uppercase letter-spacing-1">Programação</label>
+                                    <span class="badge bg-slate-200 text-slate-600 rounded-pill">${ev.atividades.length}</span>
+                                </div>
+                                ${htmlAtividades}
+                            </div>
                         </div>
                     </div>
                 </div>`;
@@ -608,17 +619,29 @@
     }
 
     async function toggleInscricao(atvId, acao) { 
-        const res = await fetch('/api/toggle_inscricao', {
-            method: 'POST', 
-            headers:{'Content-Type':'application/json'}, 
-            body: JSON.stringify({activity_id: atvId, acao: acao})
-        }); 
-        const json = await res.json(); 
-        if(res.ok) {
-            carregarEventosAluno();
-            Toast.fire({icon: 'success', title: json.mensagem});
-        } else {
-            Swal.fire('Atenção', json.erro || json.mensagem, 'warning');
+        const btn = event.currentTarget;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/toggle_inscricao', {
+                method: 'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body: JSON.stringify({activity_id: atvId, acao: acao})
+            }); 
+            const json = await res.json(); 
+            if(res.ok) {
+                carregarEventosAluno();
+                Toast.fire({icon: 'success', title: json.mensagem});
+            } else {
+                Swal.fire('Atenção', json.erro || json.mensagem, 'warning');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        } catch (e) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
         }
     }
 

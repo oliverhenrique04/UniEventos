@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+    <!-- Header Perfil com Estatísticas -->
+    <div class="glass-panel p-4 mb-5 border-top border-4 border-primary bg-white shadow-sm">
+        <div class="row align-items-center">
+            <div class="col-md-auto text-center mb-3 mb-md-0">
+                <div class="bg-indigo-50 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm" style="width: 90px; height: 90px;">
+                    <i class="fa-solid fa-user-graduate fa-2x"></i>
+                </div>
+            </div>
+            <div class="col-md text-center text-md-start border-end-md">
+                <h3 class="fw-bold mb-1 text-slate-900">{{ user.nome }}</h3>
+                <div class="text-muted d-flex flex-wrap justify-content-center justify-content-md-start gap-3 small mb-2">
+                    <span><i class="fa-solid fa-id-card me-1"></i>{{ user.cpf }}</span>
+                    <span><i class="fa-solid fa-graduation-cap me-1"></i>RA: {{ user.ra or 'N/A' }}</span>
+                </div>
+                <div class="badge bg-slate-100 text-slate-600 border border-slate-200 px-3 py-2 rounded-pill">
+                    <i class="fa-solid fa-book-open me-1"></i> {{ user.curso or 'Curso não informado' }}
+                </div>
+            </div>
+            <div class="col-md-4 mt-4 mt-md-0">
+                <div class="row text-center g-2">
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded-4">
+                            <div class="fw-bold text-primary fs-4" id="stat-hours">0</div>
+                            <div class="text-muted x-small text-uppercase fw-bold">Horas Totais</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded-4">
+                            <div class="fw-bold text-primary fs-4" id="stat-events">0</div>
+                            <div class="text-muted x-small text-uppercase fw-bold">Eventos</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navegação por Abas -->
+    <ul class="nav nav-pills nav-fill mb-4 bg-white p-1 rounded-4 shadow-sm border" id="profileTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-eventos" onclick="carregarHistorico('events', 1)">
+                <i class="fa-solid fa-calendar-day me-2"></i>Agenda
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-atividades" onclick="carregarHistorico('activities', 1)">
+                <i class="fa-solid fa-timeline me-2"></i>Linha do Tempo
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-certificados" onclick="carregarHistorico('certificates', 1)">
+                <i class="fa-solid fa-award me-2"></i>Meus Certificados
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="profileTabsContent">
+        <!-- Tab Eventos -->
+        <div class="tab-pane fade show active" id="tab-eventos">
+            <div id="lista-eventos" class="row row-cols-1 row-cols-md-2 g-4"></div>
+            <nav class="mt-5"><ul class="pagination justify-content-center" id="pag-eventos"></ul></nav>
+        </div>
+
+        <!-- Tab Atividades -->
+        <div class="tab-pane fade" id="tab-atividades">
+            <div class="glass-panel p-0 overflow-hidden shadow-sm bg-white">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Atividade</th>
+                                <th>Evento</th>
+                                <th>Data</th>
+                                <th>Horas</th>
+                                <th class="text-end pe-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-atividades"></tbody>
+                    </table>
+                </div>
+            </div>
+            <nav class="mt-4"><ul class="pagination justify-content-center" id="pag-atividades"></ul></nav>
+        </div>
+
+        <!-- Tab Certificados -->
+        <div class="tab-pane fade" id="tab-certificados">
+            <div class="row row-cols-1 row-cols-md-3 g-4" id="lista-certificados"></div>
+            <nav class="mt-5"><ul class="pagination justify-content-center" id="pag-certificados"></ul></nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let CURRENT_TAB = 'events';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarHistorico('events', 1);
+        carregarEstatisticas();
+    });
+
+    async function carregarEstatisticas() {
+        const res = await fetch('/api/me/history?type=stats');
+        const stats = await res.json();
+        document.getElementById('stat-hours').innerText = stats.total_hours;
+        document.getElementById('stat-events').innerText = stats.total_events;
+    }
+
+    async function carregarHistorico(type, page) {
+        CURRENT_TAB = type;
+        const res = await fetch(`/api/me/history?type=${type}&page=${page}`);
+        const data = await res.json();
+        
+        if (type === 'events') renderEventos(data);
+        else if (type === 'activities') renderAtividades(data);
+        else renderCertificados(data);
+    }
+
+    function renderEventos(data) {
+        const div = document.getElementById('lista-eventos');
+        div.innerHTML = '';
+        if (data.items.length === 0) {
+            div.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="fa-regular fa-calendar-xmark fs-1 mb-3"></i><p>Você ainda não se inscreveu em nenhum evento.</p></div>';
+            return;
+        }
+        data.items.forEach(ev => {
+            div.innerHTML += `
+                <div class="col animate__animated animate__fadeIn">
+                    <div class="glass-panel h-100 p-4 d-flex flex-column border-start border-5 border-primary bg-white shadow-sm">
+                        <div class="mb-3 d-flex justify-content-between align-items-start">
+                            <h5 class="fw-bold text-dark m-0">${ev.nome}</h5>
+                            <span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>
+                        </div>
+                        <p class="text-muted small mb-4 flex-grow-1">${ev.descricao || ''}</p>
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
+                            <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${ev.data_inicio.split('-').reverse().join('/')}</small>
+                            <a href="/inscrever/${ev.token_publico}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        renderPaginacao(data.current_page, data.pages, 'pag-eventos', (p) => carregarHistorico('events', p));
+    }
+
+    function renderAtividades(data) {
+        const tbody = document.getElementById('tabela-atividades');
+        tbody.innerHTML = '';
+        data.items.forEach(atv => {
+            const status = atv.presente 
+                ? '<span class="badge bg-success-subtle text-success rounded-pill px-3">Confirmada</span>' 
+                : '<span class="badge bg-slate-100 text-slate-400 rounded-pill px-3">Inscrito</span>';
+            
+            tbody.innerHTML += `
+                <tr class="animate__animated animate__fadeIn">
+                    <td class="ps-4 fw-bold text-dark">${atv.atv_nome}</td>
+                    <td><small class="text-muted">${atv.event_nome}</small></td>
+                    <td><small>${atv.data.split('-').reverse().join('/')}</small></td>
+                    <td><span class="badge bg-light text-dark border">${atv.horas}h</span></td>
+                    <td class="text-end pe-4">${status}</td>
+                </tr>`;
+        });
+        renderPaginacao(data.current_page, data.pages, 'pag-atividades', (p) => carregarHistorico('activities', p));
+    }
+
+    function renderCertificados(data) {
+        const div = document.getElementById('lista-certificados');
+        div.innerHTML = '';
+        if (data.items.length === 0) {
+            div.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="fa-solid fa-stamp fs-1 mb-3 text-slate-200"></i><p>Nenhum certificado emitido ainda. Confirme sua presença nos eventos!</p></div>';
+            return;
+        }
+        data.items.forEach(cert => {
+            div.innerHTML += `
+                <div class="col animate__animated animate__fadeIn">
+                    <div class="glass-panel text-center p-4 bg-white border-top border-4 border-success h-100 shadow-sm">
+                        <div class="bg-success-subtle text-success rounded-circle d-inline-flex p-3 mb-3">
+                            <i class="fa-solid fa-certificate fa-2x"></i>
+                        </div>
+                        <h6 class="fw-bold mb-1">${cert.atv_nome}</h6>
+                        <p class="text-muted x-small mb-3">${cert.event_nome}</p>
+                        <div class="bg-light p-2 rounded-3 mb-3 border">
+                            <div class="x-small text-muted mb-1">Carga Horária</div>
+                            <div class="fw-bold text-dark">${cert.horas} Horas</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="/api/certificates/download/${cert.enrollment_id}" class="btn btn-sm btn-primary rounded-pill">
+                                <i class="fa-solid fa-download me-1"></i> Baixar PDF
+                            </a>
+                            <small class="text-muted font-monospace" style="font-size: 0.6rem;">HASH: ${cert.hash || '---'}</small>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        renderPaginacao(data.current_page, data.pages, 'pag-certificados', (p) => carregarHistorico('certificates', p));
+    }
+
+    function renderPaginacao(current, total, containerId, callback) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        if (total <= 1) return;
+
+        const ul = document.createElement('ul');
+        ul.className = 'pagination pagination-sm m-0';
+
+        const createItem = (page, active = false, disabled = false, text = null) => {
+            const li = document.createElement('li');
+            li.className = `page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.innerText = text || page;
+            if (!disabled) a.onclick = (e) => { e.preventDefault(); callback(page); };
+            li.appendChild(a);
+            return li;
+        };
+
+        ul.appendChild(createItem(current - 1, false, current === 1, '«'));
+        const pages = [];
+        const range = 1;
+        for (let i = 1; i <= total; i++) {
+            if (i === 1 || i === total || (i >= current - range && i <= current + range)) {
+                pages.push(i);
+            } else if (pages[pages.length - 1] !== '...') {
+                pages.push('...');
+            }
+        }
+        pages.forEach(p => {
+            if (p === '...') ul.appendChild(createItem(null, false, true, '...'));
+            else ul.appendChild(createItem(p, p === current));
+        });
+        ul.appendChild(createItem(current + 1, false, current === total, '»'));
+        container.appendChild(ul);
+    }
+</script>
+{% endblock %}
