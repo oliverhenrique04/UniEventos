@@ -3,6 +3,24 @@
 {% block content %}
 <div class="container py-4 fade-in-up">
 
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-gradient mb-0">Gerenciar Usuários</h2>
+            <p class="text-muted small">Controle total sobre participantes, professores e admins.</p>
+        </div>
+        <div class="btn-group">
+            <button onclick="abrirModalImportar()" class="btn btn-outline-primary shadow-sm">
+                <i class="fa-solid fa-file-csv me-2"></i>Importar CSV
+            </button>
+            <button onclick="abrirModalPermissoes()" class="btn btn-outline-primary shadow-sm">
+                <i class="fa-solid fa-users-gear me-2"></i>Permissões em Lote
+            </button>
+            <button onclick="abrirModalNovoUsuario()" class="btn btn-primary shadow-sm">
+                <i class="fa-solid fa-plus me-2"></i>Novo Usuário
+            </button>
+        </div>
+    </div>
+
     <!-- FILTERS -->
     <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary">
         <h6 class="fw-bold mb-3 text-uppercase small text-muted">Filtros Avançados</h6>
@@ -21,7 +39,10 @@
             </div>
             <div class="col-md-3">
                 <label class="small fw-bold">Curso</label>
-                <input type="text" id="filtCurso" class="form-control form-control-sm" placeholder="Filtrar por curso...">
+                <select id="filtCurso" class="form-select form-select-sm">
+                    <option value="">-- Todos os Cursos --</option>
+                    <!-- Populated via JS -->
+                </select>
             </div>
             <div class="col-md-2 d-flex align-items-end">
                 <button onclick="carregarUsuarios(1)" class="btn btn-primary btn-sm w-100">
@@ -99,7 +120,10 @@
                     <div class="row g-2 mb-3">
                         <div class="col-8">
                             <label class="small fw-bold">Curso</label>
-                            <input type="text" id="uCurso" class="form-control">
+                            <select id="uCurso" class="form-select">
+                                <option value="">-- Selecione --</option>
+                                <!-- Populated via JS -->
+                            </select>
                         </div>
                         <div class="col-4">
                             <label class="small fw-bold">Perfil</label>
@@ -111,12 +135,66 @@
                             </select>
                         </div>
                     </div>
+                    <div class="form-check form-switch bg-light p-2 rounded ps-5">
+                        <input class="form-check-input" type="checkbox" id="uCanCreate">
+                        <label class="form-check-label small fw-bold" for="uCanCreate">Permitir criar eventos</label>
+                        <div class="form-text x-small">Habilita o usuário a criar e gerenciar seus próprios eventos.</div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer border-0">
                 <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger me-auto d-none" id="btnExcluir" onclick="confirmarExcluir()">Excluir</button>
                 <button onclick="salvarUsuario()" class="btn btn-primary px-4">Salvar Dados</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import CSV -->
+<div class="modal fade" id="modalImportCsv" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Importar Usuários (CSV)</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Arquivo CSV deve conter cabeçalho: <code>username,email,nome,cpf,role,curso_nome,can_create_events</code></p>
+                <input type="file" id="fileCsv" class="form-control" accept=".csv">
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button onclick="enviarCsv()" class="btn btn-primary px-4">Importar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Bulk Permissions -->
+<div class="modal fade" id="modalBulkPermissions" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Permissões em Lote</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Atualizar permissão de criação de eventos para todos os <strong>professores</strong> de um curso.</p>
+                <div class="mb-3">
+                    <label class="small fw-bold">Selecione o Curso</label>
+                    <select id="bulkCurso" class="form-select">
+                        <option value="">-- Selecione --</option>
+                    </select>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="bulkCanCreate">
+                    <label class="form-check-label small fw-bold" for="bulkCanCreate">Permitir criar eventos</label>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button onclick="aplicarPermissoesLote()" class="btn btn-primary px-4">Aplicar</button>
             </div>
         </div>
     </div>
@@ -160,11 +238,40 @@
 {% block scripts %}
 <script>
     let MODO_EDICAO = false;
+    let CURSOS_CACHE = [];
 
     document.addEventListener('DOMContentLoaded', () => {
+        carregarCursosSelect();
         carregarUsuarios(1);
         carregarEventosParaInscricao();
     });
+
+    async function carregarCursosSelect() {
+        const res = await fetch('/api/courses/');
+        CURSOS_CACHE = await res.json();
+        
+        const populate = (id) => {
+            const sel = document.getElementById(id);
+            // Keep first option
+            const first = sel.options[0];
+            sel.innerHTML = '';
+            sel.appendChild(first);
+            CURSOS_CACHE.forEach(c => {
+                sel.innerHTML += `<option value="${c.nome}" data-id="${c.id}">${c.nome}</option>`;
+            });
+        };
+        
+        populate('filtCurso');
+        populate('uCurso');
+        
+        // For bulk permissions, we need ID as value mostly, but let's stick to consistent logic
+        // Actually, backend for bulk expects course_id.
+        const bulkSel = document.getElementById('bulkCurso');
+        bulkSel.innerHTML = '<option value="">-- Selecione --</option>';
+        CURSOS_CACHE.forEach(c => {
+            bulkSel.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+        });
+    }
 
     async function carregarUsuarios(page) {
         const filters = {
@@ -188,6 +295,10 @@
                 case 'admin': roleBadge = '<span class="badge bg-danger">Admin</span>'; break;
                 case 'professor': roleBadge = '<span class="badge bg-warning text-dark">Professor</span>'; break;
                 default: roleBadge = '<span class="badge bg-success bg-slate-200 text-slate-700">Participante</span>';
+            }
+
+            if(u.can_create_events) {
+                roleBadge += ' <span class="badge bg-info text-dark" title="Pode criar eventos"><i class="fa-solid fa-star"></i></span>';
             }
 
             tbody.innerHTML += `
@@ -282,6 +393,7 @@
         document.getElementById('uCpf').value = u.cpf;
         document.getElementById('uCurso').value = u.curso || '';
         document.getElementById('uRole').value = u.role;
+        document.getElementById('uCanCreate').checked = u.can_create_events || false;
         document.getElementById('modalTitulo').innerText = 'Editar Usuário';
         document.getElementById('btnExcluir').classList.remove('d-none');
         new bootstrap.Modal(document.getElementById('modalUsuario')).show();
@@ -297,6 +409,7 @@
             cpf: document.getElementById('uCpf').value,
             curso: document.getElementById('uCurso').value,
             role: document.getElementById('uRole').value,
+            can_create_events: document.getElementById('uCanCreate').checked,
             username_alvo: document.getElementById('userId').value
         };
 
@@ -327,6 +440,64 @@
             bootstrap.Modal.getInstance(document.getElementById('modalUsuario')).hide();
             carregarUsuarios(1);
             Toast.fire({ icon: 'success', title: 'Usuário removido.' });
+        }
+    }
+
+    // --- CSV IMPORT ---
+    function abrirModalImportar() {
+        document.getElementById('fileCsv').value = '';
+        new bootstrap.Modal(document.getElementById('modalImportCsv')).show();
+    }
+
+    async function enviarCsv() {
+        const fileInput = document.getElementById('fileCsv');
+        if (!fileInput.files[0]) return;
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const res = await fetch('/api/importar_usuarios_csv', {
+            method: 'POST',
+            body: formData
+        });
+
+        const json = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalImportCsv')).hide();
+            carregarUsuarios(1);
+            Swal.fire('Sucesso', json.mensagem, 'success');
+        } else {
+            Swal.fire('Erro', json.erro || 'Falha na importação', 'error');
+        }
+    }
+
+    // --- BULK PERMISSIONS ---
+    function abrirModalPermissoes() {
+        new bootstrap.Modal(document.getElementById('modalBulkPermissions')).show();
+    }
+
+    async function aplicarPermissoesLote() {
+        const courseId = document.getElementById('bulkCurso').value;
+        if (!courseId) return Swal.fire('Atenção', 'Selecione um curso.', 'warning');
+
+        const data = {
+            course_id: courseId,
+            can_create_events: document.getElementById('bulkCanCreate').checked
+        };
+
+        const res = await fetch('/api/permissoes_curso_lote', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        const json = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalBulkPermissions')).hide();
+            carregarUsuarios(1);
+            Swal.fire('Sucesso', json.mensagem, 'success');
+        } else {
+            Swal.fire('Erro', json.erro, 'error');
         }
     }
 

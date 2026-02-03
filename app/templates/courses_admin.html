@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-gradient mb-0">Gerenciar Cursos</h2>
+            <p class="text-muted small">Cadastre e edite os cursos da instituição.</p>
+        </div>
+        <button onclick="abrirModalNovoCurso()" class="btn btn-primary rounded-pill shadow-sm">
+            <i class="fa-solid fa-plus me-2"></i>Novo Curso
+        </button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="glass-panel p-0 overflow-hidden mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>Nome do Curso</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaCursos">
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal CRUD Course -->
+<div class="modal fade" id="modalCurso" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold" id="modalTitulo">Curso</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCurso">
+                    <input type="hidden" id="cursoId">
+                    <div class="mb-3">
+                        <label class="small fw-bold">Nome do Curso</label>
+                        <input type="text" id="cNome" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger me-auto d-none" id="btnExcluir" onclick="confirmarExcluir()">Excluir</button>
+                <button onclick="salvarCurso()" class="btn btn-primary px-4">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let MODO_EDICAO = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarCursos();
+    });
+
+    async function carregarCursos() {
+        const res = await fetch('/api/courses/');
+        const data = await res.json();
+        
+        const tbody = document.getElementById('tabelaCursos');
+        tbody.innerHTML = '';
+        
+        data.forEach(c => {
+            tbody.innerHTML += `
+                <tr class="animate__animated animate__fadeIn">
+                    <td class="ps-4 text-muted">#${c.id}</td>
+                    <td class="fw-bold text-dark">${c.nome}</td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-xs btn-light border" onclick="abrirModalEditar(${c.id}, '${c.nome}')" title="Editar">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function abrirModalNovoCurso() {
+        MODO_EDICAO = false;
+        document.getElementById('formCurso').reset();
+        document.getElementById('cursoId').value = '';
+        document.getElementById('modalTitulo').innerText = 'Novo Curso';
+        document.getElementById('btnExcluir').classList.add('d-none');
+        new bootstrap.Modal(document.getElementById('modalCurso')).show();
+    }
+
+    function abrirModalEditar(id, nome) {
+        MODO_EDICAO = true;
+        document.getElementById('cursoId').value = id;
+        document.getElementById('cNome').value = nome;
+        document.getElementById('modalTitulo').innerText = 'Editar Curso';
+        document.getElementById('btnExcluir').classList.remove('d-none');
+        new bootstrap.Modal(document.getElementById('modalCurso')).show();
+    }
+
+    async function salvarCurso() {
+        const id = document.getElementById('cursoId').value;
+        const nome = document.getElementById('cNome').value;
+        
+        if(!nome) return Swal.fire('Erro', 'Nome é obrigatório', 'error');
+
+        const url = MODO_EDICAO ? `/api/courses/${id}` : '/api/courses/';
+        const method = MODO_EDICAO ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nome: nome })
+        });
+
+        const json = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCurso')).hide();
+            carregarCursos();
+            Toast.fire({ icon: 'success', title: 'Salvo com sucesso!' });
+        } else {
+            Swal.fire('Erro', json.erro || json.mensagem, 'error');
+        }
+    }
+
+    async function confirmarExcluir() {
+        const id = document.getElementById('cursoId').value;
+        const confirm = await Swal.fire({ title: 'Excluir Curso?', text: "Isso pode afetar usuários vinculados.", icon: 'warning', showCancelButton: true });
+        if (!confirm.isConfirmed) return;
+
+        const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCurso')).hide();
+            carregarCursos();
+            Toast.fire({ icon: 'success', title: 'Removido.' });
+        } else {
+            Swal.fire('Erro', json.erro || json.mensagem, 'error');
+        }
+    }
+</script>
+{% endblock %}

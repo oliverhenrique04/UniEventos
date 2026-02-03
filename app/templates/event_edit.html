@@ -119,7 +119,9 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold text-slate-700">Curso / Departamento</label>
-                            <input type="text" class="form-control" id="evCurso" value="{{ event.curso or '' }}" placeholder="Ex: Ciência da Computação">
+                            <select class="form-select" id="evCurso" data-selected="{{ event.curso or '' }}">
+                                <option value="">-- Selecione --</option>
+                            </select>
                         </div>
 
                         <div class="mb-4">
@@ -240,6 +242,8 @@
     ];
 
     document.addEventListener('DOMContentLoaded', () => {
+        carregarCursosSelect();
+
         const lat = parseFloat("{{ event.latitude or -15.836 }}");
         const lon = parseFloat("{{ event.longitude or -48.019 }}");
 
@@ -323,6 +327,23 @@
             </div>
         `;
         document.getElementById('activitiesList').appendChild(div);
+    }
+
+    async function carregarCursosSelect() {
+        try {
+            const res = await fetch('/api/courses/');
+            const data = await res.json();
+            const sel = document.getElementById('evCurso');
+            const selected = sel.getAttribute('data-selected');
+            
+            data.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.nome;
+                opt.innerText = c.nome;
+                if(c.nome === selected) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        } catch (e) { console.error('Falha ao carregar cursos', e); }
     }
 
     document.getElementById('mainEventForm').onsubmit = async (e) => {

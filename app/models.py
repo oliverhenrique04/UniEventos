@@ -24,6 +24,10 @@ class User(UserMixin, db.Model):
     cpf = db.Column(db.String(14), unique=True)
     ra = db.Column(db.String(20), unique=True, nullable=True) # Added for academic tracking
     curso = db.Column(db.String(100), nullable=True) # Added for filtering
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=True)
+    can_create_events = db.Column(db.Boolean, default=False)
+
+    course_obj = db.relationship('Course', backref='students')
 
     def set_password(self, password):
         """Sets the user's password hash.
@@ -51,6 +55,19 @@ class User(UserMixin, db.Model):
             str: The username.
         """
         return self.username
+
+
+class Course(db.Model):
+    """Represents a Course/Major in the institution.
+    
+    Attributes:
+        id (int): Primary key.
+        nome (str): Course name (e.g., 'Ciência da Computação').
+    """
+    __tablename__ = 'courses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), unique=True, nullable=False)
 
 
 class Event(db.Model):

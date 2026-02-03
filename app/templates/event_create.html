@@ -116,7 +116,9 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold text-slate-700">Curso / Departamento</label>
-                            <input type="text" class="form-control" id="evCurso" placeholder="Ex: Ciência da Computação">
+                            <select class="form-select" id="evCurso">
+                                <option value="">-- Selecione --</option>
+                            </select>
                         </div>
 
                         <div class="mb-4">
@@ -227,6 +229,8 @@
     let map, marker;
 
     document.addEventListener('DOMContentLoaded', () => {
+        carregarCursosSelect();
+        
         // Initialize Map (Default to Brasilia/UniEuro area if possible, or center of BR)
         map = L.map('map').setView([-15.836, -48.019], 15); 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -253,6 +257,17 @@
         // Add initial activity
         addAtvRow();
     });
+
+    async function carregarCursosSelect() {
+        try {
+            const res = await fetch('/api/courses/');
+            const data = await res.json();
+            const sel = document.getElementById('evCurso');
+            data.forEach(c => {
+                sel.innerHTML += `<option value="${c.nome}">${c.nome}</option>`;
+            });
+        } catch (e) { console.error('Falha ao carregar cursos', e); }
+    }
 
     function setEventType(type) {
         currentType = type;

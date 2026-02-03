@@ -89,3 +89,50 @@ def editar_usuario():
         return jsonify({"mensagem": "Atualizado!"})
         
     return jsonify({"erro": "Usuário não encontrado"}), 404
+
+@bp.route('/importar_usuarios_csv', methods=['POST'])
+@login_required
+def importar_usuarios_csv():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+    
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+        
+    success_count, errors = admin_service.import_users_csv(file)
+    
+    return jsonify({
+        "mensagem": f"{success_count} usuários importados.",
+        "erros": errors
+    })
+
+@bp.route('/atualizar_permissoes', methods=['POST'])
+@login_required
+def atualizar_permissoes():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+        
+    data = request.json
+    success, msg = admin_service.update_user_permissions(
+        data.get('username'), 
+        data.get('can_create_events')
+    )
+    if success: return jsonify({"mensagem": msg})
+    return jsonify({"erro": msg}), 400
+
+@bp.route('/permissoes_curso_lote', methods=['POST'])
+@login_required
+def permissoes_curso_lote():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+        
+    data = request.json
+    count, msg = admin_service.bulk_update_permissions_by_course(
+        data.get('course_id'), 
+        data.get('can_create_events')
+    )
+    return jsonify({"mensagem": msg, "count": count})

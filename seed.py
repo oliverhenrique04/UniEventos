@@ -1,6 +1,6 @@
 # seed_large_with_enrollments.py
 from app import create_app, db
-from app.models import User, Event, Activity, Enrollment
+from app.models import User, Event, Activity, Enrollment, Course
 from datetime import datetime, timedelta
 import secrets
 import hashlib
@@ -71,6 +71,15 @@ def presence_deterministic(event_id: int, cpf: str, threshold: int = 80) -> bool
     return val < threshold
 
 
+def upsert_courses():
+    for nome in CURSOS:
+        c = Course.query.filter_by(nome=nome).first()
+        if not c:
+            c = Course(nome=nome)
+            db.session.add(c)
+    db.session.commit()
+
+
 def upsert_fixed_users():
     fixed = [
         ("admin", "Administrador Geral", "000.000.000-00", "ADMIN-001", "TI", "admin", "admin"),
@@ -78,12 +87,14 @@ def upsert_fixed_users():
         ("coord.marcos", "Msc. Marcos Oliveira", "555.666.777-88", "COORD-001", "Engenharia", "coordenador", "1234"),
     ]
 
-    for username, nome, cpf, ra, curso, role, pwd in fixed:
+    for username, nome, cpf, ra, curso_nome, role, pwd in fixed:
         user = User.query.filter(
             (User.username == username) |
             (User.cpf == cpf) |
             (User.ra == ra)
         ).first()
+
+        course_obj = Course.query.filter_by(nome=curso_nome).first()
 
         if not user:
             user = User(
@@ -92,7 +103,8 @@ def upsert_fixed_users():
                 email=f"{username}@unieuro.edu.br",
                 cpf=cpf,
                 ra=ra,
-                curso=curso,
+                curso=curso_nome,
+                course_id=course_obj.id if course_obj else None,
                 role=role
             )
             user.set_password(pwd)
@@ -102,7 +114,8 @@ def upsert_fixed_users():
             user.email = f"{username}@unieuro.edu.br"
             user.cpf = cpf
             user.ra = ra
-            user.curso = curso
+            user.curso = curso_nome
+            user.course_id = course_obj.id if course_obj else None
             user.role = role
 
 
@@ -122,7 +135,7 @@ def upsert_bulk_users(target_users: int):
             cpf = generate_valid_cpf(i + 200000)
 
         ra = f"2026{i:04d}"
-        curso = CURSOS[(i - 1) % len(CURSOS)]
+        curso_nome = CURSOS[(i - 1) % len(CURSOS)]
         role = "participante"
         email = f"{username}@unieuro.edu.br"
 
@@ -131,6 +144,8 @@ def upsert_bulk_users(target_users: int):
             (User.cpf == cpf) |
             (User.ra == ra)
         ).first()
+        
+        course_obj = Course.query.filter_by(nome=curso_nome).first()
 
         if not user:
             user = User(
@@ -139,7 +154,8 @@ def upsert_bulk_users(target_users: int):
                 email=email,
                 cpf=cpf,
                 ra=ra,
-                curso=curso,
+                curso=curso_nome,
+                course_id=course_obj.id if course_obj else None,
                 role=role
             )
             user.set_password(DEFAULT_PASSWORD)
@@ -149,7 +165,8 @@ def upsert_bulk_users(target_users: int):
             user.email = email
             user.cpf = cpf
             user.ra = ra
-            user.curso = curso
+            user.curso = curso_nome
+            user.course_id = course_obj.id if course_obj else None
             user.role = role
 
         existing_cpfs.add(cpf)
@@ -319,6 +336,9 @@ def ensure_min_participants_per_event(min_participants: int):
 def run_seed_large():
     app = create_app()
     with app.app_context():
+        # First ensure courses exist
+        upsert_courses()
+
         upsert_fixed_users()
         db.session.commit()
 
@@ -335,6 +355,7 @@ def run_seed_large():
         print(f"Eventos: {Event.query.count()}")
         print(f"Atividades: {Activity.query.count()}")
         print(f"Inscricoes: {Enrollment.query.count()}")
+        print(f"Cursos: {Course.query.count()}")
 
 
 if __name__ == "__main__":

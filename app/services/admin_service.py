@@ -1,6 +1,8 @@
-from app.models import User, Enrollment, Activity, Event, db
+from app.models import User, Enrollment, Activity, Event, Course, db
 from app.repositories.user_repository import UserRepository
 from sqlalchemy import or_
+import csv
+import io
 
 class AdminService:
     """Service layer for administrative user management tasks.
@@ -130,3 +132,76 @@ class AdminService:
         db.session.add(enrollment)
         db.session.commit()
         return True, "Inscrição realizada com sucesso."
+
+    def import_users_csv(self, file_stream):
+        """
+        Imports users from a CSV file.
+        Expected format: username,email,nome,cpf,role,curso_nome
+        """
+        stream = io.StringIO(file_stream.read().decode("UTF8"), newline=None)
+        csv_input = csv.DictReader(stream)
+        
+        success_count = 0
+        errors = []
+        
+        for row in csv_input:
+            try:
+                username = row.get('username')
+                cpf = row.get('cpf')
+                
+                if not username or not cpf:
+                    continue
+                    
+                # Check if user exists
+                if self.user_repo.get_by_username(username) or self.user_repo.get_by_cpf(cpf):
+                    errors.append(f"Usuário {username} ou CPF {cpf} já existe.")
+                    continue
+                
+                # Resolve course if provided
+                course_obj = None
+                curso_nome = row.get('curso_nome')
+                if curso_nome:
+                    course_obj = Course.query.filter(Course.nome.ilike(curso_nome)).first()
+                
+                user = User(
+                    username=username,
+                    email=row.get('email'),
+                    nome=row.get('nome'),
+                    cpf=cpf,
+                    role=row.get('role', 'participante'),
+                    curso=curso_nome, # Keep string for legacy
+                    course_id=course_obj.id if course_obj else None,
+                    can_create_events=(row.get('can_create_events', '0') == '1')
+                )
+                user.set_password(row.get('password', '123456')) # Default password
+                
+                db.session.add(user)
+                success_count += 1
+            except Exception as e:
+                errors.append(f"Erro na linha {username}: {str(e)}")
+        
+        db.session.commit()
+        return success_count, errors
+
+    def update_user_permissions(self, username, can_create_events):
+        """Updates specific permission flags for a user."""
+        user = self.user_repo.get_by_username(username)
+        if not user:
+            return False, "Usuário não encontrado."
+            
+        user.can_create_events = can_create_events
+        self.user_repo.update()
+        return True, "Permissões atualizadas."
+
+    def bulk_update_permissions_by_course(self, course_id, can_create_events, role_filter='professor'):
+        """
+        Updates permissions for all users of a specific course and role.
+        """
+        users = User.query.filter_by(course_id=course_id, role=role_filter).all()
+        count = 0
+        for user in users:
+            user.can_create_events = can_create_events
+            count += 1
+        
+        db.session.commit()
+        return count, f"{count} professores atualizados."

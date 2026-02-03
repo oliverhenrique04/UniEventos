@@ -12,7 +12,7 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
 
     # Register Blueprints
-    from app.api import auth, events, activities, admin, reports, certificates
+    from app.api import auth, events, activities, admin, reports, certificates, courses
     from app.main import routes, errors
 
     app.register_blueprint(auth.bp)
@@ -21,6 +21,7 @@ def create_app(config_class=Config):
     app.register_blueprint(admin.bp)
     app.register_blueprint(reports.bp)
     app.register_blueprint(certificates.bp)
+    app.register_blueprint(courses.bp)
     app.register_blueprint(routes.bp)
     app.register_blueprint(errors.bp)
 

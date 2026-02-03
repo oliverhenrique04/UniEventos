@@ -59,6 +59,14 @@ def gerenciar_usuarios():
         return "Acesso negado", 403
     return render_template('users_admin.html', user=current_user)
 
+@bp.route('/cursos')
+@login_required
+def gerenciar_cursos():
+    """Page for full administrative course management CRUD."""
+    if current_user.role != 'admin':
+        return "Acesso negado", 403
+    return render_template('courses_admin.html', user=current_user)
+
 @bp.route('/confirmar_presenca/<int:atv_id>/<token_hash>')
 @login_required
 def confirmar_presenca_page(atv_id, token_hash):
