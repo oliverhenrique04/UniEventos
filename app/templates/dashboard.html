@@ -51,9 +51,51 @@
         }
     }
 
-    /* Projector Cinema Mode */
+    /* Projector Cinema Mode - Next Gen */
     .projector-bg {
-        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        background: #0f172a;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 50% 50%, rgba(15, 23, 42, 1) 0px, rgba(2, 6, 23, 1) 100%);
+        overflow: hidden !important;
+    }
+
+    .projector-bg::before {
+        content: "";
+        position: absolute;
+        width: 200%;
+        height: 200%;
+        top: -50%;
+        left: -50%;
+        background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+        opacity: 0.03;
+        pointer-events: none;
+    }
+    
+    .glass-card-premium {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        border-radius: 2rem;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .qr-hero-container {
+        background: white;
+        padding: 2.5rem;
+        border-radius: 3rem;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 20px 50px rgba(0, 0, 0, 0.3), 0 0 80px rgba(59, 130, 246, 0.2);
+        position: relative;
+        overflow: hidden;
+        animation: pulse-glow 4s infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+        0% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.1); }
+        100% { box-shadow: 0 0 80px rgba(59, 130, 246, 0.3); }
     }
     
     .qr-scanner-line {
@@ -61,45 +103,46 @@
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
-        background: rgba(59, 130, 246, 0.5);
-        box-shadow: 0 0 15px 5px rgba(59, 130, 246, 0.5);
-        animation: scan 3s linear infinite;
+        height: 2px;
+        background: linear-gradient(to right, transparent, #3b82f6, transparent);
+        box-shadow: 0 0 20px 2px #3b82f6;
+        animation: scan 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         z-index: 10;
     }
     
     @keyframes scan {
-        0% { top: 0; }
-        100% { top: 100%; }
+        0% { top: -5%; }
+        50% { top: 105%; }
+        100% { top: -5%; }
     }
 
     .timer-circle {
         position: relative;
-        width: 120px;
-        height: 120px;
+        width: 100px;
+        height: 100px;
     }
 
     .timer-circle svg {
         transform: rotate(-90deg);
-        width: 120px;
-        height: 120px;
+        width: 100px;
+        height: 100px;
     }
 
     .timer-circle circle {
         fill: none;
-        stroke-width: 8;
+        stroke-width: 6;
         stroke-linecap: round;
     }
 
     .timer-circle .bg {
-        stroke: rgba(255, 255, 255, 0.1);
+        stroke: rgba(255, 255, 255, 0.05);
     }
 
     .timer-circle .progress {
-        stroke: #3b82f6;
+        stroke: #6366f1;
         stroke-dasharray: 314;
         stroke-dashoffset: 0;
-        transition: stroke-dashoffset 1s linear;
+        transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
     }
 
     .timer-text {
@@ -107,9 +150,68 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        font-weight: 700;
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
         font-size: 1.5rem;
         color: white;
+        text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+    }
+
+    .status-pill-live {
+        background:#ffffff6e;
+        border: 1px solid #ffffff6e;
+        color: #fff;
+        padding: 0.5rem 1.25rem;
+        border-radius: 100px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .status-pill-live span {
+        width: 8px;
+        height: 8px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .floating-control-panel {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 100px;
+        padding: 0.75rem 1.5rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .projector-select {
+        background: transparent !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 700 !important;
+        cursor: pointer;
+        padding-right: 2.5rem !important;
+    }
+
+    .projector-select option {
+        background: #1e293b;
+        color: white;
+    }
+
+    @media (min-width: 992px) {
+        .timer-circle { width: 110px; height: 110px; }
+        .timer-circle svg { width: 110px; height: 110px; }
+        .timer-text { font-size: 1.75rem; }
     }
 </style>
 {% endblock %}
@@ -337,80 +439,111 @@
 
 <div class="modal fade" id="modalProjetor" data-bs-backdrop="static" tabindex="-1">
     <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content projector-bg text-white border-0">
-            <!-- Top Control Bar -->
-            <div class="position-absolute top-0 w-100 p-4 d-flex justify-content-between align-items-center" style="z-index: 1000;">
+        <div class="modal-content projector-bg text-white border-0 d-flex flex-column">
+            
+            <!-- Dynamic Background Elements -->
+            <div class="position-absolute top-0 start-0 w-100 h-100 overflow-hidden" style="z-index: 0; opacity: 0.4; pointer-events: none;">
+                <div class="position-absolute translate-middle rounded-circle bg-primary bg-opacity-20 blur-3xl" style="width: 60vw; height: 60vw; top: -10%; left: -10%;"></div>
+                <div class="position-absolute translate-middle rounded-circle bg-indigo-600 bg-opacity-10 blur-3xl" style="width: 50vw; height: 50vw; bottom: -10%; right: -10%;"></div>
+            </div>
+
+            <!-- Top Control Bar (Professional) -->
+            <div class="w-100 p-4 d-flex justify-content-between align-items-center" style="z-index: 1000;">
                 <div class="d-flex align-items-center">
-                    <div class="bg-primary p-3 rounded-circle me-3 shadow-lg">
-                        <i class="fa-solid fa-display fs-4"></i>
+                    <div class="bg-white bg-opacity-10 backdrop-blur p-3 rounded-4 me-3 border border-white border-opacity-10">
+                        <i class="fa-solid fa-graduation-cap fs-4"></i>
                     </div>
                     <div>
-                        <h4 class="m-0 fw-bold text-white" id="projEventName">Evento</h4>
-                        <div class="text-white-50 small text-uppercase fw-bold letter-spacing-1">Modo de Projeção</div>
+                        <h4 class="m-0 fw-bold tracking-tight text-white" id="projEventName">UniEventos</h4>
+                        <div class="status-pill-live mt-1"><span></span> Ao Vivo</div>
                     </div>
                 </div>
-                <button class="btn btn-outline-light rounded-pill px-4 fw-bold shadow-sm" onclick="fecharProjetor()">
-                    <i class="fa-solid fa-circle-xmark me-2"></i> Encerrar Projeção
+
+                <!-- Central Activity Controller (Floating) -->
+                <div class="floating-control-panel d-none d-md-flex align-items-center gap-3">
+                    <i class="fa-solid fa-layer-group text-primary"></i>
+                    <select id="selectAtividadeProjetor" class="form-select projector-select" onchange="mudarAtividadeProjetor()"></select>
+                </div>
+
+                <button class="btn btn-white bg-white text-dark rounded-pill px-4 fw-bold shadow-lg border-0 hover-scale" onclick="fecharProjetor()">
+                    <i class="fa-solid fa-xmark me-2"></i> Sair
                 </button>
             </div>
 
-            <div class="modal-body d-flex flex-column justify-content-center align-items-center">
-                
-                <div class="w-100 mb-5 text-center" style="max-width: 600px;">
-                    <label class="text-white-50 small fw-bold text-uppercase mb-3 d-block">Selecione a atividade para check-in</label>
-                    <select id="selectAtividadeProjetor"
-                        class="form-select form-select-lg text-center fw-bold rounded-pill bg-white text-dark border-0 shadow-lg"
-                        onchange="mudarAtividadeProjetor()"></select>
+            <!-- Mobile Selector (Visible only on mobile) -->
+            <div class="d-md-none px-4 mb-4" style="z-index: 1000;">
+                <div class="p-3 bg-white bg-opacity-10 rounded-4 border border-white border-opacity-10 backdrop-blur">
+                    <select id="selectAtividadeProjetorMobile" class="form-select projector-select w-100" onchange="syncAndChange(this)"></select>
                 </div>
+            </div>
 
+            <!-- Main Stage -->
+            <div class="modal-body d-flex flex-column justify-content-center align-items-center p-4 p-lg-5 flex-grow-1 overflow-visible" style="z-index: 10;">
+                
                 <div id="projector-main-ui" class="d-none w-100 animate__animated animate__fadeIn">
-                    <div class="row align-items-center justify-content-center g-5">
-                        <!-- QR Code Column -->
-                        <div class="col-lg-5 text-center">
-                            <div class="position-relative d-inline-block p-4 bg-white rounded-5 shadow-2xl mb-4 overflow-hidden" id="qrContainer">
-                                <div class="qr-scanner-line"></div>
-                                <img id="imgQrDinamico" src=""
-                                    style="height: min(60vh, 500px); width: min(60vh, 500px); object-fit: contain; position: relative; z-index: 5;">
-                            </div>
-                            <div class="d-flex align-items-center justify-content-center gap-3">
-                                <div class="timer-circle">
-                                    <svg>
-                                        <circle class="bg" cx="60" cy="60" r="50"></circle>
-                                        <circle class="progress" id="timerProgress" cx="60" cy="60" r="50"></circle>
-                                    </svg>
-                                    <div class="timer-text" id="timerDisplay">30s</div>
+                    <div class="container-fluid h-100">
+                        <div class="row align-items-stretch justify-content-center g-5">
+                            
+                            <!-- QR Hero Section (70%) -->
+                            <div class="col-12 col-xl-8 d-flex flex-column align-items-center justify-content-center text-center">
+                                <div class="qr-hero-container mb-5" id="qrContainer">
+                                    <div class="qr-scanner-line"></div>
+                                    <img id="imgQrDinamico" src=""
+                                        class="img-fluid" style="height: min(55vh, 500px); aspect-ratio: 1/1; object-fit: contain; position: relative; z-index: 5;">
                                 </div>
-                                <div class="text-start">
-                                    <h5 class="fw-bold m-0 text-white">Código Dinâmico</h5>
-                                    <p class="text-white-50 small mb-0">Atualização automática de segurança</p>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Info Column -->
-                        <div class="col-lg-4">
-                            <div class="p-5 rounded-5 border border-white border-opacity-10 bg-white bg-opacity-5 backdrop-blur shadow-lg">
-                                <i class="fa-solid fa-qrcode fa-3x text-primary mb-4"></i>
-                                <h2 class="display-6 fw-bold mb-3" id="projActivityName">Atividade</h2>
-                                <p class="lead text-white-50 mb-5">Aponte a câmera do seu celular para o código ao lado para registrar sua presença instantaneamente.</p>
-                                
-                                <div class="d-grid gap-4">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="bg-white bg-opacity-10 p-3 rounded-4">
-                                            <i class="fa-solid fa-shield-halved text-info fs-4"></i>
+                                <div class="d-flex align-items-center gap-4 bg-opacity-5 p-3 px-4 rounded-pill backdrop-blur border border-white border-opacity-10">
+                                    <div class="timer-circle">
+                                        <svg>
+                                            <circle class="bg" cx="50" cy="50" r="45"></circle>
+                                            <circle class="progress" id="timerProgress" cx="50" cy="50" r="45"></circle>
+                                        </svg>
+                                        <div class="timer-text" id="timerDisplay">30s</div>
+                                    </div>
+                                    <div class="text-start">
+                                        <h5 class="fw-bold m-0 text-white tracking-tight">QR Code Dinâmico</h5>
+                                        <p class="text-white-50 x-small mb-0">Atualização de segurança ativada</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Context Details Section (30%) -->
+                            <div class="col-12 col-xl-4 d-flex">
+                                <div class="glass-card-premium p-5 w-100 d-flex flex-column justify-content-between shadow-2xl">
+                                    <div>
+                                        <div class="mb-5">
+                                            <h6 class="text-primary fw-bold text-uppercase letter-spacing-2 small mb-3">Atividade em Curso</h6>
+                                            <h1 class="display-5 fw-bold text-white mb-4 line-clamp-3" id="projActivityName">Selecione a atividade</h1>
+                                            <p class="lead text-white-50 opacity-80" style="line-height: 1.6;">Aponte sua câmera para o código ao lado para registrar sua presença e garantir suas horas.</p>
                                         </div>
-                                        <div>
-                                            <h6 class="fw-bold m-0">Validação Segura</h6>
-                                            <p class="text-white-50 small mb-0">Criptografia em tempo real</p>
+
+                                        <div class="d-grid gap-4 mt-5">
+                                            <div class="d-flex align-items-center gap-4 p-4 rounded-4 bg-opacity-5 border border-white border-opacity-10 transition-all hover-glass">
+                                                <div class=" bg-opacity-20 p-3 rounded-circle">
+                                                    <i class="fa-solid fa-fingerprint biometria-icon fs-4"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold m-0 text-white">Biometria Digital</h6>
+                                                    <p class="text-white-50 x-small mb-0">Validação individual por dispositivo</p>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-4 p-4 rounded-4  bg-opacity-5 border border-white border-opacity-10 transition-all hover-glass">
+                                                <div class="bg-indigo-500 bg-opacity-20 p-3 rounded-circle">
+                                                    <i class="fa-solid fa-location-dot text-indigo-400 fs-4"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold m-0 text-white">Geofencing</h6>
+                                                    <p class="text-white-50 x-small mb-0">Verificação de proximidade ativa</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="bg-white bg-opacity-10 p-3 rounded-4">
-                                            <i class="fa-solid fa-location-crosshairs text-warning fs-4"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="fw-bold m-0">Geolocalização</h6>
-                                            <p class="text-white-50 small mb-0">Verificação de proximidade</p>
+
+                                    <div class="mt-5 pt-5 border-top border-white border-opacity-10">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <img src="https://nuted.unieuro.edu.br/selo/static/file/logo_nuted.png" alt="NUTED" style="height: 40px; filter: brightness(0) invert(1); opacity: 0.5;">
+                                            <div class="vr bg-white opacity-20" style="height: 30px;"></div>
+                                            <small class="text-white-50 font-monospace" style="font-size: 0.65rem;">UniEventos v1.0 <br> © 2026 Institucional</small>
                                         </div>
                                     </div>
                                 </div>
@@ -419,10 +552,16 @@
                     </div>
                 </div>
 
-                <div id="msgSelect" class="text-white-50 p-5 border border-white border-opacity-20 rounded-5 border-dashed text-center animate__animated animate__fadeIn">
-                    <i class="fa-solid fa-hand-pointer fa-4x mb-4 opacity-25"></i>
-                    <h3 class="fw-bold">Aguardando Seleção</h3>
-                    <p class="mb-0">Escolha uma atividade acima para iniciar a projeção do check-in.</p>
+                <!-- Empty State -->
+                <div id="msgSelect" class="text-center animate__animated animate__fadeIn my-auto p-5 glass-card-premium" style="max-width: 500px;">
+                    <div class="bg-primary bg-opacity-10 p-4 rounded-circle d-inline-flex mb-4">
+                        <i class="fa-solid fa-display fa-4x text-primary opacity-75"></i>
+                    </div>
+                    <h3 class="fw-bold text-white mb-3">Modo de Projeção Ativo</h3>
+                    <p class="text-white-50 mb-4">Escolha uma atividade no seletor superior para exibir o QR Code de check-in para os participantes.</p>
+                    <div class="d-md-none bg-white bg-opacity-10 p-3 rounded-4">
+                        <i class="fa-solid fa-arrow-up text-primary me-2"></i> <small class="fw-bold">Use o seletor acima</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -685,16 +824,25 @@
     });
 
     // --------------------------
-    // PROJETOR (MODERNO)
+    // PROJETOR (EXPERIÊNCIA PREMIUM)
     // --------------------------
     function abrirProjetor(idEvento) {
         const ev = CACHE_EVENTOS.find(e => e.id == idEvento);
         if (!ev) return;
 
         document.getElementById('projEventName').innerText = ev.nome;
-        const select = document.getElementById('selectAtividadeProjetor');
-        select.innerHTML = '<option value="" disabled selected>Escolha a atividade</option>';
-        ev.atividades.forEach(a => { select.innerHTML += `<option value="${a.id}">${a.nome}</option>`; });
+        
+        // Populate both selectors (desktop and mobile)
+        const selectors = [
+            document.getElementById('selectAtividadeProjetor'),
+            document.getElementById('selectAtividadeProjetorMobile')
+        ];
+
+        selectors.forEach(sel => {
+            if (!sel) return;
+            sel.innerHTML = '<option value="" disabled selected>Escolha a atividade</option>';
+            ev.atividades.forEach(a => { sel.innerHTML += `<option value="${a.id}">${a.nome}</option>`; });
+        });
 
         atividadeAtualID = null;
         document.getElementById('projector-main-ui').classList.add('d-none');
@@ -703,9 +851,16 @@
         new bootstrap.Modal(document.getElementById('modalProjetor')).show();
 
         if (ev.atividades.length === 1) {
-            select.selectedIndex = 1;
+            selectors.forEach(sel => { if(sel) sel.selectedIndex = 1; });
             mudarAtividadeProjetor();
         }
+    }
+
+    function syncAndChange(el) {
+        const otherId = el.id === 'selectAtividadeProjetor' ? 'selectAtividadeProjetorMobile' : 'selectAtividadeProjetor';
+        const other = document.getElementById(otherId);
+        if (other) other.value = el.value;
+        mudarAtividadeProjetor();
     }
 
     function updateProgressCircle(seconds) {
@@ -717,35 +872,57 @@
         circle.style.strokeDashoffset = offset;
         text.innerText = `${seconds}s`;
         
-        // Change color based on time
-        if (seconds < 10) circle.style.stroke = '#ef4444';
-        else if (seconds < 20) circle.style.stroke = '#f59e0b';
-        else circle.style.stroke = '#3b82f6';
+        // Dynamic status colors
+        if (seconds < 10) {
+            circle.style.stroke = '#ef4444'; // Danger
+            text.classList.add('text-danger');
+        } else if (seconds < 20) {
+            circle.style.stroke = '#f59e0b'; // Warning
+            text.classList.remove('text-danger');
+            text.classList.add('text-warning');
+        } else {
+            circle.style.stroke = '#6366f1'; // Primary
+            text.classList.remove('text-danger', 'text-warning');
+        }
     }
 
     function mudarAtividadeProjetor() {
         const select = document.getElementById('selectAtividadeProjetor');
+        if (!select.value) return;
+        
         atividadeAtualID = select.value;
         const activityName = select.options[select.selectedIndex].text;
         
-        document.getElementById('projActivityName').innerText = activityName;
-        document.getElementById('msgSelect').classList.add('d-none');
-        document.getElementById('projector-main-ui').classList.remove('d-none');
+        // Fluid Transition
+        const mainUI = document.getElementById('projector-main-ui');
+        mainUI.classList.add('animate__fadeOut');
+        
+        setTimeout(() => {
+            document.getElementById('projActivityName').innerText = activityName;
+            document.getElementById('msgSelect').classList.add('d-none');
+            mainUI.classList.remove('d-none', 'animate__fadeOut');
+            mainUI.classList.add('animate__fadeIn');
 
-        atualizarQR(true);
-        if (intervaloQR) clearInterval(intervaloQR);
-        intervaloQR = setInterval(() => {
-            const now = new Date();
-            const restante = 30 - (now.getSeconds() % 30);
-            updateProgressCircle(restante);
-            if (restante === 30) atualizarQR(true);
-        }, 1000);
+            atualizarQR(true);
+            if (intervaloQR) clearInterval(intervaloQR);
+            intervaloQR = setInterval(() => {
+                const now = new Date();
+                const restante = 30 - (now.getSeconds() % 30);
+                updateProgressCircle(restante);
+                if (restante === 30) atualizarQR(true);
+            }, 1000);
+        }, 300);
     }
 
     function atualizarQR(force) {
         if (!atividadeAtualID) return;
         const img = document.getElementById('imgQrDinamico');
-        if (img) img.src = `/api/qrcode_atividade/${atividadeAtualID}?t=${Date.now()}`;
+        if (img) {
+            // Smooth image replacement
+            img.style.opacity = '0.5';
+            img.src = `/api/qrcode_atividade/${atividadeAtualID}?t=${Date.now()}`;
+            img.onload = () => img.style.opacity = '1';
+        }
     }
 
     function fecharProjetor() {

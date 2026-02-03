@@ -302,6 +302,11 @@ h6 {
   color: #044d84 !important;
 }
 
+.biometria-icon {
+  color: #fff !important;
+  background: transparent !important;
+}
+
 .border-primary {
   border-color: #044d84 !important;
 }
