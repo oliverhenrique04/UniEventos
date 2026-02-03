@@ -140,6 +140,7 @@ def validar_hash(cert_hash):
     activities = Activity.query.filter_by(event_id=enrollment.event_id).all()
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
     event = Event.query.get(enrollment.event_id)
+    curso = event.curso if event and event.curso else "N/A"
     
     # Sum hours of activities where this user was present in this event
     total_hours = 0
@@ -158,4 +159,5 @@ def validar_hash(cert_hash):
                            evento=event.nome,
                            data=data_br,
                            horas=total_hours,
+                           curso=curso,
                            hash=cert_hash)

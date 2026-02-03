@@ -221,6 +221,12 @@ h6 {
 }
 
 /* Utility classes */
+.text-gradient {
+  background: linear-gradient(90deg, #044d84 0%, #033e68 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
 
 .text-indigo-600 { color: var(--primary-600); }
 

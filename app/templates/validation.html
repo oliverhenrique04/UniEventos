@@ -1,108 +1,413 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container py-4 py-md-5 fade-in-up">
-    <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-6">
+<div class="page-validate py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-9 col-lg-7 col-xl-6">
 
-            <header class="text-center mb-4 mb-md-5 px-2">
-                <i class="fa-solid fa-shield-check fa-2x fa-md-3x text-primary mb-2 mb-md-3"></i>
-                <h2 class="fw-bold mb-2 fs-4 fs-md-2">Validação de Certificados</h2>
-                <p class="text-muted mb-0 small small-md">Verifique a autenticidade de documentos emitidos pela
-                    UniEventos.</p>
-            </header>
+                <!-- Top link -->
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <a href="/" class="back-link text-decoration-none small fw-semibold">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Voltar ao site
+                    </a>
 
-            {% if success %}
-            <section
-                class="glass-panel border-top border-2 border-success p-3 p-md-5 text-center shadow-lg mb-4 rounded-4">
-                <div class="mb-3 mb-md-4">
-                    <i
-                        class="fa-solid fa-circle-check fa-3x fa-md-4x text-success mb-2 mb-md-3 animate__animated animate__bounceIn"></i>
-                    <h3 class="text-success fw-bold mb-2 fs-5 fs-md-3">Certificado Autêntico</h3>
-                    <p class="text-muted small mb-0">Este documento foi emitido e validado eletronicamente.</p>
+                    <span class="small text-muted d-none d-sm-inline">
+                        UniEventos • Validação
+                    </span>
                 </div>
 
-                <div class="bg-light p-3 p-md-4 rounded-4 text-start mb-3 mb-md-4 border">
-                    <div class="mb-3 border-bottom pb-2">
-                        <label class="small text-muted fw-bold text-uppercase d-block mb-1">Participante</label>
-                        <div class="fw-bold text-dark fs-6 fs-md-5 text-break">{{ nome }}</div>
-                    </div>
-
-                    <div class="mb-3 border-bottom pb-2">
-                        <label class="small text-muted fw-bold text-uppercase d-block mb-1">Evento</label>
-                        <div class="fw-semibold text-slate-700 text-break">{{ evento }}</div>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-12 col-sm-6">
-                            <label class="small text-muted fw-bold text-uppercase d-block mb-1">Carga Horária</label>
-                            <div class="fw-bold text-primary">{{ horas }} Horas</div>
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <label class="small text-muted fw-bold text-uppercase d-block mb-1">Data</label>
-                            <div class="fw-bold text-slate-600">{{ data }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="text-muted small">
-                    ID de Validação:
-                    <span class="fw-bold text-dark font-monospace d-inline-block text-break">{{ hash }}</span>
-                </div>
-
-                <a href="/validar" class="btn btn-outline-secondary mt-4 mt-md-5 btn-sm px-3 py-2">
-                    Validar outro código
-                </a>
-            </section>
-
-            {% else %}
-            <section class="glass-panel p-3 p-md-5 shadow-sm rounded-4">
-                {% if erro %}
-                <div class="alert alert-danger border-0 rounded-4 mb-3 mb-md-4 d-flex align-items-start">
-                    <i class="fa-solid fa-triangle-exclamation me-3 fs-4 mt-1"></i>
-                    <div class="small">{{ erro }}</div>
-                </div>
-                {% endif %}
-
-                <form onsubmit="handleValidation(event)" class="text-center">
-                    <div class="mb-3 mb-md-4 text-start">
-                        <label class="form-label fw-bold text-slate-700 mb-2">Código de Autenticação</label>
-
-                        <input type="text" id="inputHash"
-                            class="form-control form-control-lg text-center font-monospace"
-                            placeholder="EX: A1B2-C3D4-E5F6" inputmode="text" autocapitalize="characters"
-                            autocomplete="off" spellcheck="false" required>
-
-                        <div class="form-text mt-2 small">
-                            O código de 16 caracteres localizado no rodapé do certificado.
+                <!-- Main Card -->
+                <div class="card validate-card border-0 shadow-lg overflow-hidden">
+                    <!-- Accent header -->
+                    <div class="validate-hero">
+                        <div class="validate-hero__inner">
+                            <div class="hero-icon">
+                                <i class="fa-solid fa-shield"></i>
+                            </div>
+                            <div class="text-center">
+                                <h1 class="h4 fw-bold mb-1">Validação de Certificados</h1>
+                                <p class="mb-0 text-muted small">
+                                    Verifique a autenticidade e validade jurídica de documentos emitidos pela plataforma
+                                    UniEventos.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-lg w-100 py-3 rounded-pill shadow-lg">
-                        <i class="fa-solid fa-magnifying-glass me-2"></i>
-                        Verificar Autenticidade
-                    </button>
-                </form>
-            </section>
-            {% endif %}
+                    <div class="card-body p-4 p-md-5">
 
+                        {% if success %}
+                        <!-- Success State -->
+                        <div class="status-box status-success mb-4">
+                            <div class="status-box__icon">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold">Documento autêntico</div>
+                                <div class="small text-muted">Emitido e assinado digitalmente.</div>
+                            </div>
+                        </div>
+
+                        <div class="details-card mb-4 position-relative">
+                            <div class="details-watermark" aria-hidden="true">
+                                <i class="fa-solid fa-certificate"></i>
+                            </div>
+
+                            <div class="details-grid">
+                                <div class="details-row">
+                                    <div class="details-label">Participante</div>
+                                    <div class="details-value">{{ nome }}</div>
+                                </div>
+
+                                <div class="details-row">
+                                    <div class="details-label">Evento</div>
+                                    <div class="details-value">{{ evento }}</div>
+                                </div>
+                                <div class="details-row">
+                                    <div class="details-label">Curso</div>
+                                    <div class="details-value">{{ curso }}</div>
+                                </div>
+
+                                <div class="row g-3 pt-2">
+                                    <div class="col-6">
+                                        <div class="details-label">Carga horária</div>
+                                        <div class="details-value text-primary">{{ horas }}h</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="details-label">Data</div>
+                                        <div class="details-value">{{ data }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <div class="hash-badge mb-3">
+                                <span class="hash-badge__label">HASH</span>
+                                <span class="hash-badge__value">{{ hash }}</span>
+                            </div>
+
+                            <a href="/validar" class="btn btn-outline-primary w-100 rounded-pill py-3 fw-bold">
+                                <i class="fa-solid fa-rotate-left me-2"></i>Validar outro documento
+                            </a>
+                        </div>
+
+                        {% else %}
+
+                        {% if erro %}
+                        <div
+                            class="alert alert-danger border-0 rounded-4 d-flex align-items-start gap-3 mb-4 shadow-sm">
+                            <i class="fa-solid fa-circle-exclamation fs-4 mt-1"></i>
+                            <div>
+                                <div class="fw-semibold">Não foi possível validar</div>
+                                <div class="small">{{ erro }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Input State -->
+                        <form onsubmit="handleValidation(event)" class="validate-form" novalidate>
+                            <div class="mb-3">
+                                <label for="inputHash" class="form-label fw-bold mb-2">Código de autenticação</label>
+
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="fa-solid fa-barcode text-muted"></i>
+                                    </span>
+
+                                    <input type="text" id="inputHash"
+                                        class="form-control text-center font-monospace fw-bold border-start-0"
+                                        placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="Código de autenticação"
+                                        inputmode="text" autocapitalize="characters" autocomplete="off"
+                                        spellcheck="false" maxlength="19" required autofocus />
+                                </div>
+
+                                <div class="form-text mt-2 small text-muted">
+                                    Insira o código de 16 caracteres presente no rodapé do certificado.
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow-sm">
+                                Verificar autenticidade <i class="fa-solid fa-arrow-right ms-2"></i>
+                            </button>
+
+                            <div class="mt-3 small text-muted text-center">
+                                Dica: você pode colar o código inteiro; o campo formata automaticamente.
+                            </div>
+                        </form>
+
+                        {% endif %}
+
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="text-center mt-4">
+                    <p class="text-muted small mb-0">
+                        Problemas com a validação?
+                        <a href="#" class="text-decoration-none fw-semibold">Contate o suporte</a>
+                    </p>
+                </div>
+
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+    /* Page scope */
+    .page-validate {
+        background:
+            radial-gradient(900px 400px at 20% -10%, rgba(13, 110, 253, .12), transparent 60%),
+            radial-gradient(900px 400px at 80% 0%, rgba(13, 110, 253, .10), transparent 55%);
+    }
+
+    .back-link {
+        color: rgba(33, 37, 41, .75);
+        transition: color .15s ease;
+    }
+
+    .back-link:hover {
+        color: var(--bs-primary);
+    }
+
+    .validate-card {
+        border-radius: 1.25rem;
+    }
+
+    /* Hero */
+    .validate-hero {
+        position: relative;
+        padding: 1.25rem 1.25rem;
+        background: rgba(13, 110, 253, .08);
+        border-bottom: 1px solid rgba(0, 0, 0, .06);
+    }
+
+    .validate-hero::after {
+        content: "";
+        position: absolute;
+        inset: -60px -60px auto auto;
+        width: 220px;
+        height: 220px;
+        background: rgba(13, 110, 253, .18);
+        filter: blur(55px);
+        border-radius: 999px;
+        pointer-events: none;
+    }
+
+    .validate-hero__inner {
+        position: relative;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 1;
+    }
+
+    .hero-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: rgba(13, 110, 253, .12);
+        border: 1px solid rgba(13, 110, 253, .18);
+    }
+
+    .hero-icon i {
+        font-size: 1.75rem;
+        color: var(--bs-primary);
+    }
+
+    /* Status */
+    .status-box {
+        display: flex;
+        align-items: center;
+        gap: .9rem;
+        padding: 1rem 1.1rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(0, 0, 0, .06);
+        background: rgba(248, 249, 250, .85);
+    }
+
+    .status-box__icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+    }
+
+    .status-success {
+        background: rgba(25, 135, 84, .08);
+        border-color: rgba(25, 135, 84, .18);
+    }
+
+    .status-success .status-box__icon {
+        background: rgba(25, 135, 84, .12);
+        color: #198754;
+    }
+
+    .status-success .status-box__icon i {
+        font-size: 1.35rem;
+    }
+
+    /* Details */
+    .details-card {
+        position: relative;
+        border-radius: 1rem;
+        border: 1px solid rgba(0, 0, 0, .08);
+        background: rgba(255, 255, 255, .88);
+        padding: 1.25rem 1.25rem;
+        overflow: hidden;
+    }
+
+    .details-watermark {
+        position: absolute;
+        inset: 50% auto auto 50%;
+        transform: translate(-50%, -50%);
+        opacity: .09;
+        font-size: 7.5rem;
+        color: #6c757d;
+        pointer-events: none;
+    }
+
+    .details-grid {
+        position: relative;
+        z-index: 1;
+    }
+
+    .details-row {
+        padding: .65rem 0;
+        border-bottom: 1px dashed rgba(0, 0, 0, .12);
+    }
+
+    .details-row:last-child {
+        border-bottom: 0;
+    }
+
+    .details-label {
+        font-size: .72rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: rgba(33, 37, 41, .6);
+        font-weight: 700;
+        margin-bottom: .15rem;
+    }
+
+    .details-value {
+        font-weight: 700;
+        color: #212529;
+        font-size: 1.05rem;
+    }
+
+    /* Hash */
+    .hash-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .55rem .8rem;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, .10);
+        background: rgba(248, 249, 250, .95);
+    }
+
+    .hash-badge__label {
+        font-size: .7rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: rgba(33, 37, 41, .55);
+        font-weight: 800;
+    }
+
+    .hash-badge__value {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 800;
+        color: rgba(33, 37, 41, .75);
+    }
+
+    /* Form focus polish */
+    .validate-form .form-control:focus {
+        box-shadow: 0 0 0 .25rem rgba(13, 110, 253, .15);
+        border-color: rgba(13, 110, 253, .45);
+    }
+
+    .validate-form .input-group-text {
+        border-radius: 999px 0 0 999px;
+    }
+
+    .validate-form .form-control {
+        border-radius: 0 999px 999px 0;
+        letter-spacing: .18em;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    function normalizeHash(raw) {
+        return (raw || "")
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, "")
+            .slice(0, 16);
+    }
+
+    function formatHash(groups16) {
+        // XXXX-XXXX-XXXX-XXXX
+        return groups16.replace(/(.{4})/g, "$1-").replace(/-$/, "");
+    }
+
     function handleValidation(e) {
         e.preventDefault();
-        const input = document.getElementById('inputHash');
-        const hash = input.value.trim().toUpperCase().replace(/\s+/g, '');
 
-        if (hash) {
-            window.location.href = `/validar/${hash}`;
-        } else {
+        const input = document.getElementById("inputHash");
+        const btn = e.target.querySelector('button[type="submit"]');
+
+        const normalized = normalizeHash(input.value);
+        if (normalized.length !== 16) {
+            input.classList.add("is-invalid");
             input.focus();
+            setTimeout(() => input.classList.remove("is-invalid"), 2000);
+            return;
         }
+
+        // Loading state
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Verificando...';
+
+        const finalHash = normalized; // rota espera sem hífen
+        window.location.href = `/validar/${finalHash}`;
+        // se quiser preservar o botão em caso de navegação bloqueada:
+        setTimeout(() => { btn.disabled = false; btn.innerHTML = original; }, 2500);
     }
+
+    (function initMask() {
+        const input = document.getElementById("inputHash");
+        if (!input) return;
+
+        input.addEventListener("input", () => {
+            const cursorWasEnd = input.selectionStart === input.value.length;
+            const normalized = normalizeHash(input.value);
+            const formatted = formatHash(normalized);
+
+            input.value = formatted;
+
+            // Mantém o cursor no final (melhor UX para colar/digitar)
+            if (cursorWasEnd) {
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        });
+
+        input.addEventListener("paste", () => {
+            setTimeout(() => {
+                const normalized = normalizeHash(input.value);
+                input.value = formatHash(normalized);
+            }, 0);
+        });
+    })();
 </script>
 {% endblock %}
