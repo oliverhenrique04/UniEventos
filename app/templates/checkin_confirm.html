@@ -1,45 +1,166 @@
 {% extends 'base.html' %}
 
+{% block head_styles %}
+<style>
+    .checkin-card {
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        transition: transform 0.3s ease;
+    }
+
+    .checkin-header {
+        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        padding: 3rem 2rem;
+        color: white;
+        position: relative;
+    }
+
+    .checkin-icon-wrapper {
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        backdrop-filter: blur(5px);
+    }
+
+    .activity-details {
+        background: #f8fafc;
+        border-radius: 20px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .detail-item {
+        margin-bottom: 1rem;
+    }
+
+    .detail-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .label-caps {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    .value-bold {
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1.3;
+    }
+
+    .btn-confirm {
+        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        border: none;
+        color: white;
+        font-weight: 700;
+        padding: 1rem 2rem;
+        border-radius: 100px;
+        box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .btn-confirm:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 25px rgba(59, 130, 246, 0.4);
+        color: white;
+    }
+
+    .btn-confirm:active {
+        transform: translateY(0);
+    }
+
+    .success-animation {
+        color: #10b981;
+    }
+
+    .close-hint {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5 fade-in-up">
+<div class="container py-4 py-md-5">
     <div class="row justify-content-center">
-        <div class="col-lg-6 col-md-8 text-center">
-            <div class="glass-panel border-top border-5 border-primary py-5 px-4 shadow-lg bg-white">
-                <div class="mb-4">
-                    <div class="bg-indigo-50 d-inline-flex p-4 rounded-circle mb-3">
-                        <i class="fa-solid fa-user-check fa-3x text-primary"></i>
+        <div class="col-lg-5 col-md-8">
+            <div class="checkin-card animate__animated animate__fadeInUp">
+                <!-- Status Header -->
+                <div class="checkin-header text-center" id="header-visual">
+                    <div class="checkin-icon-wrapper">
+                        <i class="fa-solid fa-location-dot fa-2x" id="main-icon"></i>
                     </div>
-                    <h2 class="fw-bold">Confirmar Presença</h2>
-                    <p class="text-muted">Você está prestes a registrar sua presença na atividade abaixo:</p>
+                    <h3 class="fw-bold mb-1" id="main-title">Check-in</h3>
+                    <p class="opacity-75 small mb-0" id="main-subtitle">Confirme sua localização para registrar presença
+                    </p>
                 </div>
 
-                <!-- Detalhes da Atividade -->
-                <div class="bg-slate-50 p-4 rounded-4 border text-start mb-4">
-                    <div class="mb-3">
-                        <label class="x-small fw-bold text-slate-400 text-uppercase">Evento</label>
-                        <h5 class="fw-bold text-dark m-0">{{ activity.event.nome }}</h5>
-                    </div>
-                    <div class="mb-3">
-                        <label class="x-small fw-bold text-slate-400 text-uppercase">Atividade</label>
-                        <div class="fw-bold text-primary fs-5">{{ activity.nome }}</div>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="x-small fw-bold text-slate-400 text-uppercase">Local</label>
-                            <div class="small fw-semibold"><i class="fa-solid fa-location-dot me-1"></i> {{ activity.local or 'Auditório' }}</div>
+                <div class="p-4 p-md-5">
+                    <div id="checkin-content">
+                        <!-- Activity Info -->
+                        <div class="activity-details mb-4">
+                            <div class="detail-item">
+                                <span class="label-caps">Evento Institucional</span>
+                                <div class="value-bold fs-5">{{ activity.event.nome }}</div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label-caps">Atividade Específica</span>
+                                <div class="value-bold text-primary">{{ activity.nome }}</div>
+                            </div>
+                            <div class="row g-3 mt-1">
+                                <div class="col-6">
+                                    <span class="label-caps">Local / Ambiente</span>
+                                    <div class="small fw-bold text-dark">
+                                        <i class="fa-solid fa-building-columns text-slate-400 me-1"></i>
+                                        {{ activity.local or 'Auditório' }}
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <span class="label-caps">Carga Horária</span>
+                                    <div class="small fw-bold text-dark">
+                                        <i class="fa-solid fa-clock text-slate-400 me-1"></i>
+                                        {{ activity.carga_horaria }} Horas
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <label class="x-small fw-bold text-slate-400 text-uppercase">Horas</label>
-                            <div class="small fw-semibold"><i class="fa-regular fa-clock me-1"></i> {{ activity.carga_horaria }} Horas</div>
-                        </div>
-                    </div>
-                </div>
 
-                <div id="checkin-feedback" class="mt-4">
-                    <button id="btn-confirmar" onclick="confirmarPresencaDireta()" class="btn btn-primary btn-lg w-100 rounded-pill py-3 shadow-lg fw-bold">
-                        <i class="fa-solid fa-circle-check me-2"></i> Confirmar Agora
-                    </button>
-                    <p class="text-muted small mt-3"><i class="fa-solid fa-shield-halved me-1"></i> Validação segura via localização</p>
+                        <!-- Action Button -->
+                        <div class="text-center" id="action-area">
+                            <button id="btn-confirmar" onclick="confirmarPresencaDireta()"
+                                class="btn btn-confirm btn-lg w-100 mb-3">
+                                <i class="fa-solid fa-circle-check me-2"></i> Confirmar Presença
+                            </button>
+                            <div class="d-flex align-items-center justify-content-center gap-2 text-muted small">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                <span>Validação por geolocalização</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Close/Back Action (Always available if needed) -->
+                    <div class="text-center mt-4">
+                        <button onclick="fecharOuVoltar()"
+                            class="btn btn-link text-decoration-none text-slate-500 fw-semibold small">
+                            <i class="fa-solid fa-xmark me-1"></i> Cancelar e Sair
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -49,33 +170,39 @@
 
 {% block scripts %}
 <script>
+    /**
+     * Logic to close the window or redirect back.
+     * Some browsers block window.close() if not opened by script, 
+     * so we provide a fallback redirect.
+     */
+    function fecharOuVoltar() {
+        if (window.opener || window.history.length === 1) {
+            window.close();
+            // Fallback if close is blocked
+            setTimeout(() => {
+                window.location.href = '/perfil';
+            }, 500);
+        } else {
+            window.location.href = '/perfil';
+        }
+    }
+
     async function getPreciseLocation() {
         return new Promise((resolve, reject) => {
             const options = {
                 enableHighAccuracy: true,
-                timeout: 15000,
+                timeout: 10000,
                 maximumAge: 0
             };
 
             if (!navigator.geolocation) {
-                reject(new Error("Seu navegador não suporta geolocalização."));
+                reject(new Error("Geolocalização não suportada."));
                 return;
             }
 
             navigator.geolocation.getCurrentPosition(
                 (pos) => resolve(pos.coords),
-                (err) => {
-                    // Fallback attempt with lower accuracy if high accuracy fails (useful indoors)
-                    if (err.code === err.TIMEOUT) {
-                        navigator.geolocation.getCurrentPosition(
-                            (pos) => resolve(pos.coords),
-                            (err2) => reject(err2),
-                            { enableHighAccuracy: false, timeout: 5000 }
-                        );
-                    } else {
-                        reject(err);
-                    }
-                },
+                (err) => reject(err),
                 options
             );
         });
@@ -83,9 +210,15 @@
 
     async function confirmarPresencaDireta() {
         const btn = document.getElementById('btn-confirmar');
-        const feedback = document.getElementById('checkin-feedback');
+        const content = document.getElementById('checkin-content');
+        const header = document.getElementById('header-visual');
+        const icon = document.getElementById('main-icon');
+        const title = document.getElementById('main-title');
+        const subtitle = document.getElementById('main-subtitle');
+
         const originalHtml = btn.innerHTML;
 
+        // Loading State
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Sincronizando GPS...';
         btn.disabled = true;
 
@@ -93,15 +226,17 @@
         try {
             coords = await getPreciseLocation();
         } catch (e) {
-            console.warn("Location acquisition failed:", e.message);
+            console.warn("Location error:", e.message);
+            // We continue without coords if user denies or it fails, 
+            // the server will decide if it's mandatory.
         }
 
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Validando Token...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Registrando...';
 
         try {
             const res = await fetch('/api/validar_presenca', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     token: "CHECKIN:{{ activity.event_id }}:{{ activity.id }}:{{ token }}",
                     latitude: coords.latitude,
@@ -111,28 +246,48 @@
             const json = await res.json();
 
             if (res.ok) {
-                feedback.innerHTML = `
-                    <div class="animate__animated animate__zoomIn">
-                        <div class="text-success mb-3"><i class="fa-solid fa-circle-check fa-4x"></i></div>
-                        <h4 class="fw-bold text-dark">Presença Registrada!</h4>
-                        <p class="text-muted">Seu certificado já está disponível na sua conta.</p>
-                        <div class="d-grid gap-2">
-                            <a href="/perfil" class="btn btn-primary rounded-pill py-2">Ver Meus Certificados</a>
-                            <a href="/" class="btn btn-light border rounded-pill py-2">Voltar ao Início</a>
+                // Success State Update
+                header.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
+                icon.className = 'fa-solid fa-check-double fa-2x animate__animated animate__bounceIn';
+                title.innerText = 'Sucesso!';
+                subtitle.innerText = 'Presença confirmada com sucesso';
+
+                content.innerHTML = `
+                    <div class="text-center animate__animated animate__fadeIn">
+                        <div class="bg-emerald-50 text-emerald-600 p-4 rounded-4 mb-4 border border-emerald-100">
+                            <h5 class="fw-bold mb-2">Check-in Realizado!</h5>
+                            <p class="small mb-0">Sua participação foi registrada no sistema. Você já pode emitir seu certificado no perfil.</p>
                         </div>
-                    </div>`;
+                        
+                        <div class="d-grid gap-3">
+                            <a href="/perfil" class="btn btn-confirm btn-lg shadow-sm">
+                                <i class="fa-solid fa-certificate me-2"></i> Ver Meus Certificados
+                            </a>
+                            <button onclick="fecharOuVoltar()" class="btn btn-outline-secondary rounded-pill py-2 fw-bold">
+                                <i class="fa-solid fa-circle-xmark me-2"></i> Sair da Tela
+                            </button>
+                        </div>
+                        <p class="close-hint mt-3">Você pode fechar esta aba com segurança.</p>
+                    </div>
+                `;
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Falha na Validação',
-                    text: json.erro || 'O código expirou ou você está fora do local permitido.',
-                    confirmButtonColor: '#044d84'
+                    title: 'Ops!',
+                    text: json.erro || 'Não foi possível validar sua presença.',
+                    confirmButtonColor: '#4f46e5',
+                    confirmButtonText: 'Tentar Novamente'
                 });
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }
         } catch (err) {
-            Swal.fire('Erro', 'Não foi possível conectar ao servidor.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro de Conexão',
+                text: 'Não foi possível comunicar com o servidor. Verifique sua internet.',
+                confirmButtonColor: '#4f46e5'
+            });
             btn.innerHTML = originalHtml;
             btn.disabled = false;
         }
