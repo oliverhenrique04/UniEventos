@@ -59,6 +59,19 @@ def gerenciar_usuarios():
         return "Acesso negado", 403
     return render_template('users_admin.html', user=current_user)
 
+@bp.route('/confirmar_presenca/<int:atv_id>/<token_hash>')
+@login_required
+def confirmar_presenca_page(atv_id, token_hash):
+    """Landing page for direct QR code scanning and presence confirmation."""
+    from app.services.event_service import EventService
+    service = EventService()
+    activity = service.get_activity(atv_id)
+    
+    if not activity:
+        return render_template('404.html'), 404
+        
+    return render_template('checkin_confirm.html', activity=activity, token=token_hash, user=current_user)
+
 @bp.route('/eventos_admin')
 @login_required
 def gerenciar_eventos():

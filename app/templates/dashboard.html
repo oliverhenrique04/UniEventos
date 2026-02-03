@@ -153,8 +153,34 @@
 
     {% if user.role == 'participante' %}
     <div class="row justify-content-center mb-5">
-        <div class="col-12 col-md-10 col-lg-6 col-xl-6 text-center">
+        <div class="col-12 col-md-10 col-lg-6 text-center">
+            <!-- Scanner Section -->
+            <div class="glass-panel border-top border-5 border-primary py-5 px-4 mb-5 shadow-lg bg-white">
+                <div class="mb-4">
+                    <div class="bg-indigo-50 d-inline-flex p-4 rounded-circle mb-3">
+                        <i class="fa-solid fa-qrcode fa-3x text-primary"></i>
+                    </div>
+                    <h2 class="fw-bold">Check-in Digital</h2>
+                    <p class="text-muted">Aponte sua câmera para o QR Code dinâmico do evento para confirmar sua presença instantaneamente.</p>
+                </div>
+                
+                <div id="scanControl">
+                    <button onclick="iniciarScanner()" class="btn btn-primary btn-lg w-100 rounded-pill py-3 shadow-lg">
+                        <i class="fa-solid fa-camera me-2"></i> Abrir Scanner
+                    </button>
+                </div>
+                
+                <div id="areaCamera" class="mt-4 rounded-4 shadow-lg bg-dark overflow-hidden animate__animated animate__fadeIn" style="display:none;">
+                    <div id="reader"></div>
+                    <button onclick="pararScanner()" class="btn btn-dark w-100 rounded-0 py-3 text-danger fw-bold border-top border-secondary">
+                        <i class="fa-solid fa-circle-xmark me-2"></i> Cancelar
+                    </button>
+                </div>
+                
+                <div id="feedback" class="mt-4"></div>
+            </div>
 
+            <!-- Filters Section -->
             <div class="glass-panel p-3 p-md-4 bg-white shadow-sm border-top border-2 border-info text-start">
                 <h6 class="fw-bold mb-3 text-uppercase small text-muted">
                     <i class="fa-solid fa-magnifying-glass me-2"></i>Encontrar Eventos
@@ -1102,19 +1128,142 @@
             atividades: coletarAtividades('containerAtividadesEdit')
         };
 
-        const res = await fetch('/api/editar_evento', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        try {
+            const res = await fetch('/api/editar_evento', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('modalEditarEvento')).hide();
+                carregarEventosGestor(1);
+                Toast.fire({ icon: 'success', title: 'Evento atualizado!' });
+            } else {
+                Swal.fire('Erro', 'Não foi possível salvar as alterações.', 'error');
+            }
+        } catch (err) {
+            Swal.fire('Erro', 'Falha na conexão.', 'error');
+        }
+    }
 
-        if (res.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('modalEditarEvento')).hide();
-            carregarEventosGestor(1);
-            Toast.fire({ icon: 'success', title: 'Evento atualizado!' });
-        } else {
-            const json = await res.json().catch(() => ({}));
-            Swal.fire('Erro', json.erro || 'Não foi possível salvar as alterações.', 'error');
+    // --------------------------
+    // SCANNER OTIMIZADO
+    // --------------------------
+    let scanner = null;
+    function iniciarScanner() {
+        document.getElementById('scanControl').style.display = 'none';
+        document.getElementById('areaCamera').style.display = 'block';
+        document.getElementById('feedback').innerHTML = "";
+        
+        const config = { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
+        };
+        
+        scanner = new Html5QrcodeScanner("reader", config, false);
+        scanner.render(onScanSuccess, (err) => console.log(err));
+    }
+
+    function pararScanner() {
+        if(scanner) { scanner.clear().catch(error => console.error(error)); }
+        document.getElementById('areaCamera').style.display = 'none';
+        document.getElementById('scanControl').style.display = 'block';
+    }
+
+    async function getPreciseLocation() {
+        return new Promise((resolve, reject) => {
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            };
+
+            if (!navigator.geolocation) {
+                reject(new Error("Seu navegador não suporta geolocalização."));
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve(pos.coords),
+                (err) => {
+                    // Fallback attempt with lower accuracy if high accuracy fails
+                    if (err.code === err.TIMEOUT) {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => resolve(pos.coords),
+                            (err2) => reject(err2),
+                            { enableHighAccuracy: false, timeout: 5000 }
+                        );
+                    } else {
+                        reject(err);
+                    }
+                },
+                options
+            );
+        });
+    }
+
+    async function onScanSuccess(decodedText) {
+        if(scanner) scanner.clear(); 
+        document.getElementById('areaCamera').style.display = 'none'; 
+        
+        if (decodedText.includes('/confirmar_presenca/')) {
+            document.getElementById('feedback').innerHTML = '<div class="alert alert-info text-center shadow-sm rounded-pill"><i class="fa-solid fa-spinner fa-spin me-2"></i> Redirecionando para confirmação segura...</div>';
+            setTimeout(() => window.location.href = decodedText, 1000);
+            return;
+        }
+
+        // Legacy / Manual token handling with robust location
+        document.getElementById('feedback').innerHTML = `
+            <div class="glass-panel p-4 text-center border-top border-4 border-primary shadow-lg animate__animated animate__pulse animate__infinite">
+                <div class="spinner-border text-primary mb-3"></div>
+                <h5 class="fw-bold mb-1">Validando Presença...</h5>
+                <p class="text-muted small mb-0"><i class="fa-solid fa-satellite-dish me-1"></i> Sincronizando com satélites (GPS)...</p>
+            </div>`;
+
+        let coords = { latitude: null, longitude: null };
+        try {
+            coords = await getPreciseLocation();
+        } catch (e) {
+            console.warn("Geolocation Error:", e.message);
+            // We proceed, the server will handle the error if coordinates are required for that specific activity
+        }
+
+        try {
+            const res = await fetch('/api/validar_presenca', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({
+                    token: decodedText,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude
+                }) 
+            });
+            const json = await res.json();
+            
+            if(json.status === 'success') {
+                document.getElementById('feedback').innerHTML = `
+                    <div class="text-center animate__animated animate__fadeInUp">
+                        <div class="mb-3 text-success" style="font-size: 3rem;"><i class="fa-solid fa-circle-check"></i></div>
+                        <h4 class="fw-bold text-dark">Presença Confirmada!</h4>
+                        <p class="text-muted">Seu certificado já está disponível.</p>
+                        <a href="${json.download_link}" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow">
+                            <i class="fa-solid fa-download me-2"></i> Baixar Certificado
+                        </a>
+                        <button onclick="iniciarScanner()" class="btn btn-link text-secondary mt-2">Escanear outro código</button>
+                    </div>`;
+                document.getElementById('scanControl').style.display = 'none';
+            } else {
+                throw new Error(json.erro || "Código inválido");
+            }
+        } catch (e) {
+            document.getElementById('feedback').innerHTML = `
+                <div class="alert alert-danger border-0 shadow-sm text-center rounded-4 p-4 animate__animated animate__shakeX">
+                    <i class="fa-solid fa-triangle-exclamation fa-2x mb-3"></i>
+                    <h6 class="fw-bold">Erro de Validação</h6>
+                    <p class="small mb-0">${e.message}</p>
+                    <button onclick="iniciarScanner()" class="btn btn-dark btn-sm mt-3 rounded-pill">Tentar Novamente</button>
+                </div>`;
         }
     }
 </script>

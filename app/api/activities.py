@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_login import login_required, current_user
 from app.models import Activity, Enrollment, db
 from app.utils import gerar_hash_dinamico, validar_hash_dinamico
@@ -26,8 +26,7 @@ def toggle_inscricao():
 @bp.route('/qrcode_atividade/<int:atv_id>')
 def qrcode_atividade(atv_id):
     """
-    Generates a dynamic QR code for activity check-in.
-    The QR code contains a time-limited hash.
+    Generates a dynamic QR code for activity check-in as a direct link.
     """
     if not atv_id:
         return "ID Inválido", 404
@@ -38,7 +37,9 @@ def qrcode_atividade(atv_id):
             return "Atividade não encontrada", 404
             
         token = gerar_hash_dinamico(atv_id)
-        conteudo = f"CHECKIN:{activity.event_id}:{atv_id}:{token}"
+        # Generate a direct URL for scanning
+        base_url = current_app.config.get('BASE_URL', 'http://localhost:5000')
+        conteudo = f"{base_url}/confirmar_presenca/{atv_id}/{token}"
         
         qr = qrcode.QRCode(box_size=20, border=1)
         qr.add_data(conteudo)
@@ -56,10 +57,13 @@ def qrcode_atividade(atv_id):
 @login_required
 def validar_presenca():
     """
-    Validates a QR code scanned by a participant and registers their presence.
-    If valid, confirms attendance and returns a success message.
+    Validates a dynamic QR code and performs a geofencing check if applicable.
     """
-    token_full = request.json.get('token', '')
+    data_rcv = request.json
+    token_full = data_rcv.get('token', '')
+    user_lat = data_rcv.get('latitude')
+    user_lon = data_rcv.get('longitude')
+
     try:
         parts = token_full.split(":")
         evt_id = int(parts[1])
@@ -68,11 +72,23 @@ def validar_presenca():
     except (IndexError, ValueError):
         return jsonify({"erro": "Formato de QR Code inválido"}), 400
         
+    # 1. Cryptographic Validation (Time-based HMAC)
     if not validar_hash_dinamico(atv_id, hash_rcv):
-        return jsonify({"erro": "Código expirado ou inválido"}), 400
+        return jsonify({"erro": "Código expirado ou inválido (tente novamente)"}), 400
     
+    # 2. Geofencing Validation (Physical presence)
+    activity = Activity.query.get(atv_id)
+    if activity and activity.latitude and activity.longitude:
+        if not user_lat or not user_lon:
+            return jsonify({"erro": "Localização necessária para confirmar presença"}), 403
+        
+        from app.utils import haversine_distance
+        dist = haversine_distance(user_lat, user_lon, activity.latitude, activity.longitude)
+        if dist > 500: # 500 meters radius
+            return jsonify({"erro": f"Você está muito longe do local do evento ({int(dist)}m)"}), 403
+
     success, message, enrollment = event_service.confirm_attendance(
-        current_user, atv_id, evt_id
+        current_user, atv_id, evt_id, lat=user_lat, lon=user_lon
     )
     
     if not success:

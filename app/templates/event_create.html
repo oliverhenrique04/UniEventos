@@ -1,7 +1,10 @@
 {% extends 'base.html' %}
 
 {% block head_styles %}
+<!-- Leaflet Map CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <style>
+    #map { height: 350px; width: 100%; border-radius: 16px; border: 2px solid var(--slate-200); z-index: 1; }
     .step-card {
         border-radius: 20px;
         background: white;
@@ -115,9 +118,21 @@
                             <label class="form-label fw-bold text-slate-700">Curso / Departamento</label>
                             <input type="text" class="form-control" id="evCurso" placeholder="Ex: Ciência da Computação">
                         </div>
+
                         <div class="mb-4">
                             <label class="form-label fw-bold text-slate-700">Descrição Detalhada</label>
                             <textarea class="form-control" id="evDesc" rows="4" placeholder="Descreva os objetivos, público-alvo e informações relevantes..."></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700 d-flex justify-content-between">
+                                Localização do Check-in
+                                <small class="text-primary fw-normal">Clique no mapa para marcar o local</small>
+                            </label>
+                            <div id="map" class="mb-2 shadow-sm"></div>
+                            <input type="hidden" id="evLat">
+                            <input type="hidden" id="evLon">
+                            <div id="locationStatus" class="small text-muted"><i class="fa-solid fa-location-dot me-1"></i> Nenhuma localização marcada (opcional).</div>
                         </div>
                         
                         <div class="row g-3">
@@ -205,10 +220,31 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Leaflet Map JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     let currentType = 'PADRAO';
+    let map, marker;
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Initialize Map (Default to Brasilia/UniEuro area if possible, or center of BR)
+        map = L.map('map').setView([-15.836, -48.019], 15); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            if (marker) map.removeLayer(marker);
+            marker = L.marker([lat, lng]).addTo(map);
+            
+            document.getElementById('evLat').value = lat;
+            document.getElementById('evLon').value = lng;
+            document.getElementById('locationStatus').innerHTML = `<i class="fa-solid fa-circle-check text-success me-1"></i> Localização marcada: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        });
+
         // Set min dates
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('evDataIni').min = today;
@@ -302,6 +338,8 @@
         const data = {
             nome: document.getElementById('evNome').value,
             curso: document.getElementById('evCurso').value,
+            latitude: document.getElementById('evLat').value,
+            longitude: document.getElementById('evLon').value,
             descricao: document.getElementById('evDesc').value,
             data_inicio: document.getElementById('evDataIni').value,
             hora_inicio: document.getElementById('evHoraIni').value,

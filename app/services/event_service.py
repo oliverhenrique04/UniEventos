@@ -21,11 +21,20 @@ class EventService:
         is_rapido = data.get('is_rapido')
         token = secrets.token_urlsafe(12)
         
+        # Safe coordinate parsing
+        try:
+            lat = float(data.get('latitude')) if data.get('latitude') else None
+            lon = float(data.get('longitude')) if data.get('longitude') else None
+        except (ValueError, TypeError):
+            lat, lon = None, None
+
         event = Event(
             owner_username=owner_username,
             nome=data.get('nome'),
             descricao=data.get('descricao'),
             curso=data.get('curso'),
+            latitude=lat,
+            longitude=lon,
             tipo='RAPIDO' if is_rapido else 'PADRAO',
             data_inicio=data.get('data_inicio'),
             hora_inicio=data.get('hora_inicio'),
@@ -51,9 +60,18 @@ class EventService:
         if role != 'admin' and event.owner_username != owner_username:
             return None, "Sem permissão"
             
+        # Safe coordinate parsing
+        try:
+            lat = float(data.get('latitude')) if data.get('latitude') else None
+            lon = float(data.get('longitude')) if data.get('longitude') else None
+        except (ValueError, TypeError):
+            lat, lon = None, None
+
         event.nome = data.get('nome')
         event.descricao = data.get('descricao')
         event.curso = data.get('curso')
+        event.latitude = lat
+        event.longitude = lon
         event.data_inicio = data.get('data_inicio')
         event.hora_inicio = data.get('hora_inicio')
         event.data_fim = data.get('data_fim')
@@ -140,67 +158,49 @@ class EventService:
         return self.enrollment_repo.get_by_user_and_activity(user_cpf, activity_id)
 
     def toggle_enrollment(self, user, activity_id, action):
-        """
-        Handles user enrollment and disenrollment logic.
-        """
+        """Handles user enrollment and disenrollment logic."""
         activity = self.activity_repo.get_by_id(activity_id)
         if not activity: return None, "Atividade não encontrada"
-
-        existing = self.enrollment_repo.get_by_user_and_activity(user.cpf, activity_id)
+        existing = self.get_enrollment(activity_id, user.cpf)
 
         if action == 'inscrever':
             if existing: return existing, "Já inscrito"
-            
-            # Check capacity
             current_count = len(activity.enrollments)
             if activity.vagas != -1 and current_count >= activity.vagas:
                 return None, "Lotado!"
             
-            enrollment = Enrollment(
-                activity_id=activity_id,
-                event_id=activity.event_id,
-                user_cpf=user.cpf,
-                nome=user.nome,
-                presente=False
-            )
+            enrollment = Enrollment(activity_id=activity_id, event_id=activity.event_id, user_cpf=user.cpf, nome=user.nome, presente=False)
             saved = self.enrollment_repo.save(enrollment)
-            
-            # Notify on enrollment
             if user.email:
-                self.notification_service.send_email_task(
-                    user.email,
-                    f"Inscrição Confirmada: {activity.nome}",
-                    f"Olá {user.nome}, sua inscrição na atividade {activity.nome} do evento {activity.event.nome} foi confirmada!"
-                )
-            
+                self.notification_service.send_email_task(user.email, f"Inscrição Confirmada: {activity.nome}", f"Olá {user.nome}, sua inscrição na atividade {activity.nome} do evento {activity.event.nome} foi confirmada!")
             return saved, "Inscrição Realizada!"
-
         elif action == 'sair':
             if existing: self.enrollment_repo.delete(existing)
             return None, "Desinscrição realizada."
-        
         return None, "Ação inválida"
 
-    def confirm_attendance(self, user, activity_id, event_id):
+    def confirm_attendance(self, user, activity_id, event_id, lat=None, lon=None):
         activity = self.get_activity(activity_id)
         if not activity: return False, "Atividade não encontrada", None
         enrollment = self.get_enrollment(activity_id, user.cpf)
 
         if not enrollment:
             if activity.nome == "Check-in Presença":
-                enrollment = Enrollment(activity_id=activity_id, event_id=event_id, user_cpf=user.cpf, nome=user.nome, presente=True)
+                enrollment = Enrollment(activity_id=activity_id, event_id=event_id, user_cpf=user.cpf, nome=user.nome, presente=True, lat_checkin=lat, lon_checkin=lon)
                 self.enrollment_repo.save(enrollment)
             else:
                 return False, "Você não se inscreveu nesta atividade.", None
         else:
             enrollment.presente = True
+            enrollment.lat_checkin = lat
+            enrollment.lon_checkin = lon
             self.enrollment_repo.save(enrollment)
 
         if user.email:
             self.notification_service.send_email_task(user.email, f"Presença Confirmada: {activity.nome}", f"Parabéns {user.nome}! Sua presença na atividade {activity.nome} foi registrada com sucesso.")
         return True, "Presença confirmada!", enrollment
 
-    def get_user_events_paginated(self, user_cpf, page=1, per_page=10):
+    def get_user_events_paginated(self, user_cpf, page=1, per_page=10, filters=None):
         query = Event.query.join(Enrollment, Event.id == Enrollment.event_id).filter(Enrollment.user_cpf == user_cpf).distinct()
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
@@ -208,15 +208,26 @@ class EventService:
         query = Enrollment.query.filter_by(user_cpf=user_cpf).join(Activity)
         return query.order_by(Activity.data_atv.asc(), Activity.hora_atv.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
-    def get_user_certificates_paginated(self, user_cpf, page=1, per_page=10):
-        query = Enrollment.query.filter_by(user_cpf=user_cpf, presente=True).join(Activity)
+    def get_user_certificates_paginated(self, user_cpf, page=1, per_page=12):
+        query = Enrollment.query.filter_by(user_cpf=user_cpf, presente=True).filter(Enrollment.cert_hash.isnot(None)).join(Activity)
         return query.order_by(Activity.data_atv.asc(), Activity.hora_atv.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
     def _create_default_checkin_activity(self, event):
-        activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=0, vagas=-1)
+        activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=0, vagas=-1, latitude=event.latitude, longitude=event.longitude)
         self.activity_repo.save(activity)
 
     def _create_activities(self, event, activities_data):
         for atv in activities_data:
-            activity = Activity(event_id=event.id, nome=atv['nome'], palestrante=atv['palestrante'], local=atv['local'], descricao=atv.get('descricao', ''), data_atv=atv.get('data_atv'), hora_atv=atv.get('hora_atv'), carga_horaria=int(atv.get('horas', 0)), vagas=int(atv.get('vagas', -1)))
+            # Safe numeric parsing for activities
+            try:
+                horas = int(atv.get('horas', 0)) if atv.get('horas') else 0
+            except (ValueError, TypeError):
+                horas = 0
+                
+            try:
+                vagas = int(atv.get('vagas', -1)) if atv.get('vagas') else -1
+            except (ValueError, TypeError):
+                vagas = -1
+
+            activity = Activity(event_id=event.id, nome=atv['nome'], palestrante=atv['palestrante'], local=atv['local'], descricao=atv.get('descricao', ''), data_atv=atv.get('data_atv'), hora_atv=atv.get('hora_atv'), carga_horaria=horas, vagas=vagas, latitude=event.latitude, longitude=event.longitude)
             self.activity_repo.save(activity)

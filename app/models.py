@@ -86,6 +86,10 @@ class Event(db.Model):
     status = db.Column(db.String(20), default='ABERTO')
     curso = db.Column(db.String(100), nullable=True) # Added for filtering
     
+    # Geofencing Defaults
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+
     # Certificate Customization
     cert_bg_path = db.Column(db.String(200), nullable=True)
     cert_template_json = db.Column(db.Text, nullable=True) # JSON with positions of variables
@@ -120,6 +124,10 @@ class Activity(db.Model):
     hora_atv = db.Column(db.String(5))
     carga_horaria = db.Column(db.Integer)
     vagas = db.Column(db.Integer, default=-1)
+    
+    # Geofencing for security
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
 
     enrollments = db.relationship('Enrollment', backref='activity', cascade="all, delete-orphan")
 
@@ -149,4 +157,8 @@ class Enrollment(db.Model):
     cert_entregue = db.Column(db.Boolean, default=False)
     cert_data_envio = db.Column(db.DateTime, nullable=True)
     cert_email_alternativo = db.Column(db.String(120), nullable=True)
+
+    # Location Capture for Audit
+    lat_checkin = db.Column(db.Float, nullable=True)
+    lon_checkin = db.Column(db.Float, nullable=True)
 

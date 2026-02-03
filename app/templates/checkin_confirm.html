@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5 fade-in-up">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 text-center">
+            <div class="glass-panel border-top border-5 border-primary py-5 px-4 shadow-lg bg-white">
+                <div class="mb-4">
+                    <div class="bg-indigo-50 d-inline-flex p-4 rounded-circle mb-3">
+                        <i class="fa-solid fa-user-check fa-3x text-primary"></i>
+                    </div>
+                    <h2 class="fw-bold">Confirmar Presença</h2>
+                    <p class="text-muted">Você está prestes a registrar sua presença na atividade abaixo:</p>
+                </div>
+
+                <!-- Detalhes da Atividade -->
+                <div class="bg-slate-50 p-4 rounded-4 border text-start mb-4">
+                    <div class="mb-3">
+                        <label class="x-small fw-bold text-slate-400 text-uppercase">Evento</label>
+                        <h5 class="fw-bold text-dark m-0">{{ activity.event.nome }}</h5>
+                    </div>
+                    <div class="mb-3">
+                        <label class="x-small fw-bold text-slate-400 text-uppercase">Atividade</label>
+                        <div class="fw-bold text-primary fs-5">{{ activity.nome }}</div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="x-small fw-bold text-slate-400 text-uppercase">Local</label>
+                            <div class="small fw-semibold"><i class="fa-solid fa-location-dot me-1"></i> {{ activity.local or 'Auditório' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="x-small fw-bold text-slate-400 text-uppercase">Horas</label>
+                            <div class="small fw-semibold"><i class="fa-regular fa-clock me-1"></i> {{ activity.carga_horaria }} Horas</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="checkin-feedback" class="mt-4">
+                    <button id="btn-confirmar" onclick="confirmarPresencaDireta()" class="btn btn-primary btn-lg w-100 rounded-pill py-3 shadow-lg fw-bold">
+                        <i class="fa-solid fa-circle-check me-2"></i> Confirmar Agora
+                    </button>
+                    <p class="text-muted small mt-3"><i class="fa-solid fa-shield-halved me-1"></i> Validação segura via localização</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function getPreciseLocation() {
+        return new Promise((resolve, reject) => {
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            };
+
+            if (!navigator.geolocation) {
+                reject(new Error("Seu navegador não suporta geolocalização."));
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve(pos.coords),
+                (err) => {
+                    // Fallback attempt with lower accuracy if high accuracy fails (useful indoors)
+                    if (err.code === err.TIMEOUT) {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => resolve(pos.coords),
+                            (err2) => reject(err2),
+                            { enableHighAccuracy: false, timeout: 5000 }
+                        );
+                    } else {
+                        reject(err);
+                    }
+                },
+                options
+            );
+        });
+    }
+
+    async function confirmarPresencaDireta() {
+        const btn = document.getElementById('btn-confirmar');
+        const feedback = document.getElementById('checkin-feedback');
+        const originalHtml = btn.innerHTML;
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Sincronizando GPS...';
+        btn.disabled = true;
+
+        let coords = { latitude: null, longitude: null };
+        try {
+            coords = await getPreciseLocation();
+        } catch (e) {
+            console.warn("Location acquisition failed:", e.message);
+        }
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Validando Token...';
+
+        try {
+            const res = await fetch('/api/validar_presenca', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    token: "CHECKIN:{{ activity.event_id }}:{{ activity.id }}:{{ token }}",
+                    latitude: coords.latitude,
+                    longitude: coords.longitude
+                })
+            });
+            const json = await res.json();
+
+            if (res.ok) {
+                feedback.innerHTML = `
+                    <div class="animate__animated animate__zoomIn">
+                        <div class="text-success mb-3"><i class="fa-solid fa-circle-check fa-4x"></i></div>
+                        <h4 class="fw-bold text-dark">Presença Registrada!</h4>
+                        <p class="text-muted">Seu certificado já está disponível na sua conta.</p>
+                        <div class="d-grid gap-2">
+                            <a href="/perfil" class="btn btn-primary rounded-pill py-2">Ver Meus Certificados</a>
+                            <a href="/" class="btn btn-light border rounded-pill py-2">Voltar ao Início</a>
+                        </div>
+                    </div>`;
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Falha na Validação',
+                    text: json.erro || 'O código expirou ou você está fora do local permitido.',
+                    confirmButtonColor: '#044d84'
+                });
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        } catch (err) {
+            Swal.fire('Erro', 'Não foi possível conectar ao servidor.', 'error');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}
