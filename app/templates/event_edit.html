@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+
+{% block head_styles %}
+<!-- Leaflet Map CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+    #map { height: 350px; width: 100%; border-radius: 16px; border: 2px solid var(--slate-200); z-index: 1; }
+    .step-card {
+        border-radius: 20px;
+        background: white;
+        border: 1px solid var(--slate-200);
+        box-shadow: var(--glass-shadow);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    .step-header {
+        background: var(--slate-50);
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--slate-200);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .step-number {
+        width: 32px;
+        height: 32px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+    .activity-row {
+        background: var(--slate-50);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--slate-200);
+        position: relative;
+        transition: all 0.2s;
+    }
+    .activity-row:hover {
+        border-color: var(--primary-color);
+        background: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .btn-remove-atv {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: var(--slate-400);
+        transition: color 0.2s;
+    }
+    .btn-remove-atv:hover { color: #ef4444; }
+    
+    .type-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .type-option {
+        border: 2px solid var(--slate-200);
+        border-radius: 16px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+    .type-option i { font-size: 2rem; margin-bottom: 1rem; color: var(--slate-400); }
+    .type-option.active {
+        border-color: var(--primary-color);
+        background: var(--primary-50);
+    }
+    .type-option.active i { color: var(--primary-color); }
+    .type-option.active h6 { color: var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 pb-5 fade-in-up">
+    <form id="mainEventForm">
+        <input type="hidden" id="evId" value="{{ event.id }}">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">Início</a></li>
+                        <li class="breadcrumb-item"><a href="/eventos_admin" class="text-decoration-none text-muted">Gestão</a></li>
+                        <li class="breadcrumb-item active">Editar Evento</li>
+                    </ol>
+                </nav>
+                <h2 class="fw-bold m-0"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Editar Evento</h2>
+                <p class="text-muted mb-0">Atualize as informações do evento e suas atividades.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/eventos_admin" class="btn btn-light border">Cancelar</a>
+                <button type="submit" class="btn btn-primary px-4 shadow">
+                    <i class="fa-solid fa-save me-2"></i> Salvar Alterações
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- STEP 1: CONFIGURAÇÃO BÁSICA -->
+                <div class="step-card">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <h5 class="fw-bold m-0">Informações do Evento</h5>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700">Título do Evento</label>
+                            <input type="text" class="form-control form-control-lg" id="evNome" value="{{ event.nome }}" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700">Curso / Departamento</label>
+                            <input type="text" class="form-control" id="evCurso" value="{{ event.curso or '' }}" placeholder="Ex: Ciência da Computação">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700">Descrição Detalhada</label>
+                            <textarea class="form-control" id="evDesc" rows="4" placeholder="Descreva os objetivos...">{{ event.descricao or '' }}</textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700 d-flex justify-content-between">
+                                Localização do Check-in
+                                <small class="text-primary fw-normal">Clique no mapa para marcar o local</small>
+                            </label>
+                            <div id="map" class="mb-2 shadow-sm"></div>
+                            <input type="hidden" id="evLat" value="{{ event.latitude or '' }}">
+                            <input type="hidden" id="evLon" value="{{ event.longitude or '' }}">
+                            <div id="locationStatus" class="small text-muted"><i class="fa-solid fa-location-dot me-1"></i> 
+                                {% if event.latitude %}
+                                    Localização: {{ "%.4f"|format(event.latitude) }}, {{ "%.4f"|format(event.longitude) }}
+                                {% else %}
+                                    Nenhuma localização marcada (opcional).
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-slate-700">Data de Início</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fa-regular fa-calendar"></i></span>
+                                    <input type="date" id="evDataIni" class="form-control" value="{{ event.data_inicio }}" required>
+                                    <input type="time" id="evHoraIni" class="form-control" value="{{ event.hora_inicio }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-slate-700">Data de Término</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fa-regular fa-calendar-check"></i></span>
+                                    <input type="date" id="evDataFim" class="form-control" value="{{ event.data_fim }}" required>
+                                    <input type="time" id="evHoraFim" class="form-control" value="{{ event.hora_fim }}" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: TIPO E ATIVIDADES -->
+                <div class="step-card">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h5 class="fw-bold m-0">Cronograma e Atividades</h5>
+                    </div>
+                    <div class="p-4">
+                        <div class="type-selector mb-5">
+                            <div class="type-option {% if event.tipo == 'PADRAO' %}active{% endif %}" id="optStandard" onclick="setEventType('PADRAO')">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <h6 class="fw-bold mb-1">Evento Padrão</h6>
+                                <p class="text-muted small m-0">Múltiplas oficinas, palestras e minicursos.</p>
+                            </div>
+                            <div class="type-option {% if event.tipo == 'RAPIDO' %}active{% endif %}" id="optFast" onclick="setEventType('RAPIDO')">
+                                <i class="fa-solid fa-bolt"></i>
+                                <h6 class="fw-bold mb-1">Evento Rápido</h6>
+                                <p class="text-muted small m-0">Check-in único. Ideal para aulas ou reuniões.</p>
+                            </div>
+                        </div>
+
+                        <div id="containerPadrao" class="{% if event.tipo == 'RAPIDO' %}d-none{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold m-0">Lista de Atividades</h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAtvRow()">
+                                    <i class="fa-solid fa-plus me-1"></i> Adicionar Atividade
+                                </button>
+                            </div>
+                            <div id="activitiesList">
+                                <!-- Atividades carregadas via JS -->
+                            </div>
+                        </div>
+
+                        <div id="containerRapido" class="{% if event.tipo == 'PADRAO' %}d-none{% endif %}">
+                            <div class="alert alert-info border-0 rounded-4">
+                                <i class="fa-solid fa-circle-info me-2"></i>
+                                Para <strong>Eventos Rápidos</strong>, o sistema mantém automaticamente uma atividade de check-in única.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="glass-panel p-3 bg-white border-top border-2 border-warning mb-4 shadow-sm">
+                    <h6 class="fw-bold mb-2 small"><i class="fa-solid fa-circle-info text-warning me-2"></i>Importante</h6>
+                    <p class="x-small text-muted mb-0">Ao salvar, as atividades antigas serão substituídas pelas novas se você adicionar/remover itens. Certifique-se de manter as atividades que já possuem inscrições se desejar preservar os dados.</p>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet Map JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+    let currentType = '{{ event.tipo }}';
+    let map, marker;
+    const initialActivities = [
+        {% for atv in event.activities %}
+        {
+            id: {{ atv.id }},
+            nome: "{{ atv.nome }}",
+            horas: {{ atv.carga_horaria or 0 }},
+            palestrante: "{{ atv.palestrante or '' }}",
+            local: "{{ atv.local or '' }}",
+            vagas: {{ atv.vagas or -1 }},
+            data_atv: "{{ atv.data_atv or '' }}",
+            hora_atv: "{{ atv.hora_atv or '' }}"
+        },
+        {% endfor %}
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const lat = parseFloat("{{ event.latitude or -15.836 }}");
+        const lon = parseFloat("{{ event.longitude or -48.019 }}");
+
+        map = L.map('map').setView([lat, lon], 15); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        if ("{{ event.latitude }}") {
+            marker = L.marker([lat, lon]).addTo(map);
+        }
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            if (marker) map.removeLayer(marker);
+            marker = L.marker([lat, lng]).addTo(map);
+            document.getElementById('evLat').value = lat;
+            document.getElementById('evLon').value = lng;
+            document.getElementById('locationStatus').innerHTML = `<i class="fa-solid fa-circle-check text-success me-1"></i> Localização marcada: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        });
+
+        // Load existing activities
+        if (currentType === 'PADRAO') {
+            initialActivities.forEach(atv => addAtvRow(atv));
+        }
+    });
+
+    function setEventType(type) {
+        currentType = type;
+        document.getElementById('optStandard').classList.toggle('active', type === 'PADRAO');
+        document.getElementById('optFast').classList.toggle('active', type === 'RAPIDO');
+        document.getElementById('containerPadrao').classList.toggle('d-none', type === 'RAPIDO');
+        document.getElementById('containerRapido').classList.toggle('d-none', type === 'PADRAO');
+    }
+
+    function addAtvRow(data = {}) {
+        const id = 'atv_' + Math.random().toString(36).substr(2, 9);
+        const div = document.createElement('div');
+        div.className = 'activity-row animate__animated animate__fadeInUp';
+        div.id = id;
+        div.innerHTML = `
+            <input type="hidden" class="atv-id" value="${data.id || ''}">
+            <button type="button" class="btn btn-link btn-remove-atv" onclick="document.getElementById('${id}').remove()">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </button>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="small fw-bold text-muted mb-1">Título da Atividade</label>
+                    <input type="text" class="form-control atv-nome" value="${data.nome || ''}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Horas</label>
+                    <input type="number" class="form-control atv-horas" value="${data.horas || 0}" min="0" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="small fw-bold text-muted mb-1">Palestrante</label>
+                    <input type="text" class="form-control atv-palestrante" value="${data.palestrante || ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="small fw-bold text-muted mb-1">Local / Link</label>
+                    <input type="text" class="form-control atv-local" value="${data.local || ''}">
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Vagas</label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control atv-vagas" value="${data.vagas > 0 ? data.vagas : ''}" ${data.vagas === -1 ? 'disabled' : ''} min="1">
+                        <div class="input-group-text bg-white">
+                            <input class="form-check-input mt-0 atv-unlim" type="checkbox" ${data.vagas === -1 ? 'checked' : ''} onchange="this.previousElementSibling.disabled = this.checked"> <small class="ms-1">∞</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Data</label>
+                    <input type="date" class="form-control atv-data" value="${data.data_atv || ''}">
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Hora</label>
+                    <input type="time" class="form-control atv-hora" value="${data.hora_atv || ''}">
+                </div>
+            </div>
+        `;
+        document.getElementById('activitiesList').appendChild(div);
+    }
+
+    document.getElementById('mainEventForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+
+        const activities = [];
+        if (currentType === 'PADRAO') {
+            document.querySelectorAll('.activity-row').forEach(row => {
+                activities.push({
+                    id: row.querySelector('.atv-id').value,
+                    nome: row.querySelector('.atv-nome').value,
+                    palestrante: row.querySelector('.atv-palestrante').value,
+                    local: row.querySelector('.atv-local').value,
+                    horas: row.querySelector('.atv-horas').value,
+                    vagas: row.querySelector('.atv-unlim').checked ? -1 : row.querySelector('.atv-vagas').value,
+                    data_atv: row.querySelector('.atv-data').value,
+                    hora_atv: row.querySelector('.atv-hora').value,
+                    descricao: ""
+                });
+            });
+        }
+
+        const data = {
+            id: document.getElementById('evId').value,
+            nome: document.getElementById('evNome').value,
+            curso: document.getElementById('evCurso').value,
+            latitude: document.getElementById('evLat').value,
+            longitude: document.getElementById('evLon').value,
+            descricao: document.getElementById('evDesc').value,
+            data_inicio: document.getElementById('evDataIni').value,
+            hora_inicio: document.getElementById('evHoraIni').value,
+            data_fim: document.getElementById('evDataFim').value,
+            hora_fim: document.getElementById('evHoraFim').value,
+            is_rapido: currentType === 'RAPIDO',
+            atividades: activities
+        };
+
+        try {
+            const res = await fetch('/api/editar_evento', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                Swal.fire('Sucesso', 'Evento atualizado!', 'success').then(() => window.location.href = '/eventos_admin');
+            } else {
+                const json = await res.json();
+                Swal.fire('Erro', json.erro, 'error');
+            }
+        } catch (err) {
+            Swal.fire('Erro', 'Falha na conexão.', 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    };
+</script>
+{% endblock %}

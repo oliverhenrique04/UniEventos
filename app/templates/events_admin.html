@@ -68,6 +68,35 @@
     <nav><ul class="pagination justify-content-center" id="paginacaoEventos"></ul></nav>
 </div>
 
+<!-- Modal Broadcast Notification -->
+<div class="modal fade" id="modalNotificacao" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-info text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-paper-plane me-2"></i>Notificar Participantes</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-4">Envie uma mensagem para todos os participantes inscritos no evento <strong id="notifEventName"></strong>.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Assunto</label>
+                    <input type="text" id="notifAssunto" class="form-control" placeholder="Ex: Alteração de Sala ou Aviso Importante">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-bold small">Mensagem</label>
+                    <textarea id="notifMensagem" class="form-control" rows="5" placeholder="Digite sua mensagem aqui..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-info text-white px-4 fw-bold" onclick="enviarNotificacao()">
+                    <i class="fa-solid fa-envelope-circle-check me-2"></i> Enviar Agora
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Manage Participants -->
 <div class="modal fade" id="modalParticipantes" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -142,6 +171,7 @@
                                 <th>CPF</th>
                                 <th>Atividade</th>
                                 <th>Presença</th>
+                                <th>Distância</th>
                                 <th class="text-end pe-4">Ação</th>
                             </tr>
                         </thead>
@@ -183,7 +213,7 @@
         data.items.forEach(ev => {
             const statusBadge = ev.status === 'ABERTO' ? '<span class="badge bg-success-subtle text-success border border-success-subtle">ABERTO</span>' : '<span class="badge bg-secondary-subtle text-secondary">ENCERRADO</span>';
             const tipoBadge = `<span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>`;
-            const cursoBadge = ev.curso ? `<span class="badge bg-slate-100 text-slate-600 border ms-1"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</span>` : '';
+            const cursoBadge = ev.curso ? `<span class="badge text-color-primary border ms-1"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</span>` : '';
             
             const partInfo = `
                 <div class="d-flex align-items-center gap-2">
@@ -213,8 +243,14 @@
                     <td><span class="badge bg-light text-dark border font-monospace">${ev.owner}</span></td>
                     <td class="text-end pe-4">
                         <div class="btn-group shadow-sm">
+                            <a href="/editar_evento/${ev.id}" class="btn btn-sm btn-light border" title="Editar Evento">
+                                <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
+                            </a>
                             <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes">
                                 <i class="fa-solid fa-users-viewfinder text-primary"></i>
+                            </button>
+                            <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes">
+                                <i class="fa-solid fa-envelope text-info"></i>
                             </button>
                             <a href="/designer_certificado/${ev.id}" class="btn btn-sm btn-light border" title="Certificado">
                                 <i class="fa-solid fa-certificate text-warning"></i>
@@ -251,6 +287,38 @@
 
         new bootstrap.Modal(document.getElementById('modalParticipantes')).show();
         carregarParticipantes(1);
+    }
+
+    function abrirModalNotificacao(id, nome) {
+        EVENTO_SELECIONADO_ID = id;
+        document.getElementById('notifEventName').innerText = nome;
+        document.getElementById('notifAssunto').value = '';
+        document.getElementById('notifMensagem').value = '';
+        new bootstrap.Modal(document.getElementById('modalNotificacao')).show();
+    }
+
+    async function enviarNotificacao() {
+        const subject = document.getElementById('notifAssunto').value;
+        const message = document.getElementById('notifMensagem').value;
+        
+        if(!subject || !message) {
+            Swal.fire('Erro', 'Assunto e mensagem são obrigatórios.', 'warning');
+            return;
+        }
+
+        const res = await fetch(`/api/notificar_participantes/${EVENTO_SELECIONADO_ID}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ assunto: subject, mensagem: message })
+        });
+
+        if(res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalNotificacao')).hide();
+            Toast.fire({ icon: 'success', title: 'Notificações enviadas para a fila!' });
+        } else {
+            const data = await res.json();
+            Swal.fire('Erro', data.erro, 'error');
+        }
     }
 
     function mostrarAreaAdicao() {
@@ -370,12 +438,24 @@
                 ? `<button onclick="alternarPresenca(${p.id}, false)" class="btn btn-xs btn-success rounded-pill px-3"><i class="fa-solid fa-check me-1"></i> Validado</button>`
                 : `<button onclick="alternarPresenca(${p.id}, true)" class="btn btn-xs btn-outline-secondary rounded-pill px-3"><i class="fa-solid fa-clock me-1"></i> Pendente</button>`;
 
+            let distHtml = '<span class="text-muted x-small">N/A</span>';
+            if (p.distancia !== null) {
+                const color = p.distancia > 200 ? 'text-danger' : 'text-success';
+                const icon = p.distancia > 200 ? 'fa-triangle-exclamation' : 'fa-location-crosshairs';
+                distHtml = `
+                    <div class="${color} small fw-bold" title="Coordenadas: ${p.lat_checkin.toFixed(4)}, ${p.lon_checkin.toFixed(4)}">
+                        <i class="fa-solid ${icon} me-1"></i>${p.distancia}m
+                    </div>
+                `;
+            }
+
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn">
                     <td class="ps-4 fw-bold text-dark">${p.nome}</td>
                     <td><small class="font-monospace text-muted">${p.cpf}</small></td>
-                    <td><span class="badge bg-light text-dark border">${p.atividade}</span></td>
+                    <td><span class="badge bg-light text-dark border">${p.activity_name || p.atividade}</span></td>
                     <td>${toggleBtn}</td>
+                    <td>${distHtml}</td>
                     <td class="text-end pe-4">
                         <button class="btn btn-xs btn-link text-danger p-0" onclick="removerInscricao(${p.id})"><i class="fa-solid fa-user-xmark"></i></button>
                     </td>

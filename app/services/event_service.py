@@ -53,36 +53,123 @@ class EventService:
         return event
 
     def update_event(self, event_id, owner_username, role, data):
-        """Updates an existing event and its activities."""
+        """Updates an existing event's information and its associated activities.
+        
+        Args:
+            event_id (int): ID of the event to update.
+            owner_username (str): Username of the person attempting the update.
+            role (str): Role of the user (to check for admin permissions).
+            data (dict): Dictionary containing the updated event data.
+            
+        Returns:
+            tuple: (Updated event object or None, success/error message).
+        """
         event = self.event_repo.get_by_id(event_id)
-        if not event: return None, "Evento não encontrado"
+        if not event:
+            return None, "Evento não encontrado"
             
+        # Security check: Only the owner or an admin can modify an event.
         if role != 'admin' and event.owner_username != owner_username:
-            return None, "Sem permissão"
+            return None, "Sem permissão para editar este evento"
             
-        # Safe coordinate parsing
+        # Safe coordinate parsing to prevent crashes on invalid input
         try:
             lat = float(data.get('latitude')) if data.get('latitude') else None
             lon = float(data.get('longitude')) if data.get('longitude') else None
         except (ValueError, TypeError):
             lat, lon = None, None
 
-        event.nome = data.get('nome')
-        event.descricao = data.get('descricao')
-        event.curso = data.get('curso')
+        # Update basic event fields
+        event.nome = data.get('nome', event.nome)
+        event.descricao = data.get('descricao', event.descricao)
+        event.curso = data.get('curso', event.curso)
         event.latitude = lat
         event.longitude = lon
-        event.data_inicio = data.get('data_inicio')
-        event.hora_inicio = data.get('hora_inicio')
-        event.data_fim = data.get('data_fim')
-        event.hora_fim = data.get('hora_fim')
+        event.data_inicio = data.get('data_inicio', event.data_inicio)
+        event.hora_inicio = data.get('hora_inicio', event.hora_inicio)
+        event.data_fim = data.get('data_fim', event.data_fim)
+        event.hora_fim = data.get('hora_fim', event.hora_fim)
         
-        for activity in event.activities:
-            self.activity_repo.delete(activity)
+        # Non-destructive activity synchronization
+        if 'atividades' in data or data.get('is_rapido'):
+            if data.get('is_rapido'):
+                # For fast events, check if default activity exists before recreating
+                has_checkin = any(a.nome == "Check-in Presença" for a in event.activities)
+                if not has_checkin:
+                    # Only clear if changing from PADRAO to RAPIDO
+                    for activity in event.activities:
+                        self.activity_repo.delete(activity)
+                    self._create_default_checkin_activity(event)
+                else:
+                    # Update existing check-in activity with new event details
+                    checkin = next(a for a in event.activities if a.nome == "Check-in Presença")
+                    checkin.data_atv = event.data_inicio
+                    checkin.hora_atv = event.hora_inicio
+                    checkin.latitude = event.latitude
+                    checkin.longitude = event.longitude
+                    self.activity_repo.save(checkin)
+            else:
+                self._sync_activities(event, data.get('atividades', []))
             
-        self._create_activities(event, data.get('atividades', []))
         self.event_repo.save(event)
-        return event, "Atualizado!"
+        return event, "Evento atualizado com sucesso!"
+
+    def _sync_activities(self, event, activities_data):
+        """Synchronizes activities without losing existing enrollments.
+        
+        Updates existing activities, creates new ones, and removes missing ones.
+        """
+        existing_ids = {a.id: a for a in event.activities}
+        incoming_ids = set()
+        
+        for atv_data in activities_data:
+            atv_id = atv_data.get('id')
+            
+            # Safe numeric parsing
+            try:
+                horas = int(atv_data.get('horas', 0)) if atv_data.get('horas') else 0
+                vagas = int(atv_data.get('vagas', -1)) if atv_data.get('vagas') else -1
+            except (ValueError, TypeError):
+                horas, vagas = 0, -1
+
+            if atv_id and int(atv_id) in existing_ids:
+                # Update existing activity
+                activity = existing_ids[int(atv_id)]
+                activity.nome = atv_data['nome']
+                activity.palestrante = atv_data['palestrante']
+                activity.local = atv_data['local']
+                activity.descricao = atv_data.get('descricao', '')
+                activity.data_atv = atv_data.get('data_atv')
+                activity.hora_atv = atv_data.get('hora_atv')
+                activity.carga_horaria = horas
+                activity.vagas = vagas
+                activity.latitude = event.latitude
+                activity.longitude = event.longitude
+                self.activity_repo.save(activity)
+                incoming_ids.add(int(atv_id))
+            else:
+                # Create new activity
+                new_atv = Activity(
+                    event_id=event.id,
+                    nome=atv_data['nome'],
+                    palestrante=atv_data['palestrante'],
+                    local=atv_data['local'],
+                    descricao=atv_data.get('descricao', ''),
+                    data_atv=atv_data.get('data_atv'),
+                    hora_atv=atv_data.get('hora_atv'),
+                    carga_horaria=horas,
+                    vagas=vagas,
+                    latitude=event.latitude,
+                    longitude=event.longitude
+                )
+                self.activity_repo.save(new_atv)
+        
+        # Remove activities that are no longer in the list
+        for aid, activity in existing_ids.items():
+            if aid not in incoming_ids:
+                # Warning: This will still delete enrollments due to cascade.
+                # However, it only happens if the user explicitly removes the activity from the UI.
+                self.activity_repo.delete(activity)
 
     def get_events_for_user_paginated(self, user, page=1, per_page=10, filters=None):
         """Lists events visible to a specific user with chronological sorting and filters."""
@@ -139,6 +226,26 @@ class EventService:
         enrollment.presente = status
         self.enrollment_repo.save(enrollment)
         return True, "Presença atualizada com sucesso!"
+
+    def notify_all_participants(self, event_id, subject, body):
+        """Sends a broadcast email to all unique participants of an event.
+        
+        Uses RabbitMQ for asynchronous processing of email tasks.
+        """
+        from app.models import User
+        # Get unique user CPFs enrolled in any activity of this event
+        enrollments = Enrollment.query.filter_by(event_id=event_id).all()
+        cpfs = set([e.user_cpf for e in enrollments])
+        
+        count = 0
+        for cpf in cpfs:
+            user = User.query.filter_by(cpf=cpf).first()
+            if user and user.email:
+                # Add a small note about the event context to the body
+                full_body = f"{body}\n\n---\nEsta é uma mensagem automática do sistema UniEventos."
+                self.notification_service.send_email_task(user.email, subject, full_body)
+                count += 1
+        return count
 
     def get_event_by_id(self, event_id):
         return self.event_repo.get_by_id(event_id)

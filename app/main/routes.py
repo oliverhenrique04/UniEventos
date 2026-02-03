@@ -100,6 +100,19 @@ def criar_evento_page():
         return "Acesso negado", 403
     return render_template('event_create.html', user=current_user)
 
+@bp.route('/editar_evento/<int:event_id>')
+@login_required
+def editar_evento_page(event_id):
+    """Page for editing an existing event."""
+    if current_user.role not in ['admin', 'professor', 'coordenador']:
+        return "Acesso negado", 403
+    from app.models import Event
+    event = Event.query.get_or_404(event_id)
+    # Check permission
+    if current_user.role != 'admin' and event.owner_username != current_user.username:
+        return "Acesso negado", 403
+    return render_template('event_edit.html', user=current_user, event=event)
+
 @bp.route('/validar')
 def validar_busca():
     """Public page to search and validate certificates by hash."""

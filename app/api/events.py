@@ -39,20 +39,26 @@ def criar_evento():
 def editar_evento():
     """
     Endpoint for updating an existing event.
-    Only owners or admins can edit.
+    Validates ownership or administrative privileges before proceeding.
     """
     data = request.json
     evt_id = data.get('id')
     
-    event, message = event_service.update_event(
-        evt_id, current_user.username, current_user.role, data
-    )
+    if not evt_id:
+        return jsonify({"erro": "ID do evento é obrigatório"}), 400
     
-    if not event:
-        status_code = 404 if message == "Evento não encontrado" else 403
-        return jsonify({"erro": message}), status_code
+    try:
+        event, message = event_service.update_event(
+            evt_id, current_user.username, current_user.role, data
+        )
         
-    return jsonify({"mensagem": message})
+        if not event:
+            status_code = 404 if message == "Evento não encontrado" else 403
+            return jsonify({"erro": message}), status_code
+            
+        return jsonify({"mensagem": message})
+    except Exception as e:
+        return jsonify({"erro": f"Erro interno ao atualizar evento: {str(e)}"}), 500
 
 @bp.route('/eventos_admin', methods=['GET'])
 @login_required
@@ -80,10 +86,34 @@ def listar_eventos_admin():
         "current_page": pagination.page
     })
 
+@bp.route('/notificar_participantes/<int:event_id>', methods=['POST'])
+@login_required
+def notificar_participantes(event_id):
+    """
+    Sends a broadcast email notification to all participants of an event.
+    Only authorized personnel (admin, professor, coordinator) can call this.
+    """
+    if current_user.role not in ['admin', 'professor', 'coordenador']:
+        return jsonify({"erro": "Acesso negado"}), 403
+    
+    data = request.json
+    subject = data.get('assunto')
+    body = data.get('mensagem')
+    
+    if not subject or not body:
+        return jsonify({"erro": "Assunto e mensagem são obrigatórios"}), 400
+        
+    try:
+        count = event_service.notify_all_participants(event_id, subject, body)
+        return jsonify({"mensagem": f"Notificação enfileirada para {count} participantes!"})
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar notificações: {str(e)}"}), 500
+
 @bp.route('/participantes_evento/<int:event_id>', methods=['GET'])
 @login_required
 def listar_participantes_evento(event_id):
-    """Paginated and filtered list of participants in an event."""
+    """Paginated and filtered list of participants in an event, including geofencing distance."""
+    from app.utils import haversine_distance
     page = request.args.get('page', 1, type=int)
     filters = {
         'nome': request.args.get('nome'),
@@ -93,14 +123,30 @@ def listar_participantes_evento(event_id):
     
     pagination = event_service.get_event_participants_paginated(event_id, page=page, filters=filters)
     
-    return jsonify({
-        "items": [{
+    items = []
+    for e in pagination.items:
+        # Calculate distance if we have both activity and check-in coordinates
+        dist = None
+        # Use activity coords if set, otherwise event coords
+        ref_lat = e.activity.latitude if e.activity.latitude else e.activity.event.latitude
+        ref_lon = e.activity.longitude if e.activity.longitude else e.activity.event.longitude
+        
+        if ref_lat and ref_lon and e.lat_checkin and e.lon_checkin:
+            dist = haversine_distance(ref_lat, ref_lon, e.lat_checkin, e.lon_checkin)
+        
+        items.append({
             "id": e.id,
             "nome": e.nome,
             "cpf": e.user_cpf,
             "presente": e.presente,
-            "atividade": e.activity.nome
-        } for e in pagination.items],
+            "atividade": e.activity.nome,
+            "distancia": round(dist) if dist is not None else None,
+            "lat_checkin": e.lat_checkin,
+            "lon_checkin": e.lon_checkin
+        })
+    
+    return jsonify({
+        "items": items,
         "total": pagination.total,
         "pages": pagination.pages,
         "current_page": pagination.page
