@@ -77,10 +77,11 @@
                         </div>
                         <div class="p-4 flex-grow-1 d-flex flex-column justify-content-between">
                             <div>
-                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
                                     <h4 class="fw-bold text-slate-900 m-0">${ev.nome}</h4>
                                     <span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>
                                 </div>
+                                ${ev.curso ? `<div class="text-primary small fw-bold mb-3"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</div>` : ''}
                                 <p class="text-muted mb-0 small">Você conquistou <strong>${ev.horas} horas</strong> acadêmicas neste evento.</p>
                             </div>
                             <div class="d-flex gap-2 mt-4 pt-3 border-top">

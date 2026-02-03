@@ -3,20 +3,20 @@
 :root {
   --font-main: "Inter", sans-serif;
 
-  /* Primary Colors - Indigo */
-  --primary-50: #eef2ff;
-  --primary-100: #e0e7ff;
-  --primary-200: #c7d2fe;
-  --primary-300: #a5b4fc;
-  --primary-400: #818cf8;
-  --primary-500: #6366f1;
-  --primary-600: #4f46e5;
-  --primary-700: #4338ca;
-  --primary-800: #3730a3;
-  --primary-900: #312e81;
+  /* Primary Colors - UniEuro Blue (#044d84) */
+  --primary-50: #e6f0f7;
+  --primary-100: #cce1ef;
+  --primary-200: #99c2df;
+  --primary-300: #66a4cf;
+  --primary-400: #3385bf;
+  --primary-500: #044d84;
+  --primary-600: #034576;
+  --primary-700: #033e68;
+  --primary-800: #02365a;
+  --primary-900: #022e4c;
 
-  --primary-color: var(--primary-600);
-  --primary-hover: var(--primary-700);
+  --primary-color: #044d84;
+  --primary-hover: #033e68;
 
   /* Secondary Colors - Slate */
   --slate-50: #f8fafc;
@@ -136,14 +136,14 @@ h6 {
 .btn-primary {
   background-color: #044d84;
   border-color: #044d84;
-  box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 4px 6px -1px rgba(4, 77, 132, 0.2);
 }
 
 .btn-primary:hover {
   background-color: var(--primary-hover);
   border-color: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 10px 15px -3px rgba(4, 77, 132, 0.3);
 }
 
 .btn-light {
@@ -166,7 +166,7 @@ h6 {
 .form-select:focus {
   background-color: white;
   border-color: #044d84;
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+  box-shadow: 0 0 0 4px rgba(4, 77, 132, 0.1);
 }
 
 /* Badges */
@@ -271,15 +271,10 @@ h6 {
 
 
 .page-item.active .page-link {
-
     background-color: var(--primary-color);
-
     border-color: var(--primary-color);
-
     color: white;
-
-    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
-
+    box-shadow: 0 4px 6px -1px rgba(4, 77, 132, 0.2);
 }
 
 
@@ -309,4 +304,8 @@ h6 {
 
 .border-primary {
   border-color: #044d84 !important;
+}
+
+.full-width-container {
+  min-width: 100%;
 }

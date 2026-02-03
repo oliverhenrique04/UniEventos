@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container py-4 fade-in-up">
     <!-- Header Perfil com Estatísticas -->
-    <div class="glass-panel p-4 mb-5 border-top border-4 border-primary bg-white shadow-sm">
+    <div class="glass-panel p-4 mb-5 border-top border-2 border-primary bg-white shadow-sm">
         <div class="row align-items-center">
             <div class="col-md-auto text-center mb-3 mb-md-0">
                 <div class="bg-indigo-50 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm" style="width: 90px; height: 90px;">
@@ -132,10 +132,11 @@
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
                     <div class="glass-panel h-100 p-4 d-flex flex-column border-start border-5 border-primary bg-white shadow-sm">
-                        <div class="mb-3 d-flex justify-content-between align-items-start">
+                        <div class="mb-1 d-flex justify-content-between align-items-start">
                             <h5 class="fw-bold text-dark m-0">${ev.nome}</h5>
                             <span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>
                         </div>
+                        ${ev.curso ? `<div class="text-primary x-small fw-bold mb-3"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</div>` : ''}
                         <p class="text-muted small mb-4 flex-grow-1">${ev.descricao || ''}</p>
                         <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
                             <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${ev.data_inicio.split('-').reverse().join('/')}</small>
@@ -177,7 +178,7 @@
         data.items.forEach(cert => {
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
-                    <div class="glass-panel text-center p-4 bg-white border-top border-4 border-success h-100 shadow-sm">
+                    <div class="glass-panel text-center p-4 bg-white border-top border-2 border-success h-100 shadow-sm">
                         <div class="bg-success-subtle text-success rounded-circle d-inline-flex p-3 mb-3">
                             <i class="fa-solid fa-certificate fa-2x"></i>
                         </div>

@@ -68,6 +68,8 @@ class Event(db.Model):
         hora_inicio (str): Start time (HH:MM).
         data_fim (str): End date (YYYY-MM-DD).
         hora_fim (str): End time (HH:MM).
+        curso (str): Course associated with the event (for filtering).
+        cert_bg_path (str): File path to certificate background image.
     """
     __tablename__ = 'events'
 
@@ -82,6 +84,7 @@ class Event(db.Model):
     hora_fim = db.Column(db.String(5))
     token_publico = db.Column(db.String(50))
     status = db.Column(db.String(20), default='ABERTO')
+    curso = db.Column(db.String(100), nullable=True) # Added for filtering
     
     # Certificate Customization
     cert_bg_path = db.Column(db.String(200), nullable=True)

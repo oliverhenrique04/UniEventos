@@ -66,7 +66,9 @@ def listar_eventos_admin():
         'nome': request.args.get('nome'),
         'tipo': request.args.get('tipo'),
         'status': request.args.get('status'),
-        'owner': request.args.get('owner')
+        'owner': request.args.get('owner'),
+        'curso': request.args.get('curso'),
+        'data': request.args.get('data')
     }
     
     pagination = event_service.list_events_paginated(page=page, filters=filters)
@@ -211,9 +213,14 @@ def meu_historico():
 @bp.route('/eventos', methods=['GET'])
 @login_required
 def listar_eventos():
-    """Endpoint for listing events visible to the current user with pagination."""
+    """Endpoint for listing events visible to the current user with pagination and filters."""
     page = request.args.get('page', 1, type=int)
-    pagination = event_service.get_events_for_user_paginated(current_user, page=page)
+    filters = {
+        'nome': request.args.get('nome'),
+        'data': request.args.get('data'),
+        'curso': request.args.get('curso')
+    }
+    pagination = event_service.get_events_for_user_paginated(current_user, page=page, filters=filters)
     
     return jsonify({
         "items": [serialize_event(e, current_user) for e in pagination.items],

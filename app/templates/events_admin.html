@@ -13,20 +13,20 @@
     </div>
 
     <!-- FILTERS -->
-    <div class="glass-panel p-4 mb-4 bg-white border-top border-4 border-primary">
-        <h6 class="fw-bold mb-3 text-uppercase small text-muted">Filtros de Evento</h6>
+    <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+        <h6 class="fw-bold mb-3 text-uppercase small text-muted"><i class="fa-solid fa-filter me-2"></i>Filtrar Eventos</h6>
         <div class="row g-3">
-            <div class="col-md-4">
-                <label class="small fw-bold">Nome do Evento</label>
+            <div class="col-md-3">
+                <label class="small fw-bold">Título / Nome</label>
                 <input type="text" id="filtNome" class="form-control form-control-sm" placeholder="Ex: Simpósio...">
             </div>
+            <div class="col-md-3">
+                <label class="small fw-bold">Curso / Depto</label>
+                <input type="text" id="filtCurso" class="form-control form-control-sm" placeholder="Ex: TI...">
+            </div>
             <div class="col-md-2">
-                <label class="small fw-bold">Tipo</label>
-                <select id="filtTipo" class="form-select form-select-sm">
-                    <option value="">Todos</option>
-                    <option value="PADRAO">Padrão</option>
-                    <option value="RAPIDO">Rápido</option>
-                </select>
+                <label class="small fw-bold">Data Início</label>
+                <input type="date" id="filtData" class="form-control form-control-sm">
             </div>
             <div class="col-md-2">
                 <label class="small fw-bold">Status</label>
@@ -36,13 +36,9 @@
                     <option value="ENCERRADO">Encerrado</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="small fw-bold">Responsável</label>
-                <input type="text" id="filtOwner" class="form-control form-control-sm" placeholder="Username...">
-            </div>
             <div class="col-md-2 d-flex align-items-end">
-                <button onclick="carregarEventos(1)" class="btn btn-primary btn-sm w-100">
-                    <i class="fa-solid fa-filter me-1"></i> Filtrar
+                <button onclick="carregarEventos(1)" class="btn btn-primary btn-sm w-100 fw-bold">
+                    <i class="fa-solid fa-magnifying-glass me-1"></i> Pesquisar
                 </button>
             </div>
         </div>
@@ -172,9 +168,9 @@
     async function carregarEventos(page) {
         const filters = {
             nome: document.getElementById('filtNome').value,
-            tipo: document.getElementById('filtTipo').value,
+            curso: document.getElementById('filtCurso').value,
+            data: document.getElementById('filtData').value,
             status: document.getElementById('filtStatus').value,
-            owner: document.getElementById('filtOwner').value,
             page: page
         };
         const params = new URLSearchParams(filters);
@@ -187,6 +183,7 @@
         data.items.forEach(ev => {
             const statusBadge = ev.status === 'ABERTO' ? '<span class="badge bg-success-subtle text-success border border-success-subtle">ABERTO</span>' : '<span class="badge bg-secondary-subtle text-secondary">ENCERRADO</span>';
             const tipoBadge = `<span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>`;
+            const cursoBadge = ev.curso ? `<span class="badge bg-slate-100 text-slate-600 border ms-1"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</span>` : '';
             
             const partInfo = `
                 <div class="d-flex align-items-center gap-2">
@@ -204,23 +201,26 @@
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn">
                     <td class="ps-4">
-                        <div class="fw-bold text-dark">${ev.nome}</div>
-                        <div class="text-muted x-small">${ev.atividades.length} atividades</div>
+                        <div class="fw-bold text-dark fs-6">${ev.nome}</div>
+                        <div class="d-flex align-items-center mt-1">
+                            <span class="text-muted x-small me-2">${ev.atividades.length} atividades</span>
+                            ${cursoBadge}
+                        </div>
                     </td>
                     <td>${tipoBadge} ${statusBadge}</td>
                     <td><small class="fw-bold text-slate-600">${ev.data_inicio.split('-').reverse().join('/')}</small></td>
                     <td>${partInfo}</td>
                     <td><span class="badge bg-light text-dark border font-monospace">${ev.owner}</span></td>
                     <td class="text-end pe-4">
-                        <div class="btn-group">
-                            <button class="btn btn-xs btn-outline-primary" onclick="abrirParticipantes(${ev.id})" title="Gerenciar Participantes">
-                                <i class="fa-solid fa-users-gear"></i>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes">
+                                <i class="fa-solid fa-users-viewfinder text-primary"></i>
                             </button>
-                            <a href="/designer_certificado/${ev.id}" class="btn btn-xs btn-light border" title="Designer de Certificado">
-                                <i class="fa-solid fa-certificate text-primary"></i>
+                            <a href="/designer_certificado/${ev.id}" class="btn btn-sm btn-light border" title="Certificado">
+                                <i class="fa-solid fa-certificate text-warning"></i>
                             </a>
-                            <button class="btn btn-xs btn-light border text-danger" onclick="confirmarExcluirEvento(${ev.id})" title="Excluir">
-                                <i class="fa-solid fa-trash"></i>
+                            <button class="btn btn-sm btn-light border text-danger" onclick="confirmarExcluirEvento(${ev.id})">
+                                <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </div>
                     </td>

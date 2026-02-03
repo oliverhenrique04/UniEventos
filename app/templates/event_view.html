@@ -2,7 +2,6 @@
 
 {% block content %}
 <div class="container py-4 fade-in-up">
-    <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Dashboard</a></li>
@@ -11,12 +10,13 @@
     </nav>
 
     <div class="row g-4">
-        <!-- Event Main Info -->
         <div class="col-lg-8">
             <div class="glass-panel p-0 overflow-hidden border-0 shadow-lg bg-white mb-4">
                 <div class="p-4 bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="badge bg-white bg-opacity-20 text-color-primary border-0 small text-uppercase fw-bold" style="letter-spacing: 1px;">
+                        <span
+                            class="badge bg-white bg-opacity-20 text-color-primary border-0 small text-uppercase fw-bold"
+                            style="letter-spacing: 1px;">
                             {{ event.tipo }}
                         </span>
                         <div class="small fw-bold opacity-75">
@@ -24,51 +24,61 @@
                             {{ event.data_inicio.split('-')|reverse|join('/') }}
                         </div>
                     </div>
+
                     <h2 class="fw-bold m-0">{{ event.nome }}</h2>
+
+                    {% if event.curso %}
+                    <div class="mt-2 opacity-75 fw-bold small">
+                        <i class="fa-solid fa-graduation-cap me-1"></i>{{ event.curso }}
+                    </div>
+                    {% endif %}
                 </div>
-                
+
                 <div class="p-4">
                     <h6 class="fw-bold text-slate-400 text-uppercase letter-spacing-1 mb-3">Sobre o Evento</h6>
-                    <p class="text-slate-700 fs-5" style="line-height: 1.6; white-space: pre-wrap;">{{ event.descricao or 'Nenhuma descrição disponível para este evento.' }}</p>
-                    
+                    <p class="text-slate-700 fs-5" style="line-height: 1.6; white-space: pre-wrap;">
+                        {{ event.descricao or 'Nenhuma descrição disponível para este evento.' }}
+                    </p>
+
                     <div class="row g-3 mt-4">
                         <div class="col-sm-6">
                             <div class="p-3 bg-slate-50 rounded-4 border">
                                 <small class="text-muted d-block mb-1 fw-bold text-uppercase">Início</small>
-                                <div class="fw-bold text-dark"><i class="fa-regular fa-clock me-2 text-primary"></i>{{ event.data_inicio.split('-')|reverse|join('/') }} às {{ event.hora_inicio }}</div>
+                                <div class="fw-bold text-dark">
+                                    <i class="fa-regular fa-clock me-2 text-primary"></i>
+                                    {{ event.data_inicio.split('-')|reverse|join('/') }} às {{ event.hora_inicio }}
+                                </div>
                             </div>
                         </div>
                         <div class="col-sm-6">
                             <div class="p-3 bg-slate-50 rounded-4 border">
                                 <small class="text-muted d-block mb-1 fw-bold text-uppercase">Término</small>
-                                <div class="fw-bold text-dark"><i class="fa-regular fa-calendar-check me-2 text-primary"></i>{{ event.data_fim.split('-')|reverse|join('/') }} às {{ event.hora_fim }}</div>
+                                <div class="fw-bold text-dark">
+                                    <i class="fa-regular fa-calendar-check me-2 text-primary"></i>
+                                    {{ event.data_fim.split('-')|reverse|join('/') }} às {{ event.hora_fim }}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Mobile Activities List -->
             <div class="d-lg-none">
                 <h4 class="fw-bold mb-4 px-2">Atividades</h4>
-                <div id="lista-atividades-mobile">
-                    <!-- Activities will be rendered here -->
-                </div>
+                <div id="lista-atividades-mobile"></div>
             </div>
         </div>
 
-        <!-- Sidebar: Activities (Desktop) -->
         <div class="col-lg-4">
             <div class="sticky-top" style="top: 100px;">
                 <h4 class="fw-bold mb-4 px-2 d-none d-lg-block">Programação</h4>
-                <div id="lista-atividades-desktop" class="d-grid gap-3">
-                    <!-- Activities will be rendered here -->
-                </div>
+                <div id="lista-atividades-desktop" class="d-grid gap-3"></div>
 
                 {% if not user.is_authenticated %}
                 <div class="glass-panel p-4 bg-indigo-50 border-0 mt-4 text-center">
                     <h6 class="fw-bold text-indigo-700">Quer participar?</h6>
-                    <p class="small text-indigo-600 mb-3">Faça login ou crie sua conta para se inscrever nas atividades.</p>
+                    <p class="small text-indigo-600 mb-3">Faça login ou crie sua conta para se inscrever nas atividades.
+                    </p>
                     <a href="/" class="btn btn-primary w-100 rounded-pill shadow">Acessar Sistema</a>
                 </div>
                 {% endif %}
@@ -80,95 +90,118 @@
 
 {% block scripts %}
 <script>
-    const eventData = {{ event.id }};
+    const eventId = {{ event.id }};
     const isParticipant = {{ 'true' if user.role == 'participante' else 'false' }};
     const isAuthenticated = {{ 'true' if user.is_authenticated else 'false' }};
 
+    // Monta a lista em JS com loop Jinja (sem comprehension, compatível com Jinja2)
+    const activitiesData = [
+        {% for a in event.activities %}
+    {
+        id: { { a.id } },
+        nome: { { (a.nome or '')| tojson } },
+        horas: { { a.carga_horaria if a.carga_horaria is not none else 0 } },
+        local: { { (a.local or '')| tojson } },
+        palestrante: { { (a.palestrante or '')| tojson } },
+        vagas: { { a.vagas if a.vagas is not none else -1 } },
+        total_inscritos: { { a.enrollments | length } },
+        inscrito: { { 'true' if user.is_authenticated and(a.enrollments | selectattr('user_cpf', 'equalto', user.cpf) | list | length > 0) else 'false' } }
+    } {% if not loop.last %}, {% endif %}
+    {% endfor %}
+  ];
+
     document.addEventListener('DOMContentLoaded', () => {
-        carregarAtividades();
+        renderAtividades(activitiesData);
     });
 
-    async function carregarAtividades() {
-        const res = await fetch(`/api/eventos`);
-        const data = await res.json();
-        // Since /api/eventos is paginated and we are on a specific event page, 
-        // we might need to fetch the specific event if it's not in the first page of results.
-        // But wait, the API 'listar_eventos' only returns what the user sees.
-        // Better: let's use the 'event' object passed from Python to render initial, 
-        // then refresh if needed.
-        
-        // Actually, we have the event object in Jinja. Let's iterate it directly for initial render.
-        renderAtividades();
+    function renderAtividades(list) {
+        const mobile = document.getElementById('lista-atividades-mobile');
+        const desktop = document.getElementById('lista-atividades-desktop');
+
+        const html = buildAtividadesHtml(list);
+
+        if (mobile) mobile.innerHTML = html;
+        if (desktop) desktop.innerHTML = html;
     }
 
-    function renderAtividades() {
-        // We use the data injected by Jinja for the activities list
-        const activities = [
-            {% for a in event.activities %}
-            {
-                id: {{ a.id }},
-                nome: "{{ a.nome }}",
-                horas: {{ a.carga_horaria or 0 }},
-                local: "{{ a.local or '' }}",
-                palestrante: "{{ a.palestrante or '' }}",
-                vagas: {{ a.vagas or -1 }},
-                total_inscritos: {{ a.enrollments|length }},
-                inscrito: {{ 'true' if user.is_authenticated and a.enrollments|selectattr('user_cpf', 'equalto', user.cpf)|list|length > 0 else 'false' }}
-            },
-            {% endfor %}
-        ];
+    function buildAtividadesHtml(list) {
+        if (!Array.isArray(list) || list.length === 0) {
+            return `
+        <div class="glass-panel p-4 text-center text-muted">
+          <p class="mb-0">Nenhuma atividade cadastrada para este evento.</p>
+        </div>
+      `;
+        }
 
-        const containers = [
-            document.getElementById('lista-atividades-mobile'),
-            document.getElementById('lista-atividades-desktop')
-        ];
+        let out = '';
 
-        containers.forEach(container => {
-            if (!container) return;
-            container.innerHTML = '';
-            
-            activities.forEach(a => {
-                const isFull = a.vagas !== -1 && a.total_inscritos >= a.vagas;
-                let btnHtml = '';
-                
-                if (!isAuthenticated) {
-                    btnHtml = `<a href="/" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
-                } else if (isParticipant) {
-                    const btnClass = a.inscrito ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger' : (isFull ? 'btn-light disabled' : 'btn-outline-primary'); 
-                    const btnText = a.inscrito ? '<i class="fa-solid fa-user-minus me-1"></i> Sair' : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever'); 
-                    const acao = a.inscrito ? 'sair' : 'inscrever';
-                    btnHtml = `<button onclick="toggleInscricao(${a.id}, '${acao}')" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem;">${btnText}</button>`;
-                }
+        for (const a of list) {
+            const isFull = a.vagas !== -1 && a.total_inscritos >= a.vagas;
 
-                let vagasStatus = '';
-                if (a.vagas == -1) {
-                    vagasStatus = '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 small"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>';
-                } else {
-                    const perc = Math.round((a.total_inscritos / a.vagas) * 100);
-                    const color = perc > 90 ? 'danger' : (perc > 70 ? 'warning' : 'primary');
-                    vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle rounded-pill px-2 small">${a.vagas - a.total_inscritos} vagas</span>`;
-                }
+            let btnHtml = '';
+            if (!isAuthenticated) {
+                btnHtml = `<a href="/" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
+            } else if (isParticipant) {
+                const btnClass = a.inscrito
+                    ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
+                    : (isFull ? 'btn-light disabled' : 'btn-outline-primary');
 
-                container.innerHTML += `
-                    <div class="p-3 bg-white rounded-4 mb-3 border shadow-sm transition-fast ${a.inscrito ? 'border-primary' : ''}">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="pe-2">
-                                <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : 'text-slate-800'}">${a.nome}</h6>
-                                <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
-                                    <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.horas}h</span>
-                                    <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${a.local || 'Auditório'}</span>
-                                    ${a.palestrante ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${a.palestrante}</span>` : ''}
-                                </div>
-                            </div>
-                            ${vagasStatus}
-                        </div>
-                        ${btnHtml}
-                    </div>`;
-            });
-        });
+                const btnText = a.inscrito
+                    ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
+                    : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever');
+
+                const acao = a.inscrito ? 'sair' : 'inscrever';
+
+                btnHtml = `
+          <button onclick="toggleInscricao(event, ${a.id}, '${acao}')"
+            class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
+            style="font-size: 0.65rem;">
+            ${btnText}
+          </button>
+        `;
+            }
+
+            let vagasStatus = '';
+            if (a.vagas === -1) {
+                vagasStatus = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 small"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>`;
+            } else {
+                const perc = a.vagas > 0 ? Math.round((a.total_inscritos / a.vagas) * 100) : 100;
+                const color = perc > 90 ? 'danger' : (perc > 70 ? 'warning' : 'primary');
+                const restantes = Math.max(0, a.vagas - a.total_inscritos);
+                vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle rounded-pill px-2 small">${restantes} vagas</span>`;
+            }
+
+            out += `
+        <div class="p-3 bg-white rounded-4 mb-3 border shadow-sm transition-fast ${a.inscrito ? 'border-primary' : ''}">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="pe-2">
+              <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : 'text-slate-800'}">${escapeHtml(a.nome)}</h6>
+              <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
+                <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.horas}h</span>
+                <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${escapeHtml(a.local || 'Auditório')}</span>
+                ${a.palestrante ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${escapeHtml(a.palestrante)}</span>` : ''}
+              </div>
+            </div>
+            ${vagasStatus}
+          </div>
+          ${btnHtml}
+        </div>
+      `;
+        }
+
+        return out;
     }
 
-    async function toggleInscricao(atvId, acao) { 
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    async function toggleInscricao(event, atvId, acao) {
         const btn = event.currentTarget;
         const originalHtml = btn.innerHTML;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
@@ -176,16 +209,17 @@
 
         try {
             const res = await fetch('/api/toggle_inscricao', {
-                method: 'POST', 
-                headers:{'Content-Type':'application/json'}, 
-                body: JSON.stringify({activity_id: atvId, acao: acao})
-            }); 
-            const json = await res.json(); 
-            if(res.ok) {
-                // Refresh full page to update all states (easiest way to sync Jinja data)
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activity_id: atvId, acao })
+            });
+
+            const json = await res.json();
+
+            if (res.ok) {
                 window.location.reload();
             } else {
-                Swal.fire('Atenção', json.erro || json.mensagem, 'warning');
+                Swal.fire('Atenção', json.erro || json.mensagem || 'Falha ao atualizar inscrição.', 'warning');
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }

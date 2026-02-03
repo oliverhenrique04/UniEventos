@@ -112,6 +112,10 @@
                             <input type="text" class="form-control form-control-lg" id="evNome" placeholder="Ex: Semana de Tecnologia e Inovação 2026" required>
                         </div>
                         <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700">Curso / Departamento</label>
+                            <input type="text" class="form-control" id="evCurso" placeholder="Ex: Ciência da Computação">
+                        </div>
+                        <div class="mb-4">
                             <label class="form-label fw-bold text-slate-700">Descrição Detalhada</label>
                             <textarea class="form-control" id="evDesc" rows="4" placeholder="Descreva os objetivos, público-alvo e informações relevantes..."></textarea>
                         </div>
@@ -181,7 +185,7 @@
 
             <div class="col-lg-4">
                 <!-- Sidebar Info / Tips -->
-                <div class="glass-panel p-3 bg-white border-top border-4 border-warning mb-4 shadow-sm">
+                <div class="glass-panel p-3 bg-white border-top border-2 border-warning mb-4 shadow-sm">
                     <h6 class="fw-bold mb-2 small"><i class="fa-solid fa-lightbulb text-warning me-2"></i>Dicas</h6>
                     <ul class="x-small text-muted ps-3 mb-0">
                         <li class="mb-1">Verifique as datas de início e fim.</li>
@@ -297,6 +301,7 @@
 
         const data = {
             nome: document.getElementById('evNome').value,
+            curso: document.getElementById('evCurso').value,
             descricao: document.getElementById('evDesc').value,
             data_inicio: document.getElementById('evDataIni').value,
             hora_inicio: document.getElementById('evHoraIni').value,

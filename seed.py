@@ -5,10 +5,9 @@ from datetime import datetime, timedelta
 import secrets
 import hashlib
 
-TARGET_USERS = 1000
+TARGET_USERS = 1200                 # recomendo >= 1200 para folga, mas pode deixar 1000
 TARGET_EVENTS = 500
 MIN_PARTICIPANTS_PER_EVENT = 300
-
 DEFAULT_PASSWORD = "1234"
 
 CURSOS = [
@@ -44,8 +43,8 @@ PALESTRANTES = [
 
 def generate_valid_cpf(seed_int: int) -> str:
     """
-    Gera CPF válido (com dígitos verificadores) e formata XXX.XXX.XXX-YY.
-    Determinístico a partir de seed_int.
+    CPF válido (com dígitos verificadores) no formato XXX.XXX.XXX-YY.
+    Determinístico a partir do seed_int.
     """
     base = f"{(seed_int * 7919) % 10**9:09d}"
     nums = [int(x) for x in base]
@@ -65,7 +64,7 @@ def generate_valid_cpf(seed_int: int) -> str:
 
 def presence_deterministic(event_id: int, cpf: str, threshold: int = 80) -> bool:
     """
-    Presença determinística (idempotente): ~threshold% True.
+    Presença determinística para idempotência (~threshold% True).
     """
     h = hashlib.sha256(f"{event_id}-{cpf}".encode("utf-8")).hexdigest()
     val = int(h[:8], 16) % 100
@@ -109,21 +108,20 @@ def upsert_fixed_users():
 
 def upsert_bulk_users(target_users: int):
     """
-    Cria/atualiza usuários determinísticos: user0001..user1000 (role=participante)
+    Cria/atualiza participantes determinísticos user0001..userNNNN.
     """
-    reserved_cpfs = {u.cpf for u in User.query.filter(User.cpf.isnot(None)).all()}
+    existing_cpfs = {c for (c,) in db.session.query(User.cpf).all() if c}
 
     for i in range(1, target_users + 1):
         username = f"user{i:04d}"
         nome = f"Usuario {i:04d}"
-        # offset alto para reduzir chance de colidir com CPFs já existentes
-        cpf = generate_valid_cpf(i + 100000)
-        while cpf in reserved_cpfs:
-            # pequena variação determinística em caso de colisão rara
-            cpf = generate_valid_cpf(i + 200000)
-            break
 
-        ra = f"2026{i:04d}"  # 20260001..20261000
+        # offset alto para reduzir colisão com CPFs existentes
+        cpf = generate_valid_cpf(i + 100000)
+        if cpf in existing_cpfs:
+            cpf = generate_valid_cpf(i + 200000)
+
+        ra = f"2026{i:04d}"
         curso = CURSOS[(i - 1) % len(CURSOS)]
         role = "participante"
         email = f"{username}@unieuro.edu.br"
@@ -154,7 +152,7 @@ def upsert_bulk_users(target_users: int):
             user.curso = curso
             user.role = role
 
-        reserved_cpfs.add(cpf)
+        existing_cpfs.add(cpf)
 
 
 def upsert_events(target_events: int):
@@ -165,6 +163,7 @@ def upsert_events(target_events: int):
         nome_evento = f"Evento {i:04d}"
         owner = owners[(i - 1) % len(owners)]
         tipo = "PADRAO" if (i % 2 == 0) else "RAPIDO"
+        curso_evento = CURSOS[(i - 1) % len(CURSOS)]
 
         start_dt = base_start + timedelta(days=i)
         end_dt = start_dt if tipo == "RAPIDO" else (start_dt + timedelta(days=2))
@@ -187,30 +186,24 @@ def upsert_events(target_events: int):
                 hora_fim=hora_fim,
                 token_publico=secrets.token_urlsafe(8),
                 status="ABERTO",
+                curso=curso_evento,
             )
             db.session.add(ev)
             db.session.flush()
 
-            # Cria 1 a 3 atividades por evento (determinístico)
-            num_atvs = 1 + (i % 9)
+            # 1 a 3 atividades por evento (vagas ilimitadas para suportar 300+ inscrições)
+            num_atvs = 1 + (i % 3)
             for k in range(1, num_atvs + 1):
-                atv_nome = f"Atividade {k} - {nome_evento}"
-                palestrante = PALESTRANTES[(i + k) % len(PALESTRANTES)]
-                local = LOCAIS[(i + 2 * k) % len(LOCAIS)]
-                carga = 2 if tipo == "RAPIDO" else (2 + (k % 3) * 2)
-
-                # Para suportar 300 inscrições sem restrição
-                vagas = -1
-
                 a = Activity(
                     event_id=ev.id,
-                    nome=atv_nome,
-                    palestrante=palestrante,
-                    local=local,
+                    nome=f"Atividade {k} - {nome_evento}",
+                    palestrante=PALESTRANTES[(i + k) % len(PALESTRANTES)],
+                    local=LOCAIS[(i + 2 * k) % len(LOCAIS)],
+                    descricao=None,
                     data_atv=data_inicio,
                     hora_atv=hora_inicio,
-                    carga_horaria=carga,
-                    vagas=vagas
+                    carga_horaria=2 if tipo == "RAPIDO" else (2 + (k % 3) * 2),
+                    vagas=-1,
                 )
                 db.session.add(a)
         else:
@@ -221,6 +214,7 @@ def upsert_events(target_events: int):
             ev.data_fim = data_fim
             ev.hora_fim = hora_fim
             ev.status = "ABERTO"
+            ev.curso = curso_evento
             if not ev.token_publico:
                 ev.token_publico = secrets.token_urlsafe(8)
             if not ev.descricao:
@@ -235,7 +229,7 @@ def ensure_min_participants_per_event(min_participants: int):
     )
     if len(participants) < min_participants:
         raise RuntimeError(
-            f"Usuarios participantes insuficientes: {len(participants)}. "
+            f"Participantes insuficientes: {len(participants)}. "
             f"Necessario ao menos {min_participants}."
         )
 
@@ -250,7 +244,6 @@ def ensure_min_participants_per_event(min_participants: int):
     )
 
     for idx, ev in enumerate(events, start=1):
-        # Activity primária do evento
         primary = (
             Activity.query
             .filter_by(event_id=ev.id)
@@ -263,6 +256,7 @@ def ensure_min_participants_per_event(min_participants: int):
                 nome=f"Check-in - {ev.nome}",
                 palestrante="Coordenacao",
                 local="Auditório Central",
+                descricao=None,
                 data_atv=ev.data_inicio,
                 hora_atv=ev.hora_inicio,
                 carga_horaria=2,
@@ -271,7 +265,6 @@ def ensure_min_participants_per_event(min_participants: int):
             db.session.add(primary)
             db.session.flush()
 
-        # Garante vagas ilimitadas ou suficientes (se houver lógica no app)
         if primary.vagas is not None and primary.vagas != -1 and primary.vagas < min_participants:
             primary.vagas = -1
 
@@ -286,12 +279,11 @@ def ensure_min_participants_per_event(min_participants: int):
 
         need = max(0, min_participants - len(existing_cpfs))
         if need == 0:
-            # Commit em lotes para reduzir memória em seeds grandes
             if idx % 25 == 0:
                 db.session.commit()
             continue
 
-        # Seleção determinística de CPFs por evento (rotação)
+        # Seleção determinística por evento
         offset = (ev.id * 137) % len(cpf_list)
 
         selected = []
@@ -304,18 +296,19 @@ def ensure_min_participants_per_event(min_participants: int):
             j += 1
 
         for cpf in selected:
-            en = Enrollment(
-                activity_id=primary.id,
-                event_id=ev.id,
-                user_cpf=cpf,
-                nome=cpf_to_name.get(cpf, "Participante"),
-                presente=presence_deterministic(ev.id, cpf, threshold=80),
-                cert_hash=None,
-                cert_entregue=False,
-                cert_data_envio=None,
-                cert_email_alternativo=None
+            db.session.add(
+                Enrollment(
+                    activity_id=primary.id,
+                    event_id=ev.id,
+                    user_cpf=cpf,
+                    nome=cpf_to_name.get(cpf, "Participante"),
+                    presente=presence_deterministic(ev.id, cpf, threshold=80),
+                    cert_hash=None,
+                    cert_entregue=False,
+                    cert_data_envio=None,
+                    cert_email_alternativo=None,
+                )
             )
-            db.session.add(en)
 
         if idx % 25 == 0:
             db.session.commit()
@@ -326,25 +319,22 @@ def ensure_min_participants_per_event(min_participants: int):
 def run_seed_large():
     app = create_app()
     with app.app_context():
-        print("Iniciando seed grande (idempotente).")
-
         upsert_fixed_users()
         db.session.commit()
 
         upsert_bulk_users(TARGET_USERS)
         db.session.commit()
-        print(f"Usuarios totais: {User.query.count()}")
 
         upsert_events(TARGET_EVENTS)
         db.session.commit()
-        print(f"Eventos totais: {Event.query.count()}")
-        print(f"Atividades totais: {Activity.query.count()}")
 
         ensure_min_participants_per_event(MIN_PARTICIPANTS_PER_EVENT)
-        print("Inscricoes garantidas.")
-        print(f"Inscricoes totais: {Enrollment.query.count()}")
+        db.session.commit()
 
-        print("Seed finalizado.")
+        print(f"Usuarios: {User.query.count()}")
+        print(f"Eventos: {Event.query.count()}")
+        print(f"Atividades: {Activity.query.count()}")
+        print(f"Inscricoes: {Enrollment.query.count()}")
 
 
 if __name__ == "__main__":

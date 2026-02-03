@@ -57,6 +57,7 @@ def serialize_event(event, current_user=None):
         'owner': event.owner_username,
         'nome': event.nome,
         'descricao': event.descricao,
+        'curso': event.curso, # Include curso in serialization
         'tipo': event.tipo,
         'data_inicio': event.data_inicio,
         'hora_inicio': event.hora_inicio,
