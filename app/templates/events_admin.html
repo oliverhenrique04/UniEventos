@@ -399,10 +399,13 @@
     }
 
     function renderPaginacao(current, total, containerId, callback) {
-        const nav = document.getElementById(containerId);
-        if (!nav) return;
-        nav.innerHTML = '';
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
         if (total <= 1) return;
+
+        const ul = document.createElement('ul');
+        ul.className = 'pagination justify-content-center m-0';
 
         const createItem = (page, active = false, disabled = false, text = null) => {
             const li = document.createElement('li');
@@ -416,7 +419,7 @@
             return li;
         };
 
-        nav.appendChild(createItem(current - 1, false, current === 1, '«'));
+        ul.appendChild(createItem(current - 1, false, current === 1, '«'));
 
         const pages = [];
         const range = 1;
@@ -429,11 +432,12 @@
         }
 
         pages.forEach(p => {
-            if (p === '...') nav.appendChild(createItem(null, false, true, '...'));
-            else nav.appendChild(createItem(p, p === current));
+            if (p === '...') ul.appendChild(createItem(null, false, true, '...'));
+            else ul.appendChild(createItem(p, p === current));
         });
 
-        nav.appendChild(createItem(current + 1, false, current === total, '»'));
+        ul.appendChild(createItem(current + 1, false, current === total, '»'));
+        container.appendChild(ul);
     }
 
     async function confirmarExcluirEvento(id) {

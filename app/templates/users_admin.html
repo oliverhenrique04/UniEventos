@@ -220,9 +220,13 @@
     }
 
     function renderPaginacao(current, total, containerId, callback) {
-        const nav = document.getElementById(containerId);
-        nav.innerHTML = '';
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
         if (total <= 1) return;
+
+        const ul = document.createElement('ul');
+        ul.className = 'pagination justify-content-center m-0';
 
         const createItem = (page, active = false, disabled = false, text = null) => {
             const li = document.createElement('li');
@@ -236,12 +240,10 @@
             return li;
         };
 
-        // Previous
-        nav.appendChild(createItem(current - 1, false, current === 1, '«'));
+        ul.appendChild(createItem(current - 1, false, current === 1, '«'));
 
         const pages = [];
-        const range = 1; // Number of neighbors to show
-
+        const range = 1;
         for (let i = 1; i <= total; i++) {
             if (i === 1 || i === total || (i >= current - range && i <= current + range)) {
                 pages.push(i);
@@ -251,15 +253,12 @@
         }
 
         pages.forEach(p => {
-            if (p === '...') {
-                nav.appendChild(createItem(null, false, true, '...'));
-            } else {
-                nav.appendChild(createItem(p, p === current));
-            }
+            if (p === '...') ul.appendChild(createItem(null, false, true, '...'));
+            else ul.appendChild(createItem(p, p === current));
         });
 
-        // Next
-        nav.appendChild(createItem(current + 1, false, current === total, '»'));
+        ul.appendChild(createItem(current + 1, false, current === total, '»'));
+        container.appendChild(ul);
     }
 
     function abrirModalNovoUsuario() {

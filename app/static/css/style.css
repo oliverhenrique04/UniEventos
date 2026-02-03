@@ -217,15 +217,80 @@ h6 {
 }
 
 /* Utility classes */
-.text-indigo-600 {
-  color: var(--primary-600);
+
+.text-indigo-600 { color: var(--primary-600); }
+
+.bg-indigo-50 { background-color: var(--primary-50); }
+
+.border-indigo-100 { border-color: var(--primary-100); }
+
+
+
+/* Custom Pagination Styling */
+
+.pagination {
+
+    gap: 5px;
+
 }
-.bg-indigo-50 {
-  background-color: var(--primary-50);
+
+
+
+.page-item .page-link {
+
+    border-radius: 8px !important;
+
+    border: 1px solid var(--slate-200);
+
+    color: var(--slate-600);
+
+    font-weight: 600;
+
+    padding: 0.5rem 0.85rem;
+
+    transition: var(--transition-fast);
+
 }
-.border-indigo-100 {
-  border-color: var(--primary-100);
+
+
+
+.page-item .page-link:hover {
+
+    background-color: var(--primary-50);
+
+    border-color: var(--primary-color);
+
+    color: var(--primary-color);
+
 }
+
+
+
+.page-item.active .page-link {
+
+    background-color: var(--primary-color);
+
+    border-color: var(--primary-color);
+
+    color: white;
+
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+
+}
+
+
+
+.page-item.disabled .page-link {
+
+    background-color: transparent;
+
+    border-color: var(--slate-100);
+
+    color: var(--slate-300);
+
+}
+
+
 
 .pagination .page-item.active .page-link {
   background-color: #044d84;
