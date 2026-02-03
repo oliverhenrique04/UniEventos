@@ -21,8 +21,15 @@ def logout():
 
 @bp.route('/inscrever/<token>')
 def inscrever_via_link(token):
-    # (Existing implementation remains)
-    return "Link de inscrição (Não implementado no código original)"
+    """Public page to view event details via shared token link."""
+    from app.repositories.event_repository import EventRepository
+    repo = EventRepository()
+    event = repo.get_by_token(token)
+    
+    if not event:
+        return render_template('404.html'), 404
+        
+    return render_template('event_view.html', event=event, user=current_user)
 
 @bp.route('/designer_certificado/<int:event_id>')
 @login_required
