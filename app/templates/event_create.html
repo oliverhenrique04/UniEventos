@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+
+{% block head_styles %}
+<style>
+    .step-card {
+        border-radius: 20px;
+        background: white;
+        border: 1px solid var(--slate-200);
+        box-shadow: var(--glass-shadow);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    .step-header {
+        background: var(--slate-50);
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--slate-200);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .step-number {
+        width: 32px;
+        height: 32px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+    .activity-row {
+        background: var(--slate-50);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--slate-200);
+        position: relative;
+        transition: all 0.2s;
+    }
+    .activity-row:hover {
+        border-color: var(--primary-color);
+        background: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .btn-remove-atv {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: var(--slate-400);
+        transition: color 0.2s;
+    }
+    .btn-remove-atv:hover { color: #ef4444; }
+    
+    .type-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .type-option {
+        border: 2px solid var(--slate-200);
+        border-radius: 16px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+    .type-option i { font-size: 2rem; margin-bottom: 1rem; color: var(--slate-400); }
+    .type-option.active {
+        border-color: var(--primary-color);
+        background: var(--primary-50);
+    }
+    .type-option.active i { color: var(--primary-color); }
+    .type-option.active h6 { color: var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 pb-5 fade-in-up">
+    <form id="mainEventForm">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">Início</a></li>
+                        <li class="breadcrumb-item active">Criar Evento</li>
+                    </ol>
+                </nav>
+                <h2 class="fw-bold m-0"><i class="fa-solid fa-calendar-plus text-primary me-2"></i>Novo Evento Institucional</h2>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-light border">Cancelar</a>
+                <button type="submit" class="btn btn-primary px-4 shadow">
+                    <i class="fa-solid fa-cloud-arrow-up me-2"></i> Publicar Evento
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- STEP 1: CONFIGURAÇÃO BÁSICA -->
+                <div class="step-card">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <h5 class="fw-bold m-0">Informações do Evento</h5>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700">Título do Evento</label>
+                            <input type="text" class="form-control form-control-lg" id="evNome" placeholder="Ex: Semana de Tecnologia e Inovação 2026" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-slate-700">Descrição Detalhada</label>
+                            <textarea class="form-control" id="evDesc" rows="4" placeholder="Descreva os objetivos, público-alvo e informações relevantes..."></textarea>
+                        </div>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-slate-700">Data de Início</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fa-regular fa-calendar"></i></span>
+                                    <input type="date" id="evDataIni" class="form-control" required>
+                                    <input type="time" id="evHoraIni" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-slate-700">Data de Término</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fa-regular fa-calendar-check"></i></span>
+                                    <input type="date" id="evDataFim" class="form-control" required>
+                                    <input type="time" id="evHoraFim" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: TIPO E ATIVIDADES -->
+                <div class="step-card">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h5 class="fw-bold m-0">Cronograma e Atividades</h5>
+                    </div>
+                    <div class="p-4">
+                        <div class="type-selector mb-5">
+                            <div class="type-option active" id="optStandard" onclick="setEventType('PADRAO')">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <h6 class="fw-bold mb-1">Evento Padrão</h6>
+                                <p class="text-muted small m-0">Múltiplas oficinas, palestras e minicursos.</p>
+                            </div>
+                            <div class="type-option" id="optFast" onclick="setEventType('RAPIDO')">
+                                <i class="fa-solid fa-bolt"></i>
+                                <h6 class="fw-bold mb-1">Evento Rápido</h6>
+                                <p class="text-muted small m-0">Check-in único. Ideal para aulas ou reuniões.</p>
+                            </div>
+                        </div>
+
+                        <div id="containerPadrao">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold m-0">Lista de Atividades</h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAtvRow()">
+                                    <i class="fa-solid fa-plus me-1"></i> Adicionar Atividade
+                                </button>
+                            </div>
+                            <div id="activitiesList">
+                                <!-- Filas de atividades JS -->
+                            </div>
+                        </div>
+
+                        <div id="containerRapido" class="d-none">
+                            <div class="alert alert-info border-0 rounded-4">
+                                <i class="fa-solid fa-circle-info me-2"></i>
+                                Para <strong>Eventos Rápidos</strong>, o sistema gera automaticamente uma atividade de check-in vinculada ao horário principal do evento.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Sidebar Info / Tips -->
+                <div class="glass-panel p-3 bg-white border-top border-4 border-warning mb-4 shadow-sm">
+                    <h6 class="fw-bold mb-2 small"><i class="fa-solid fa-lightbulb text-warning me-2"></i>Dicas</h6>
+                    <ul class="x-small text-muted ps-3 mb-0">
+                        <li class="mb-1">Verifique as datas de início e fim.</li>
+                        <li class="mb-1">Vagas limitadas exibem contador.</li>
+                        <li>Eventos ficam visíveis após salvar.</li>
+                    </ul>
+                </div>
+
+                <div class="glass-panel p-3 bg-indigo-50 border-0 shadow-sm">
+                    <h6 class="fw-bold mb-1 text-indigo-700 small">Certificação Automática</h6>
+                    <p style="font-size: 0.75rem;" class="text-indigo-600 mb-0">Carga horária calculada pela soma das presenças confirmadas.</p>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentType = 'PADRAO';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Set min dates
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('evDataIni').min = today;
+        document.getElementById('evDataFim').min = today;
+        
+        // Add initial activity
+        addAtvRow();
+    });
+
+    function setEventType(type) {
+        currentType = type;
+        document.getElementById('optStandard').classList.toggle('active', type === 'PADRAO');
+        document.getElementById('optFast').classList.toggle('active', type === 'RAPIDO');
+        
+        document.getElementById('containerPadrao').classList.toggle('d-none', type === 'RAPIDO');
+        document.getElementById('containerRapido').classList.toggle('d-none', type === 'PADRAO');
+    }
+
+    function addAtvRow() {
+        const id = 'atv_' + Date.now();
+        const div = document.createElement('div');
+        div.className = 'activity-row animate__animated animate__fadeInUp';
+        div.id = id;
+        div.innerHTML = `
+            <button type="button" class="btn btn-link btn-remove-atv" onclick="document.getElementById('${id}').remove()">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </button>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="small fw-bold text-muted mb-1">Título da Atividade</label>
+                    <input type="text" class="form-control atv-nome" placeholder="Ex: Workshop de Design Patterns" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Horas</label>
+                    <input type="number" class="form-control atv-horas" placeholder="0" min="0" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="small fw-bold text-muted mb-1">Palestrante / Facilitador</label>
+                    <input type="text" class="form-control atv-palestrante" placeholder="Nome do responsável">
+                </div>
+                <div class="col-md-6">
+                    <label class="small fw-bold text-muted mb-1">Local / Link</label>
+                    <input type="text" class="form-control atv-local" placeholder="Ex: Auditório ou URL Meet">
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Vagas</label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control atv-vagas" placeholder="Sem limite" min="1">
+                        <div class="input-group-text bg-white">
+                            <input class="form-check-input mt-0 atv-unlim" type="checkbox" onchange="this.previousElementSibling.disabled = this.checked"> <small class="ms-1">∞</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Data</label>
+                    <input type="date" class="form-control atv-data">
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Hora</label>
+                    <input type="time" class="form-control atv-hora">
+                </div>
+            </div>
+        `;
+        document.getElementById('activitiesList').appendChild(div);
+    }
+
+    document.getElementById('mainEventForm').onsubmit = async (e) => {
+        e.preventDefault();
+        
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Publicando...';
+        btn.disabled = true;
+
+        const activities = [];
+        if (currentType === 'PADRAO') {
+            document.querySelectorAll('.activity-row').forEach(row => {
+                activities.push({
+                    nome: row.querySelector('.atv-nome').value,
+                    palestrante: row.querySelector('.atv-palestrante').value,
+                    local: row.querySelector('.atv-local').value,
+                    horas: row.querySelector('.atv-horas').value,
+                    vagas: row.querySelector('.atv-unlim').checked ? -1 : row.querySelector('.atv-vagas').value,
+                    data_atv: row.querySelector('.atv-data').value,
+                    hora_atv: row.querySelector('.atv-hora').value,
+                    descricao: ""
+                });
+            });
+        }
+
+        const data = {
+            nome: document.getElementById('evNome').value,
+            descricao: document.getElementById('evDesc').value,
+            data_inicio: document.getElementById('evDataIni').value,
+            hora_inicio: document.getElementById('evHoraIni').value,
+            data_fim: document.getElementById('evDataFim').value,
+            hora_fim: document.getElementById('evHoraFim').value,
+            is_rapido: currentType === 'RAPIDO',
+            atividades: activities
+        };
+
+        try {
+            const res = await fetch('/api/criar_evento', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Evento Publicado!',
+                    text: 'Seu evento já está disponível para inscrições.',
+                    confirmButtonColor: '#4f46e5'
+                }).then(() => window.location.href = '/eventos_admin');
+            } else {
+                Swal.fire('Erro', json.erro, 'error');
+            }
+        } catch (err) {
+            Swal.fire('Falha de Rede', 'Não foi possível conectar ao servidor.', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    };
+</script>
+{% endblock %}

@@ -60,6 +60,14 @@ def gerenciar_eventos():
         return "Acesso negado", 403
     return render_template('events_admin.html', user=current_user)
 
+@bp.route('/criar_evento')
+@login_required
+def criar_evento_page():
+    """Dedicated page for creating new events with multiple activities."""
+    if current_user.role not in ['admin', 'professor', 'coordenador']:
+        return "Acesso negado", 403
+    return render_template('event_create.html', user=current_user)
+
 @bp.route('/validar')
 def validar_busca():
     """Public page to search and validate certificates by hash."""

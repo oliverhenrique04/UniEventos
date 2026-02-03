@@ -9,3 +9,4 @@ logs/
 *.log
 dist/
 build/
+app/static/certificates/

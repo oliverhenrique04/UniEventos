@@ -14,6 +14,21 @@ class ReportService:
         self.activity_repo = ActivityRepository()
         self.user_repo = UserRepository()
 
+    def get_event_enrollment_report_paginated(self, event_id: int, page=1, per_page=15, filter_nome=None):
+        """Generates a paginated report of all enrollments for an event with eager loading."""
+        from app.models import Enrollment, Activity
+        from sqlalchemy.orm import joinedload
+        
+        query = Enrollment.query.filter(Enrollment.event_id == event_id).options(joinedload(Enrollment.activity))
+        
+        if filter_nome:
+            query = query.filter(Enrollment.nome.ilike(f"%{filter_nome}%"))
+            
+        # Order by Activity name then Participant name
+        query = query.join(Activity, Enrollment.activity_id == Activity.id).order_by(Activity.nome.asc(), Enrollment.nome.asc())
+        
+        return query.paginate(page=page, per_page=per_page, error_out=False)
+
     def get_event_enrollment_report(self, event_id: int):
         """Generates a structured report of enrollments for a specific event.
         

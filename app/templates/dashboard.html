@@ -3,7 +3,7 @@
 {% block head_styles %}
 <style>
     .event-card {
-        border-left: 5px solid var(--primary-color);
+        border-left: 5px solid #044d84;
         transition: transform 0.2s;
     }
     .event-card:active {
@@ -48,15 +48,20 @@
         <div class="col-lg-8">
             <div class="d-flex align-items-center justify-content-between mb-4 px-2">
                 <h4 class="m-0"><i class="fa-solid fa-calendar-days text-primary me-2"></i>Meus Eventos</h4>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        Filtrar
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                        <li><a class="dropdown-item" href="#">Todos</a></li>
-                        <li><a class="dropdown-item" href="#">Ativos</a></li>
-                        <li><a class="dropdown-item" href="#">Finalizados</a></li>
-                    </ul>
+                <div class="d-flex gap-2">
+                    <a href="/criar_evento" class="btn btn-sm btn-primary shadow-sm">
+                        <i class="fa-solid fa-plus me-1"></i> Criar Completo
+                    </a>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            Filtrar
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                            <li><a class="dropdown-item" href="#">Todos</a></li>
+                            <li><a class="dropdown-item" href="#">Ativos</a></li>
+                            <li><a class="dropdown-item" href="#">Finalizados</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
             <div id="listaEventosGestor" class="row row-cols-1 row-cols-md-2 g-4">
@@ -242,6 +247,7 @@
     const userRole = "{{ user.role }}";
     let intervaloQR = null;
     let atividadeAtualID = null;
+    let EVENTO_SELECIONADO_ID = null;
     let CACHE_EVENTOS = [];
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -694,36 +700,65 @@
         }
     }
     async function abrirRelatorio(evtId) { 
+        EVENTO_SELECIONADO_ID = evtId;
         new bootstrap.Modal(document.getElementById('modalRelatorio')).show(); 
-        document.getElementById('corpoRelatorio').innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
+        carregarDadosRelatorio(1);
+    }
+
+    async function carregarDadosRelatorio(page = 1) {
+        const corpo = document.getElementById('corpoRelatorio');
+        const termo = document.getElementById('searchRelatorio')?.value || '';
         
-        const res = await fetch(`/api/relatorio_inscritos/${evtId}`); 
-        const dados = await res.json(); 
-        
-        let html = '<div class="list-group list-group-flush">';
-        dados.forEach(d => { 
-            html += `<div class="list-group-item bg-slate-100 fw-bold text-primary py-3 d-flex justify-content-between align-items-center">
-                        <span><i class="fa-solid fa-tag me-2"></i>${d.atividade}</span>
-                        <span class="badge bg-white text-primary border">${d.inscritos.length} inscritos</span>
-                    </div>`; 
-            if(d.inscritos.length === 0) {
-                html += '<div class="list-group-item text-muted small ps-4 py-3"><i class="fa-solid fa-info-circle me-1"></i> Nenhum participante inscrito ainda.</div>';
-            } else { 
-                d.inscritos.forEach(i => { 
-                    const status = i.presente ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="fa-solid fa-check me-1"></i> Presente</span>' : '<span class="badge bg-slate-200 text-slate-500 rounded-pill">Ausente</span>'; 
-                    html += `
-                        <div class="list-group-item ps-4 py-3 d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-bold text-slate-800">${i.nome}</div>
-                                <div class="text-muted" style="font-size: 0.75rem;">CPF: ${i.cpf}</div>
+        corpo.innerHTML = `
+            <div class="p-4 bg-light border-bottom">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" id="searchRelatorio" class="form-control border-start-0 ps-0" placeholder="Buscar participante..." value="${termo}" oninput="carregarDadosRelatorio(1)">
+                </div>
+            </div>
+            <div id="listaRelatorio" class="list-group list-group-flush">
+                <div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="p-3 border-top bg-light d-flex justify-content-center" id="paginacaoRelatorio"></div>
+        `;
+
+        try {
+            const res = await fetch(`/api/relatorio_inscritos/${EVENTO_SELECIONADO_ID}?page=${page}&q=${encodeURIComponent(termo)}`);
+            const data = await res.json();
+            const lista = document.getElementById('listaRelatorio');
+            lista.innerHTML = '';
+
+            if (data.items.length === 0) {
+                lista.innerHTML = '<div class="p-5 text-center text-muted"><i class="fa-solid fa-user-slash fs-2 mb-2"></i><p>Nenhum participante encontrado.</p></div>';
+                return;
+            }
+
+            data.items.forEach(i => {
+                const status = i.presente 
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="fa-solid fa-check me-1"></i> Presente</span>' 
+                    : '<span class="badge bg-slate-200 text-slate-500 rounded-pill">Ausente</span>';
+                
+                lista.innerHTML += `
+                    <div class="list-group-item ps-4 py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-slate-800">${i.nome}</div>
+                            <div class="text-muted x-small">
+                                <i class="fa-solid fa-id-card me-1"></i>${i.cpf} 
+                                <span class="mx-2 text-slate-300">|</span> 
+                                <i class="fa-solid fa-tag me-1"></i>${i.atividade}
                             </div>
-                            ${status}
-                        </div>`; 
-                }); 
-            } 
-        }); 
-        html += '</div>'; 
-        document.getElementById('corpoRelatorio').innerHTML = html; 
+                        </div>
+                        ${status}
+                    </div>`;
+            });
+
+            renderPaginacao(data.current_page, data.pages, 'paginacaoRelatorio', carregarDadosRelatorio);
+            
+            // Refocus search if it was active
+            if(termo) document.getElementById('searchRelatorio').focus();
+        } catch (e) {
+            corpo.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar dados.</div>';
+        }
     }
 
 </script>
