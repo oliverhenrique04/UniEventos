@@ -29,6 +29,75 @@
         line-height: 1.2;
     }
 
+    .canvas-stage {
+        transform-origin: top left;
+        position: relative;
+        padding-left: 28px;
+        padding-top: 28px;
+    }
+
+    .ruler-x,
+    .ruler-y {
+        position: absolute;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        z-index: 6;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .ruler-x {
+        left: 28px;
+        top: 0;
+        right: 0;
+        height: 24px;
+        background-image: repeating-linear-gradient(
+            to right,
+            rgba(15, 23, 42, 0.2) 0,
+            rgba(15, 23, 42, 0.2) 1px,
+            transparent 1px,
+            transparent 33.67px
+        );
+    }
+
+    .ruler-y {
+        top: 28px;
+        left: 0;
+        bottom: 0;
+        width: 24px;
+        background-image: repeating-linear-gradient(
+            to bottom,
+            rgba(15, 23, 42, 0.2) 0,
+            rgba(15, 23, 42, 0.2) 1px,
+            transparent 1px,
+            transparent 33.67px
+        );
+    }
+
+    .ruler-corner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 24px;
+        height: 24px;
+        background: #e2e8f0;
+        border: 1px solid #cbd5e1;
+        z-index: 7;
+    }
+
+    .ruler-label {
+        position: absolute;
+        font-size: 9px;
+        color: #475569;
+        opacity: 0.75;
+        white-space: nowrap;
+    }
+
+    .ruler-label.y {
+        transform: rotate(-90deg);
+        transform-origin: left top;
+    }
+
     #certCanvas {
         display: block;
         max-width: 100%;
@@ -45,6 +114,16 @@
         min-width: 50px;
         min-height: 20px;
         outline: none !important;
+    }
+
+    .canvas-overlay-item.locked {
+        cursor: default;
+        border-style: solid;
+        border-color: rgba(148, 163, 184, 0.5);
+    }
+
+    .canvas-overlay-item.multi {
+        border: 2px solid #0284c7;
     }
 
     .canvas-overlay-item:hover {
@@ -108,6 +187,52 @@
 
     .canvas-overlay-item.active .resize-handle { display: block; }
 
+    .guide-line {
+        position: absolute;
+        pointer-events: none;
+        z-index: 3000;
+        display: none;
+        background: rgba(14, 165, 233, 0.8);
+    }
+
+    .guide-line.v {
+        width: 1px;
+        top: 0;
+        bottom: 0;
+    }
+
+    .guide-line.h {
+        height: 1px;
+        left: 0;
+        right: 0;
+    }
+
+    .layer-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .layer-row .layer-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .icon-btn {
+        border: 0;
+        background: transparent;
+        color: #475569;
+        border-radius: 6px;
+        width: 26px;
+        height: 26px;
+    }
+
+    .icon-btn:hover {
+        background: #e2e8f0;
+    }
+
     .variable-guide-item {
         background: var(--slate-50);
         border: 1px solid var(--slate-200);
@@ -121,6 +246,35 @@
     .variable-guide-item:hover {
         border-color: #044d84;
         background: var(--primary-50);
+    }
+
+    .var-status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 6px;
+        font-size: 12px;
+    }
+
+    .var-chip {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+    }
+
+    .var-chip.ok {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .var-chip.miss {
+        background: #fee2e2;
+        color: #991b1b;
     }
 
     @media (max-width: 1200px) {
@@ -137,17 +291,22 @@
     <div class="dropdown">
         <button class="toolbar-btn" data-bs-toggle="dropdown" title="Inserir Variável"><i class="fa-solid fa-brackets-curly"></i></button>
         <ul class="dropdown-menu shadow border-0">
-            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{NOME}}')">Nome</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{EVENTO}}')">Evento</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{HORAS}}')">Horas</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{DATA}}')">Data</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{CPF}}')">CPF</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="injectVar('{{HASH}}')">Hash</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{NOME}}', event)">Nome</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EVENTO}}', event)">Evento</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">Horas</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">Data</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">CPF</a></li>
+            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HASH}}', event)">Hash</a></li>
         </ul>
     </div>
     <div class="toolbar-divider"></div>
     <button class="toolbar-btn" id="btn-bold" onclick="toggleStyle('bold')" title="Negrito"><i class="fa-solid fa-bold"></i></button>
     <button class="toolbar-btn" id="btn-italic" onclick="toggleStyle('italic')" title="Itálico"><i class="fa-solid fa-italic"></i></button>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" id="btn-align-left" onclick="setStyle('align', 'left')" title="Alinhar à esquerda"><i class="fa-solid fa-align-left"></i></button>
+    <button class="toolbar-btn" id="btn-align-center" onclick="setStyle('align', 'center')" title="Centralizar"><i class="fa-solid fa-align-center"></i></button>
+    <button class="toolbar-btn" id="btn-align-right" onclick="setStyle('align', 'right')" title="Alinhar à direita"><i class="fa-solid fa-align-right"></i></button>
+    <button class="toolbar-btn" id="btn-align-justify" onclick="setStyle('align', 'justify')" title="Justificar"><i class="fa-solid fa-align-justify"></i></button>
     <div class="toolbar-divider"></div>
     <select class="form-select form-select-sm border-0 py-0" style="width: 110px; background: transparent;" onchange="setStyle('font_family', this.value)" id="select-font">
         <option value="Helvetica">Sans Serif</option>
@@ -172,6 +331,10 @@
                 <i class="fa-solid fa-truck-fast me-1"></i> Entregas
             </a>
             <button onclick="adicionarTexto()" class="btn btn-light border"><i class="fa-solid fa-plus me-1"></i> Texto</button>
+            <button onclick="adicionarImagem()" class="btn btn-light border"><i class="fa-solid fa-image me-1"></i> Imagem</button>
+            <button onclick="duplicateSelected()" class="btn btn-light border"><i class="fa-solid fa-clone me-1"></i> Duplicar</button>
+            <button onclick="undoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-left me-1"></i> Undo</button>
+            <button onclick="redoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-right me-1"></i> Redo</button>
             <button onclick="resetarLayout()" class="btn btn-light border">Limpar Tudo</button>
             <button onclick="salvarConfiguracao()" class="btn btn-primary shadow-sm px-4">Salvar Layout</button>
             <button onclick="confirmarEnvioLote()" class="btn btn-dark shadow-sm px-4">Enviar em Lote</button>
@@ -180,9 +343,16 @@
 
     <div class="designer-container">
         <div class="preview-box" id="dropZone" onclick="deselectAll(event)">
-            <div class="cert-canvas-container" id="canvasContainer" onclick="event.stopPropagation()">
-                <canvas id="certCanvas"></canvas>
-                <!-- Elements dynamically injected -->
+            <div class="canvas-stage" id="canvasStage">
+                <div class="ruler-corner"></div>
+                <div class="ruler-x" id="rulerX"></div>
+                <div class="ruler-y" id="rulerY"></div>
+                <div class="cert-canvas-container" id="canvasContainer" onclick="event.stopPropagation()">
+                    <canvas id="certCanvas"></canvas>
+                    <div id="guideV" class="guide-line v"></div>
+                    <div id="guideH" class="guide-line h"></div>
+                    <!-- Elements dynamically injected -->
+                </div>
             </div>
             
             <div id="noBgMsg" class="text-center p-5 d-none">
@@ -202,6 +372,52 @@
                     <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="limparBackground()">Remover</button>
                 </div>
                 <input type="file" id="inputBg" class="d-none" accept="image/*" onchange="handleBgUpload(this)">
+                <input type="file" id="inputAsset" class="d-none" accept="image/*" onchange="handleAssetUpload(this)">
+            </div>
+
+            <div class="glass-panel p-4 mb-4">
+                <h6 class="fw-bold mb-3">Grid e Navegação</h6>
+                <div class="small text-muted mb-2" id="a4Info">A4 Paisagem: 297 x 210 mm</div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="small mb-0">Snap para Grid</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="snapToggle" checked onchange="toggleSnap(this.checked)">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <label class="small mb-0">Guias</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="guidesToggle" checked onchange="toggleGuides(this.checked)">
+                    </div>
+                </div>
+                <label class="small mb-1">Tamanho do Grid (%)</label>
+                <input type="range" class="form-range" min="1" max="10" value="2" id="gridSize" oninput="setGridSize(this.value)">
+                <label class="small mb-1 mt-2">Zoom</label>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setZoom(zoomLevel - 0.1)">-</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setZoom(1)">100%</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setZoom(zoomLevel + 0.1)">+</button>
+                </div>
+            </div>
+
+            <div class="glass-panel p-4 mb-4">
+                <h6 class="fw-bold mb-3">Alinhar e Distribuir</h6>
+                <div class="d-grid gap-2">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" onclick="alignSelected('left')">Esq</button>
+                        <button class="btn btn-outline-secondary" onclick="alignSelected('hcenter')">Centro H</button>
+                        <button class="btn btn-outline-secondary" onclick="alignSelected('right')">Dir</button>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" onclick="alignSelected('top')">Topo</button>
+                        <button class="btn btn-outline-secondary" onclick="alignSelected('vcenter')">Centro V</button>
+                        <button class="btn btn-outline-secondary" onclick="alignSelected('bottom')">Base</button>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" onclick="distributeSelected('horizontal')">Dist H</button>
+                        <button class="btn btn-outline-secondary" onclick="distributeSelected('vertical')">Dist V</button>
+                    </div>
+                </div>
             </div>
 
             <div class="glass-panel p-4 mb-4">
@@ -234,8 +450,31 @@
                 </div>
             </div>
 
+            <div class="glass-panel p-4 mb-4">
+                <h6 class="fw-bold mb-3">Validação do Layout</h6>
+                <div class="small text-muted mb-2">Status em tempo real dos campos essenciais.</div>
+                <div id="variable-status-panel"></div>
+            </div>
+
             <div class="glass-panel p-4">
                 <h6 class="fw-bold mb-3">Camadas</h6>
+                <div class="small text-muted mb-2">Use Ctrl/Cmd para seleção múltipla.</div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="small mb-0">AutoFit (texto)</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoFitToggle" checked onchange="toggleAutoFit(this.checked)">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="small mb-1">Largura (%)</label>
+                        <input type="number" class="form-control form-control-sm" id="blockWidthInput" min="1" max="100" step="0.1" oninput="updateTextBlockSizeFromInputs()">
+                    </div>
+                    <div class="col-6">
+                        <label class="small mb-1">Altura (%)</label>
+                        <input type="number" class="form-control form-control-sm" id="blockHeightInput" min="1" max="100" step="0.1" oninput="updateTextBlockSizeFromInputs()">
+                    </div>
+                </div>
                 <div id="elements-list" class="list-group list-group-flush small"></div>
             </div>
         </div>
@@ -244,292 +483,1301 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <script>
     const eventId = {{ event.id }};
-    const canvas = document.getElementById('certCanvas');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('canvasContainer');
     const toolbar = document.getElementById('floatingToolbar');
-    
-    let bgImage = new Image();
-    let selectedId = null;
-    let isDragging = false;
-    let isResizing = false;
+    const guideV = document.getElementById('guideV');
+    const guideH = document.getElementById('guideH');
+    const persistedTemplateRaw = {{ (event.cert_template_json or '')|tojson }};
 
-    const defaultElements = {
-        txt1: { text: "CERTIFICADO DE PARTICIPAÇÃO", x: 50, y: 20, w: 80, h: 8, font: 35, color: '#1e293b', align: 'center', bold: true, italic: false, font_family: 'Helvetica' },
-        txt2: { text: "Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.", x: 50, y: 50, w: 80, h: 25, font: 22, color: '#334155', align: 'center', bold: false, italic: false, font_family: 'Helvetica' },
-        hash: { text: "Código de Validação: {{HASH}}", x: 50, y: 92, w: 60, h: 5, font: 11, color: '#94a3b8', align: 'center', bold: false, italic: false, font_family: 'Courier' },
-        qrcode: { x: 88, y: 88, w: 12, h: 12, size: 80 }
-    };
+    const W = 1000;
+    const H = 707;
+    const MAX_HISTORY = 60;
 
-    let currentConfig = {
+    const defaultTemplate = {
+        version: 2,
+        document: { gridSize: 2, snap: true, guides: true },
         bg: "{{ event.cert_bg_path or '' }}",
-        elements: JSON.parse(JSON.stringify(defaultElements))
+        elements: [
+            { id: 'txt1', type: 'text', text: 'CERTIFICADO DE PARTICIPAÇÃO', x: 50, y: 20, w: 80, h: 8, font: 34, color: '#1e293b', align: 'center', bold: true, italic: false, font_family: 'Helvetica', zIndex: 1, locked: false, visible: true },
+            { id: 'txt2', type: 'text', text: 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.', x: 50, y: 50, w: 82, h: 24, font: 22, color: '#334155', align: 'center', bold: false, italic: false, font_family: 'Helvetica', zIndex: 2, locked: false, visible: true },
+            { id: 'hash', type: 'text', text: 'Código de Validação: {{HASH}}', x: 50, y: 92, w: 60, h: 5, font: 11, color: '#94a3b8', align: 'center', bold: false, italic: false, font_family: 'Courier', zIndex: 3, locked: false, visible: true },
+            { id: 'qrcode', type: 'qr', x: 88, y: 88, w: 12, h: 12, size: 80, zIndex: 4, locked: false, visible: true }
+        ]
     };
 
-    {% if event.cert_template_json %}
-    try { currentConfig.elements = JSON.parse('{{ event.cert_template_json|safe }}'); } catch(e) {}
-    {% endif %}
+    let template = JSON.parse(JSON.stringify(defaultTemplate));
+    let designer = null;
+    let bgPath = template.bg;
+    let zoomLevel = 1;
+    let isSpacePanning = false;
+    let historyPast = [];
+    let historyFuture = [];
+    let isHydrating = false;
+    let gridObjects = [];
 
-    function init() {
-        if (currentConfig.bg) {
-            document.getElementById('noBgMsg').classList.add('d-none');
-            bgImage.src = currentConfig.bg.startsWith('/') ? currentConfig.bg : '/static/' + currentConfig.bg;
-            bgImage.onload = () => { renderCanvas(); updateOverlays(); };
-        } else {
-            document.getElementById('noBgMsg').classList.remove('d-none');
-            container.style.display = 'none';
+    function generateId(prefix) {
+        return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    }
+
+    function pxToPctX(x) { return (x / W) * 100; }
+    function pxToPctY(y) { return (y / H) * 100; }
+    function pctToPxX(x) { return (x / 100) * W; }
+    function pctToPxY(y) { return (y / 100) * H; }
+
+    function scaleTextStyles(obj, ratio) {
+        if (!obj.styles || ratio >= 1) return;
+        Object.keys(obj.styles).forEach((lineKey) => {
+            const line = obj.styles[lineKey] || {};
+            Object.keys(line).forEach((charKey) => {
+                const st = line[charKey];
+                if (st && st.fontSize) {
+                    st.fontSize = Math.max(6, st.fontSize * ratio);
+                }
+            });
+        });
+    }
+
+    function fitTextToBlock(obj) {
+        if (!obj || obj.data?.type !== 'text') return;
+
+        const targetW = Math.max(20, Number(obj.data?.blockWidth || obj.width || 120));
+        const targetH = Math.max(12, Number(obj.data?.blockHeight || obj.height || 40));
+
+        obj.set({
+            width: targetW,
+            scaleX: 1,
+            scaleY: 1
+        });
+
+        let guard = 0;
+        while (obj.calcTextHeight() > targetH && guard < 60) {
+            const ratio = 0.96;
+            obj.set('fontSize', Math.max(6, (obj.fontSize || 16) * ratio));
+            scaleTextStyles(obj, ratio);
+            guard += 1;
         }
+
+        obj.data.blockWidth = targetW;
+        obj.data.blockHeight = targetH;
+        obj.setCoords();
+    }
+
+    function syncAutoFitToggle() {
+        const input = document.getElementById('autoFitToggle');
+        if (!input) return;
+
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') {
+            input.checked = true;
+            input.disabled = true;
+            return;
+        }
+
+        input.disabled = false;
+        input.checked = selected[0].data?.autoFit !== false;
+    }
+
+    function toggleAutoFit(enabled) {
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
+
+        pushHistory();
+        const obj = selected[0];
+        obj.data.autoFit = !!enabled;
+        if (obj.data.autoFit) {
+            fitTextToBlock(obj);
+        }
+        designer.requestRenderAll();
         updateElementsList();
+        syncAutoFitToggle();
     }
 
-    function renderCanvas() {
-        const ratio = bgImage.height / bgImage.width;
-        canvas.width = 1000;
-        canvas.height = 1000 * ratio;
-        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-        container.style.display = 'block';
+    function syncBlockSizeControls() {
+        const widthInput = document.getElementById('blockWidthInput');
+        const heightInput = document.getElementById('blockHeightInput');
+        if (!widthInput || !heightInput) return;
+
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') {
+            widthInput.value = '';
+            heightInput.value = '';
+            widthInput.disabled = true;
+            heightInput.disabled = true;
+            return;
+        }
+
+        const obj = selected[0];
+        const widthPx = Math.max(20, Number(obj.data?.blockWidth || obj.width || 120));
+        const heightPx = Math.max(12, Number(obj.data?.blockHeight || obj.height || 40));
+
+        widthInput.disabled = false;
+        heightInput.disabled = false;
+        widthInput.value = ((widthPx / W) * 100).toFixed(2);
+        heightInput.value = ((heightPx / H) * 100).toFixed(2);
     }
 
-    function updateOverlays() {
-        const existing = container.querySelectorAll('.canvas-overlay-item');
-        existing.forEach(el => { if (!currentConfig.elements[el.id.replace('item-','')]) el.remove(); });
+    function updateTextBlockSizeFromInputs() {
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
 
-        Object.keys(currentConfig.elements).forEach(key => {
-            const config = currentConfig.elements[key];
-            let el = document.getElementById(`item-${key}`);
-            if (!el) {
-                el = document.createElement('div');
-                el.id = `item-${key}`;
-                el.className = 'canvas-overlay-item';
-                el.innerHTML = '<div class="resize-handle"></div>';
-                container.appendChild(el);
-                setupElementEvents(el, key);
+        const widthInput = document.getElementById('blockWidthInput');
+        const heightInput = document.getElementById('blockHeightInput');
+        const wPct = Number(widthInput?.value);
+        const hPct = Number(heightInput?.value);
+        if (!Number.isFinite(wPct) || !Number.isFinite(hPct)) return;
+
+        pushHistory();
+
+        const obj = selected[0];
+        const safeWPct = Math.max(1, Math.min(100, wPct));
+        const safeHPct = Math.max(1, Math.min(100, hPct));
+        obj.data.blockWidth = Math.max(20, pctToPxX(safeWPct));
+        obj.data.blockHeight = Math.max(12, pctToPxY(safeHPct));
+
+        obj.set({
+            width: obj.data.blockWidth,
+            scaleX: 1,
+            scaleY: 1
+        });
+
+        fitTextToBlock(obj);
+
+        designer.requestRenderAll();
+        updateElementsList();
+        syncToolbarWithSelection();
+        syncBlockSizeControls();
+    }
+
+    function applyTemplateDefaults(raw) {
+        const out = JSON.parse(JSON.stringify(defaultTemplate));
+        if (!raw || typeof raw !== 'object') return out;
+
+        out.version = raw.version || 2;
+        out.document.gridSize = Number(raw.document?.gridSize || 2);
+        out.document.snap = raw.document?.snap !== false;
+        out.document.guides = raw.document?.guides !== false;
+        out.bg = raw.bg || template.bg;
+
+        if (Array.isArray(raw.elements)) {
+            out.elements = raw.elements.map((el, idx) => ({
+                id: el.id || generateId('el'),
+                type: el.type || (el.src ? 'image' : 'text'),
+                text: el.text || '',
+                src: el.src,
+                x: Number(el.x ?? 50),
+                y: Number(el.y ?? 50),
+                w: Number(el.w ?? 20),
+                h: Number(el.h ?? 8),
+                font: Number(el.font ?? 20),
+                color: el.color || '#000000',
+                align: el.align || 'center',
+                bold: !!el.bold,
+                italic: !!el.italic,
+                font_family: el.font_family || 'Helvetica',
+                text_styles: el.text_styles || {},
+                size: Number(el.size ?? 80),
+                zIndex: Number(el.zIndex ?? idx + 1),
+                locked: ['qrcode', 'hash'].includes(el.id) ? false : !!el.locked,
+                visible: el.visible !== false
+            }));
+        } else if (raw.elements === undefined) {
+            const keys = Object.keys(raw).filter((k) => typeof raw[k] === 'object');
+            if (keys.length) {
+                out.elements = keys.map((key, idx) => {
+                    const el = raw[key] || {};
+                    if (key === 'qrcode') {
+                        return {
+                            id: key,
+                            type: 'qr',
+                            x: Number(el.x ?? 88),
+                            y: Number(el.y ?? 88),
+                            w: Number(el.w ?? 12),
+                            h: Number(el.h ?? 12),
+                            size: Number(el.size ?? 80),
+                            zIndex: Number(el.zIndex ?? idx + 1),
+                            locked: false,
+                            visible: el.visible !== false
+                        };
+                    }
+                    return {
+                        id: key,
+                        type: el.type || (el.src ? 'image' : 'text'),
+                        text: el.text || '',
+                        src: el.src,
+                        x: Number(el.x ?? 50),
+                        y: Number(el.y ?? 50),
+                        w: Number(el.w ?? 20),
+                        h: Number(el.h ?? 8),
+                        font: Number(el.font ?? 20),
+                        color: el.color || '#000000',
+                        align: el.align || 'center',
+                        bold: !!el.bold,
+                        italic: !!el.italic,
+                        font_family: el.font_family || 'Helvetica',
+                        text_styles: el.text_styles || {},
+                        zIndex: Number(el.zIndex ?? idx + 1),
+                        locked: ['qrcode', 'hash'].includes(key) ? false : !!el.locked,
+                        visible: el.visible !== false
+                    };
+                });
             }
+        }
 
-            el.style.left = `${config.x - (config.w || 10)/2}%`;
-            el.style.top = `${config.y - (config.h || 5)/2}%`;
-            el.style.width = `${config.w || 10}%`;
-            el.style.height = `${config.h || 5}%`;
+        out.elements.sort((a, b) => a.zIndex - b.zIndex);
+        return out;
+    }
 
-            if (key === 'qrcode') {
-                el.innerHTML = '<i class="fa-solid fa-qrcode text-dark"></i><div class="resize-handle"></div>';
-                el.style.background = 'white';
-                el.style.justifyContent = 'center';
-                const icon = el.querySelector('i');
-                icon.style.fontSize = `${Math.min(el.offsetWidth, el.offsetHeight) * 0.7}px`;
+    function getActiveObjects() {
+        const active = designer.getActiveObject();
+        if (!active) return [];
+        if (active.type === 'activeSelection') return active.getObjects().filter((obj) => !obj.data?.isGrid);
+        if (active.data?.isGrid) return [];
+        return [active];
+    }
+
+    function clearGridOverlay() {
+        gridObjects.forEach((obj) => designer.remove(obj));
+        gridObjects = [];
+    }
+
+    function renderGridOverlay() {
+        clearGridOverlay();
+        const grid = Math.max(1, Number(template.document.gridSize || 2));
+        const gridPxX = (grid / 100) * W;
+        const gridPxY = (grid / 100) * H;
+
+        for (let x = 0; x <= W; x += gridPxX) {
+            const major = Math.abs((x / gridPxX) % 5) < 0.001;
+            const line = new fabric.Line([x, 0, x, H], {
+                stroke: major ? 'rgba(15, 23, 42, 0.22)' : 'rgba(15, 23, 42, 0.12)',
+                strokeWidth: major ? 1.05 : 0.7,
+                selectable: false,
+                evented: false,
+                excludeFromExport: true
+            });
+            line.data = { isGrid: true };
+            gridObjects.push(line);
+            designer.add(line);
+            designer.sendToBack(line);
+        }
+
+        for (let y = 0; y <= H; y += gridPxY) {
+            const major = Math.abs((y / gridPxY) % 5) < 0.001;
+            const line = new fabric.Line([0, y, W, y], {
+                stroke: major ? 'rgba(15, 23, 42, 0.22)' : 'rgba(15, 23, 42, 0.12)',
+                strokeWidth: major ? 1.05 : 0.7,
+                selectable: false,
+                evented: false,
+                excludeFromExport: true
+            });
+            line.data = { isGrid: true };
+            gridObjects.push(line);
+            designer.add(line);
+            designer.sendToBack(line);
+        }
+
+        designer.requestRenderAll();
+    }
+
+    function syncToolbarWithSelection() {
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') {
+            toolbar.style.display = 'none';
+            return;
+        }
+
+        const obj = selected[0];
+        toolbar.style.display = 'flex';
+        const rect = designer.upperCanvasEl.getBoundingClientRect();
+        const objRect = obj.getBoundingRect(true, true);
+        toolbar.style.top = `${rect.top + objRect.top - 50}px`;
+        toolbar.style.left = `${rect.left + objRect.left + (objRect.width / 2) - (toolbar.offsetWidth / 2)}px`;
+
+        document.getElementById('btn-bold').classList.toggle('active', obj.fontWeight === 'bold');
+        document.getElementById('btn-italic').classList.toggle('active', obj.fontStyle === 'italic');
+
+        if (hasTextSelection(obj)) {
+            const partialBold = getSelectionStyleValue(obj, 'fontWeight', obj.fontWeight) === 'bold';
+            const partialItalic = getSelectionStyleValue(obj, 'fontStyle', obj.fontStyle) === 'italic';
+            document.getElementById('btn-bold').classList.toggle('active', partialBold);
+            document.getElementById('btn-italic').classList.toggle('active', partialItalic);
+            document.getElementById('input-size').value = Math.max(8, Math.round(getSelectionStyleValue(obj, 'fontSize', obj.fontSize || 20)));
+            document.getElementById('input-color').value = getSelectionStyleValue(obj, 'fill', obj.fill || '#000000');
+            document.getElementById('select-font').value = getSelectionStyleValue(obj, 'fontFamily', obj.data?.font_family || 'Helvetica');
+        } else {
+            document.getElementById('input-size').value = Math.max(8, Math.round(obj.fontSize || 20));
+            document.getElementById('input-color').value = obj.fill || '#000000';
+            const family = (obj.data?.font_family || 'Helvetica');
+            document.getElementById('select-font').value = family;
+        }
+        updateAlignButtons(obj.textAlign || 'center');
+        syncAutoFitToggle();
+        syncBlockSizeControls();
+    }
+
+    function updateAlignButtons(align) {
+        const target = align || 'center';
+        document.getElementById('btn-align-left').classList.toggle('active', target === 'left');
+        document.getElementById('btn-align-center').classList.toggle('active', target === 'center');
+        document.getElementById('btn-align-right').classList.toggle('active', target === 'right');
+        document.getElementById('btn-align-justify').classList.toggle('active', target === 'justify');
+    }
+
+    function hasTextSelection(obj) {
+        return !!(
+            obj &&
+            obj.isEditing &&
+            Number.isInteger(obj.selectionStart) &&
+            Number.isInteger(obj.selectionEnd) &&
+            obj.selectionEnd > obj.selectionStart
+        );
+    }
+
+    function applySelectionStyle(obj, styles) {
+        obj.setSelectionStyles(styles, obj.selectionStart, obj.selectionEnd);
+        obj.dirty = true;
+    }
+
+    function getSelectionStyleValue(obj, key, fallback) {
+        if (!hasTextSelection(obj)) {
+            return fallback;
+        }
+        const styles = obj.getSelectionStyles(obj.selectionStart, obj.selectionEnd) || [];
+        if (!styles.length) {
+            return fallback;
+        }
+        const value = styles[0]?.[key];
+        return value === undefined ? fallback : value;
+    }
+
+    function hideGuides() {
+        guideV.style.display = 'none';
+        guideH.style.display = 'none';
+    }
+
+    function showGuidesForObject(obj) {
+        if (!template.document.guides) {
+            hideGuides();
+            return;
+        }
+
+        hideGuides();
+        const center = obj.getCenterPoint();
+        const threshold = 8;
+        if (Math.abs(center.x - (W / 2)) < threshold) {
+            guideV.style.display = 'block';
+            guideV.style.left = `${(50 / 100) * designer.getWidth()}px`;
+        }
+        if (Math.abs(center.y - (H / 2)) < threshold) {
+            guideH.style.display = 'block';
+            guideH.style.top = `${(50 / 100) * designer.getHeight()}px`;
+        }
+    }
+
+    function pushHistory() {
+        if (isHydrating) return;
+        historyPast.push(JSON.stringify(exportTemplate()));
+        if (historyPast.length > MAX_HISTORY) historyPast.shift();
+        historyFuture = [];
+    }
+
+    function applyTemplateOnCanvas(nextTemplate) {
+        isHydrating = true;
+        template = applyTemplateDefaults(nextTemplate);
+        bgPath = template.bg || '';
+
+        const keepBackground = designer.backgroundImage;
+        designer.clear();
+        if (keepBackground) designer.setBackgroundImage(keepBackground, designer.renderAll.bind(designer));
+        renderGridOverlay();
+
+        const addObjectFromTemplate = (el) => {
+            if (el.visible === false) return;
+
+            if (el.type === 'text') {
+                const txt = new fabric.IText(el.text || '', {
+                    left: pctToPxX(el.x),
+                    top: pctToPxY(el.y),
+                    originX: 'center',
+                    originY: 'center',
+                    width: pctToPxX(el.w),
+                    fontSize: Math.max(8, el.font),
+                    fill: el.color || '#000000',
+                    textAlign: el.align || 'center',
+                    fontStyle: el.italic ? 'italic' : 'normal',
+                    fontWeight: el.bold ? 'bold' : 'normal',
+                    fontFamily: el.font_family || 'Helvetica',
+                    styles: el.text_styles || {},
+                    editable: !el.locked,
+                    lockMovementX: !!el.locked,
+                    lockMovementY: !!el.locked,
+                    lockScalingX: !!el.locked,
+                    lockScalingY: !!el.locked,
+                    hasControls: !el.locked
+                });
+                txt.data = {
+                    ...el,
+                    blockWidth: pctToPxX(el.w),
+                    blockHeight: pctToPxY(el.h),
+                    autoFit: el.auto_fit !== false
+                };
+                if (txt.data.autoFit) {
+                    fitTextToBlock(txt);
+                }
+                designer.add(txt);
                 return;
             }
 
-            el.contentEditable = "true";
-            el.style.fontSize = `${(config.font / 1000) * container.offsetWidth}px`;
-            el.style.color = config.color;
-            el.style.fontWeight = config.bold ? 'bold' : 'normal';
-            el.style.fontStyle = config.italic ? 'italic' : 'normal';
-            el.setAttribute('data-align', config.align || 'center');
-            
-            const fontMap = { 'Helvetica': "'Inter', sans-serif", 'Times-Roman': "'Times New Roman', serif", 'Courier': "'Courier New', monospace" };
-            el.style.fontFamily = fontMap[config.font_family] || fontMap['Helvetica'];
-
-            if (document.activeElement !== el) {
-                let previewText = config.text
-                    .replace('{{NOME}}', 'LUCAS ALUNO')
-                    .replace('{{EVENTO}}', '{{ event.nome }}')
-                    .replace('{{HORAS}}', '10')
-                    .replace('{{DATA}}', '{{ event.data_inicio }}')
-                    .replace('{{HASH}}', 'A1B2-C3D4')
-                    .replace('{{CPF}}', '000.000.000-00');
-                el.innerText = previewText;
+            if (el.type === 'qr') {
+                const qrious = new QRious({
+                    value: `{{ request.host_url if request else '' }}validar/{{HASH}}`,
+                    size: 180,
+                    level: 'H'
+                });
+                fabric.Image.fromURL(qrious.toDataURL(), (img) => {
+                    img.set({
+                        left: pctToPxX(el.x),
+                        top: pctToPxY(el.y),
+                        originX: 'center',
+                        originY: 'center',
+                        scaleX: pctToPxX(el.w) / img.width,
+                        scaleY: pctToPxY(el.h) / img.height,
+                        lockRotation: true,
+                        lockMovementX: !!el.locked,
+                        lockMovementY: !!el.locked,
+                        lockScalingX: !!el.locked,
+                        lockScalingY: !!el.locked,
+                        hasControls: !el.locked
+                    });
+                    img.data = { ...el, type: 'qr' };
+                    designer.add(img);
+                    designer.renderAll();
+                });
+                return;
             }
-        });
-    }
 
-    function setupElementEvents(el, key) {
-        el.addEventListener('mousedown', (e) => {
-            if (e.target.classList.contains('resize-handle')) return;
-            selectElement(key);
-            if (document.activeElement === el) return;
-            
-            isDragging = true;
-            const startX = e.clientX, startY = e.clientY;
-            const initialX = currentConfig.elements[key].x, initialY = currentConfig.elements[key].y;
-
-            const move = (ev) => {
-                const dx = ((ev.clientX - startX) / container.offsetWidth) * 100;
-                const dy = ((ev.clientY - startY) / container.offsetHeight) * 100;
-                currentConfig.elements[key].x = Math.max(0, Math.min(100, initialX + dx));
-                currentConfig.elements[key].y = Math.max(0, Math.min(100, initialY + dy));
-                updateOverlays();
-                positionToolbar();
-            };
-            const stop = () => { isDragging = false; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', stop); };
-            document.addEventListener('mousemove', move);
-            document.addEventListener('mouseup', stop);
-        });
-
-        el.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            isResizing = true;
-            const startX = e.clientX, startY = e.clientY;
-            const initialW = currentConfig.elements[key].w || 10, initialH = currentConfig.elements[key].h || 5;
-
-            const move = (ev) => {
-                const dw = ((ev.clientX - startX) / container.offsetWidth) * 100;
-                const dh = ((ev.clientY - startY) / container.offsetHeight) * 100;
-                currentConfig.elements[key].w = Math.max(2, initialW + dw);
-                currentConfig.elements[key].h = Math.max(1, initialH + dh);
-                updateOverlays();
-            };
-            const stop = () => { isResizing = false; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', stop); };
-            document.addEventListener('mousemove', move);
-            document.addEventListener('mouseup', stop);
-        });
-
-        el.addEventListener('focus', () => {
-            if (key !== 'qrcode') el.innerText = currentConfig.elements[key].text;
-        });
-
-        el.addEventListener('blur', () => {
-            if (key !== 'qrcode') {
-                currentConfig.elements[key].text = el.innerText;
-                updateOverlays();
+            if (el.type === 'image' && el.src) {
+                const src = el.src.startsWith('/') ? el.src : `/static/${el.src}`;
+                fabric.Image.fromURL(src, (img) => {
+                    img.set({
+                        left: pctToPxX(el.x),
+                        top: pctToPxY(el.y),
+                        originX: 'center',
+                        originY: 'center',
+                        scaleX: pctToPxX(el.w) / img.width,
+                        scaleY: pctToPxY(el.h) / img.height,
+                        lockMovementX: !!el.locked,
+                        lockMovementY: !!el.locked,
+                        lockScalingX: !!el.locked,
+                        lockScalingY: !!el.locked,
+                        hasControls: !el.locked
+                    });
+                    img.data = { ...el };
+                    designer.add(img);
+                    designer.renderAll();
+                }, { crossOrigin: 'anonymous' });
             }
+        };
+
+        template.elements.forEach(addObjectFromTemplate);
+        updateElementsList();
+        syncControlsFromTemplate();
+        isHydrating = false;
+    }
+
+    function exportTemplate() {
+        const doc = {
+            version: 2,
+            document: {
+                gridSize: Number(template.document.gridSize || 2),
+                snap: !!template.document.snap,
+                guides: !!template.document.guides
+            },
+            bg: bgPath || '',
+            elements: []
+        };
+
+        designer.getObjects().forEach((obj, idx) => {
+            if (!obj.data || obj.data.isGrid) return;
+
+            const center = obj.getCenterPoint();
+            const bounds = obj.getBoundingRect(true, true);
+            const base = {
+                id: obj.data.id || generateId('el'),
+                type: obj.data.type || 'text',
+                x: Number(pxToPctX(center.x).toFixed(4)),
+                y: Number(pxToPctY(center.y).toFixed(4)),
+                w: Number((((obj.data?.blockWidth || bounds.width) / W) * 100).toFixed(4)),
+                h: Number((((obj.data?.blockHeight || bounds.height) / H) * 100).toFixed(4)),
+                zIndex: doc.elements.length + 1,
+                locked: !!obj.lockMovementX,
+                visible: obj.visible !== false
+            };
+
+            if (base.type === 'text') {
+                doc.elements.push({
+                    ...base,
+                    text: obj.text || '',
+                    font: Math.round(obj.fontSize || 20),
+                    color: obj.fill || '#000000',
+                    align: obj.textAlign || 'center',
+                    bold: obj.fontWeight === 'bold',
+                    italic: obj.fontStyle === 'italic',
+                    font_family: obj.data.font_family || 'Helvetica',
+                    text_styles: obj.styles || {},
+                    auto_fit: obj.data?.autoFit !== false
+                });
+                return;
+            }
+
+            if (base.type === 'qr') {
+                doc.elements.push({ ...base, size: Math.round(Math.min(bounds.width, bounds.height)) });
+                return;
+            }
+
+            doc.elements.push({ ...base, src: obj.data.src });
         });
+
+        template = applyTemplateDefaults(doc);
+        return doc;
     }
 
-    function selectElement(id) {
-        selectedId = id;
-        document.querySelectorAll('.canvas-overlay-item').forEach(el => el.classList.remove('active'));
-        document.getElementById(`item-${id}`).classList.add('active');
-        
-        const config = currentConfig.elements[id];
-        toolbar.style.display = 'flex';
-        document.getElementById('btn-bold').classList.toggle('active', !!config.bold);
-        document.getElementById('btn-italic').classList.toggle('active', !!config.italic);
-        document.getElementById('select-font').value = config.font_family || 'Helvetica';
-        document.getElementById('input-size').value = config.font || 20;
-        document.getElementById('input-color').value = config.color || '#000000';
-        
-        positionToolbar();
-    }
-
-    function deselectAll(e) {
-        selectedId = null;
-        document.querySelectorAll('.canvas-overlay-item').forEach(el => el.classList.remove('active'));
-        toolbar.style.display = 'none';
-    }
-
-    function positionToolbar() {
-        if (!selectedId) return;
-        const el = document.getElementById(`item-${selectedId}`);
-        const rect = el.getBoundingClientRect();
-        toolbar.style.top = `${rect.top - 50}px`;
-        toolbar.style.left = `${rect.left + (rect.width/2) - (toolbar.offsetWidth/2)}px`;
-    }
-
-    function setStyle(prop, val) {
-        if (!selectedId) return;
-        currentConfig.elements[selectedId][prop] = val;
-        updateOverlays();
-    }
-
-    function toggleStyle(prop) {
-        if (!selectedId) return;
-        currentConfig.elements[selectedId][prop] = !currentConfig.elements[selectedId][prop];
-        updateOverlays();
-        document.getElementById(`btn-${prop}`).classList.toggle('active', currentConfig.elements[selectedId][prop]);
-    }
-
-    function injectVar(tag) {
-        if (!selectedId || selectedId === 'qrcode') {
-            // If no selection, add to first text block or create one
-            const keys = Object.keys(currentConfig.elements).filter(k => k !== 'qrcode');
-            if (keys.length > 0) selectElement(keys[0]);
-            else return;
-        }
-        const el = document.getElementById(`item-${selectedId}`);
-        el.focus();
-        document.execCommand('insertText', false, tag);
-    }
-
-    function adicionarTexto() {
-        const id = 'txt_' + Date.now();
-        currentConfig.elements[id] = { text: "Clique para editar o conteúdo", x: 50, y: 50, w: 40, h: 8, font: 20, color: '#000000', align: 'center', bold: false, italic: false, font_family: 'Helvetica' };
-        updateOverlays();
-        setTimeout(() => selectElement(id), 50);
-        updateElementsList();
-    }
-
-    function deleteSelected() {
-        if (!selectedId) return;
-        if (['qrcode', 'hash'].includes(selectedId)) { Toast.fire({icon:'warning', title:'Este elemento é obrigatório para validação'}); return; }
-        delete currentConfig.elements[selectedId];
-        deselectAll();
-        updateOverlays();
-        updateElementsList();
+    function syncControlsFromTemplate() {
+        document.getElementById('snapToggle').checked = !!template.document.snap;
+        document.getElementById('guidesToggle').checked = !!template.document.guides;
+        document.getElementById('gridSize').value = String(template.document.gridSize || 2);
     }
 
     function updateElementsList() {
         const list = document.getElementById('elements-list');
         list.innerHTML = '';
-        Object.keys(currentConfig.elements).forEach(k => {
-            const btn = document.createElement('button');
-            btn.className = 'list-group-item list-group-item-action py-2 border-0 rounded-3 mb-1';
-            btn.innerText = k.toUpperCase();
-            btn.onclick = (e) => { e.stopPropagation(); selectElement(k); };
-            list.appendChild(btn);
+        const items = exportTemplate().elements.slice().sort((a, b) => b.zIndex - a.zIndex);
+
+        items.forEach((el) => {
+            const row = document.createElement('div');
+            row.className = 'list-group-item border-0 rounded-3 mb-1 py-2 layer-row';
+
+            const name = document.createElement('button');
+            name.className = 'btn btn-link text-start p-0 layer-name text-decoration-none';
+            name.innerText = `${el.id.toUpperCase()} (${el.type})`;
+            name.onclick = () => {
+                const found = designer.getObjects().find((o) => o.data?.id === el.id);
+                if (!found) return;
+                designer.setActiveObject(found);
+                designer.requestRenderAll();
+                syncToolbarWithSelection();
+            };
+
+            const lock = document.createElement('button');
+            lock.className = 'icon-btn';
+            lock.innerHTML = `<i class="fa-solid ${el.locked ? 'fa-lock' : 'fa-lock-open'}"></i>`;
+            lock.onclick = () => toggleLock(el.id);
+
+            const up = document.createElement('button');
+            up.className = 'icon-btn';
+            up.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
+            up.onclick = () => moveLayer(el.id, 'up');
+
+            const down = document.createElement('button');
+            down.className = 'icon-btn';
+            down.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
+            down.onclick = () => moveLayer(el.id, 'down');
+
+            row.appendChild(name);
+            row.appendChild(lock);
+            row.appendChild(up);
+            row.appendChild(down);
+            list.appendChild(row);
         });
+
+        updateVariableStatusPanel();
+        syncAutoFitToggle();
+        syncBlockSizeControls();
+    }
+
+    function updateVariableStatusPanel() {
+        const panel = document.getElementById('variable-status-panel');
+        if (!panel) return;
+
+        const snapshot = exportTemplate();
+        const allText = snapshot.elements
+            .filter((el) => el.type === 'text')
+            .map((el) => el.text || '')
+            .join(' ');
+
+        const hasQR = snapshot.elements.some((el) => el.type === 'qr' || el.id === 'qrcode');
+
+        const checks = [
+            { label: '{{NOME}}', ok: allText.includes('{{NOME}}') },
+            { label: '{{CPF}}', ok: allText.includes('{{CPF}}') },
+            { label: '{{EVENTO}}', ok: allText.includes('{{EVENTO}}') },
+            { label: '{{HORAS}}', ok: allText.includes('{{HORAS}}') },
+            { label: '{{DATA}}', ok: allText.includes('{{DATA}}') },
+            { label: '{{HASH}}', ok: allText.includes('{{HASH}}') },
+            { label: 'QRCode', ok: hasQR }
+        ];
+
+        panel.innerHTML = '';
+        checks.forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'var-status-row';
+
+            const name = document.createElement('span');
+            name.className = 'fw-semibold';
+            name.innerText = item.label;
+
+            const chip = document.createElement('span');
+            chip.className = `var-chip ${item.ok ? 'ok' : 'miss'}`;
+            chip.innerText = item.ok ? 'OK' : 'FALTANDO';
+
+            row.appendChild(name);
+            row.appendChild(chip);
+            panel.appendChild(row);
+        });
+    }
+
+    function toggleLock(id) {
+        const obj = designer.getObjects().find((o) => o.data?.id === id);
+        if (!obj) return;
+        pushHistory();
+        const lock = !obj.lockMovementX;
+        obj.set({
+            lockMovementX: lock,
+            lockMovementY: lock,
+            lockScalingX: lock,
+            lockScalingY: lock,
+            editable: !lock,
+            hasControls: !lock
+        });
+        designer.requestRenderAll();
+        updateElementsList();
+    }
+
+    function moveLayer(id, direction) {
+        const obj = designer.getObjects().find((o) => o.data?.id === id);
+        if (!obj) return;
+        pushHistory();
+        if (direction === 'up') designer.bringForward(obj);
+        else designer.sendBackwards(obj);
+        designer.requestRenderAll();
+        updateElementsList();
+    }
+
+    function alignSelected(mode) {
+        const selected = getActiveObjects();
+        if (selected.length < 2) {
+            Toast.fire({ icon: 'warning', title: 'Selecione ao menos 2 elementos' });
+            return;
+        }
+
+        pushHistory();
+        const centersX = selected.map((o) => o.getCenterPoint().x);
+        const centersY = selected.map((o) => o.getCenterPoint().y);
+        const lefts = selected.map((o) => o.getBoundingRect(true, true).left);
+        const rights = selected.map((o) => o.getBoundingRect(true, true).left + o.getBoundingRect(true, true).width);
+        const tops = selected.map((o) => o.getBoundingRect(true, true).top);
+        const bottoms = selected.map((o) => o.getBoundingRect(true, true).top + o.getBoundingRect(true, true).height);
+
+        selected.forEach((o) => {
+            const r = o.getBoundingRect(true, true);
+            if (mode === 'hcenter') o.set({ left: centersX.reduce((a, b) => a + b, 0) / centersX.length, originX: 'center' });
+            if (mode === 'vcenter') o.set({ top: centersY.reduce((a, b) => a + b, 0) / centersY.length, originY: 'center' });
+            if (mode === 'left') o.set({ left: Math.min(...lefts) + (r.width / 2), originX: 'center' });
+            if (mode === 'right') o.set({ left: Math.max(...rights) - (r.width / 2), originX: 'center' });
+            if (mode === 'top') o.set({ top: Math.min(...tops) + (r.height / 2), originY: 'center' });
+            if (mode === 'bottom') o.set({ top: Math.max(...bottoms) - (r.height / 2), originY: 'center' });
+            o.setCoords();
+        });
+
+        designer.requestRenderAll();
+        updateElementsList();
+    }
+
+    function distributeSelected(axis) {
+        const selected = getActiveObjects();
+        if (selected.length < 3) {
+            Toast.fire({ icon: 'warning', title: 'Selecione ao menos 3 elementos' });
+            return;
+        }
+
+        pushHistory();
+        const sorted = [...selected].sort((a, b) => {
+            const ac = a.getCenterPoint();
+            const bc = b.getCenterPoint();
+            return axis === 'horizontal' ? ac.x - bc.x : ac.y - bc.y;
+        });
+
+        const first = sorted[0].getCenterPoint();
+        const last = sorted[sorted.length - 1].getCenterPoint();
+        const step = axis === 'horizontal'
+            ? (last.x - first.x) / (sorted.length - 1)
+            : (last.y - first.y) / (sorted.length - 1);
+
+        sorted.forEach((obj, idx) => {
+            if (idx === 0 || idx === sorted.length - 1) return;
+            if (axis === 'horizontal') obj.set({ left: first.x + step * idx, originX: 'center' });
+            else obj.set({ top: first.y + step * idx, originY: 'center' });
+            obj.setCoords();
+        });
+
+        designer.requestRenderAll();
+        updateElementsList();
+    }
+
+    function setZoom(next) {
+        zoomLevel = Math.max(0.3, Math.min(3, Number(next.toFixed(2))));
+        designer.setZoom(zoomLevel);
+        designer.requestRenderAll();
+    }
+
+    function toggleSnap(v) { template.document.snap = !!v; }
+    function toggleGuides(v) {
+        template.document.guides = !!v;
+        if (!v) hideGuides();
+    }
+    function setGridSize(v) {
+        template.document.gridSize = Math.max(1, Number(v || 2));
+        renderGridOverlay();
+    }
+
+    function renderRulerLabels() {
+        const rulerX = document.getElementById('rulerX');
+        const rulerY = document.getElementById('rulerY');
+        if (!rulerX || !rulerY) return;
+
+        rulerX.querySelectorAll('.ruler-label').forEach((el) => el.remove());
+        rulerY.querySelectorAll('.ruler-label').forEach((el) => el.remove());
+
+        const pxPerMmX = W / 297;
+        const pxPerMmY = H / 210;
+
+        for (let mm = 0; mm <= 297; mm += 10) {
+            const label = document.createElement('span');
+            label.className = 'ruler-label';
+            label.style.left = `${mm * pxPerMmX + 2}px`;
+            label.style.top = '2px';
+            label.innerText = String(mm);
+            rulerX.appendChild(label);
+        }
+
+        for (let mm = 0; mm <= 210; mm += 10) {
+            const label = document.createElement('span');
+            label.className = 'ruler-label y';
+            label.style.left = '3px';
+            label.style.top = `${mm * pxPerMmY + 10}px`;
+            label.innerText = String(mm);
+            rulerY.appendChild(label);
+        }
+    }
+
+    function addTextElement(text = 'Clique para editar o conteúdo') {
+        pushHistory();
+        const obj = new fabric.IText(text, {
+            left: W * 0.5,
+            top: H * 0.5,
+            originX: 'center',
+            originY: 'center',
+            width: W * 0.4,
+            fontSize: 22,
+            fill: '#000000',
+            textAlign: 'center',
+            fontFamily: 'Helvetica'
+        });
+        obj.data = {
+            id: generateId('txt'),
+            type: 'text',
+            font_family: 'Helvetica',
+            blockWidth: W * 0.4,
+            blockHeight: H * 0.12,
+            autoFit: true
+        };
+        fitTextToBlock(obj);
+        designer.add(obj);
+        designer.setActiveObject(obj);
+        designer.requestRenderAll();
+        updateElementsList();
+        syncToolbarWithSelection();
+    }
+
+    function adicionarTexto() { addTextElement(); }
+
+    function injectVar(tag, evt) {
+        if (evt && typeof evt.preventDefault === 'function') {
+            evt.preventDefault();
+        }
+
+        let selected = getActiveObjects();
+        let obj = selected.length && selected[0].data?.type === 'text' ? selected[0] : null;
+
+        if (!obj) {
+            const firstText = designer.getObjects().find((o) => o.data?.type === 'text');
+            if (firstText) {
+                designer.setActiveObject(firstText);
+                obj = firstText;
+            }
+        }
+
+        if (!obj) {
+            addTextElement(tag);
+            return false;
+        }
+
+        pushHistory();
+        const text = obj.text || '';
+        const start = Number.isInteger(obj.selectionStart) ? obj.selectionStart : text.length;
+        const end = Number.isInteger(obj.selectionEnd) ? obj.selectionEnd : start;
+        const nextText = `${text.slice(0, start)}${tag}${text.slice(end)}`;
+
+        obj.set('text', nextText);
+        const cursor = start + tag.length;
+        obj.selectionStart = cursor;
+        obj.selectionEnd = cursor;
+        if (!obj.isEditing) {
+            obj.enterEditing();
+        }
+
+        if (obj.data?.autoFit !== false) {
+            fitTextToBlock(obj);
+        }
+
+        designer.requestRenderAll();
+        syncToolbarWithSelection();
+        return false;
+    }
+
+    function setStyle(prop, val) {
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
+        pushHistory();
+
+        const obj = selected[0];
+        if (prop === 'font') {
+            const size = Math.max(8, Number(val || 20));
+            if (hasTextSelection(obj)) applySelectionStyle(obj, { fontSize: size });
+            else obj.set('fontSize', size);
+        }
+        if (prop === 'font_family') {
+            if (hasTextSelection(obj)) applySelectionStyle(obj, { fontFamily: val });
+            else obj.set('fontFamily', val);
+            obj.data.font_family = val;
+        }
+        if (prop === 'color') {
+            const color = val || '#000000';
+            if (hasTextSelection(obj)) applySelectionStyle(obj, { fill: color });
+            else obj.set('fill', color);
+        }
+        if (prop === 'align') {
+            obj.set('textAlign', val || 'center');
+            updateAlignButtons(obj.textAlign || 'center');
+        }
+        if (obj.data?.autoFit !== false) {
+            fitTextToBlock(obj);
+        }
+        designer.requestRenderAll();
+        syncToolbarWithSelection();
+    }
+
+    function toggleStyle(style) {
+        const selected = getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
+        pushHistory();
+        const obj = selected[0];
+
+        if (style === 'bold') {
+            if (hasTextSelection(obj)) {
+                const current = getSelectionStyleValue(obj, 'fontWeight', obj.fontWeight);
+                applySelectionStyle(obj, { fontWeight: current === 'bold' ? 'normal' : 'bold' });
+            } else {
+                obj.set('fontWeight', obj.fontWeight === 'bold' ? 'normal' : 'bold');
+            }
+        }
+        if (style === 'italic') {
+            if (hasTextSelection(obj)) {
+                const current = getSelectionStyleValue(obj, 'fontStyle', obj.fontStyle);
+                applySelectionStyle(obj, { fontStyle: current === 'italic' ? 'normal' : 'italic' });
+            } else {
+                obj.set('fontStyle', obj.fontStyle === 'italic' ? 'normal' : 'italic');
+            }
+        }
+        if (obj.data?.autoFit !== false) {
+            fitTextToBlock(obj);
+        }
+        designer.requestRenderAll();
+        syncToolbarWithSelection();
+    }
+
+    function deleteSelected() {
+        const selected = getActiveObjects();
+        if (!selected.length) return;
+
+        const blocked = selected.find((o) => ['qrcode', 'hash'].includes(o.data?.id));
+        if (blocked) {
+            Toast.fire({ icon: 'warning', title: 'Hash e QR são obrigatórios para validação' });
+            return;
+        }
+
+        pushHistory();
+        selected.forEach((o) => designer.remove(o));
+        designer.discardActiveObject();
+        designer.requestRenderAll();
+        updateElementsList();
+        toolbar.style.display = 'none';
+    }
+
+    function duplicateSelected() {
+        const selected = getActiveObjects();
+        if (!selected.length) return;
+        pushHistory();
+
+        selected.forEach((obj) => {
+            if (['qrcode', 'hash'].includes(obj.data?.id)) return;
+            obj.clone((cloned) => {
+                cloned.set({ left: obj.left + 20, top: obj.top + 20 });
+                cloned.data = { ...obj.data, id: generateId(obj.data?.type || 'el') };
+                designer.add(cloned);
+            });
+        });
+
+        designer.requestRenderAll();
+        updateElementsList();
+    }
+
+    function undoAction() {
+        if (!historyPast.length) return;
+        historyFuture.push(JSON.stringify(exportTemplate()));
+        const prev = JSON.parse(historyPast.pop());
+        applyTemplateOnCanvas(prev);
+    }
+
+    function redoAction() {
+        if (!historyFuture.length) return;
+        historyPast.push(JSON.stringify(exportTemplate()));
+        const next = JSON.parse(historyFuture.pop());
+        applyTemplateOnCanvas(next);
+    }
+
+    function deselectAll() {
+        designer.discardActiveObject();
+        designer.requestRenderAll();
+        toolbar.style.display = 'none';
+        syncAutoFitToggle();
+    }
+
+    async function adicionarImagem() {
+        document.getElementById('inputAsset').click();
+    }
+
+    async function handleAssetUpload(input) {
+        if (!input.files[0]) return;
+        const formData = new FormData();
+        formData.append('asset', input.files[0]);
+        Toast.fire({ icon: 'info', title: 'Enviando imagem...' });
+
+        try {
+            const res = await fetch(`/api/certificates/upload_asset/${eventId}`, { method: 'POST', body: formData });
+            const json = await res.json();
+            if (!res.ok) {
+                Toast.fire({ icon: 'error', title: json.erro || 'Não foi possível enviar a imagem' });
+                return;
+            }
+
+            pushHistory();
+            const src = json.asset_url;
+            fabric.Image.fromURL(src, (img) => {
+                img.set({
+                    left: W * 0.5,
+                    top: H * 0.5,
+                    originX: 'center',
+                    originY: 'center',
+                    scaleX: (W * 0.2) / img.width,
+                    scaleY: (H * 0.2) / img.height
+                });
+                img.data = {
+                    id: generateId('img'),
+                    type: 'image',
+                    src: json.asset_path
+                };
+                designer.add(img);
+                designer.setActiveObject(img);
+                designer.requestRenderAll();
+                updateElementsList();
+                Toast.fire({ icon: 'success', title: 'Imagem adicionada ao layout' });
+            }, { crossOrigin: 'anonymous' });
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao enviar imagem' });
+        } finally {
+            input.value = '';
+        }
     }
 
     async function handleBgUpload(input) {
         if (!input.files[0]) return;
         const formData = new FormData();
         formData.append('background', input.files[0]);
-        formData.append('template', JSON.stringify(currentConfig.elements));
-        Toast.fire({ icon: 'info', title: 'Carregando...' });
+        formData.append('template', JSON.stringify(exportTemplate()));
+
         try {
             const res = await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
             const json = await res.json();
-            if (res.ok) { bgImage.src = json.bg_url; init(); Toast.fire({ icon: 'success', title: 'Background pronto' }); }
-        } catch (e) {}
+            if (!res.ok) {
+                Toast.fire({ icon: 'error', title: json.erro || 'Falha no upload do background' });
+                return;
+            }
+
+            bgPath = (json.bg_url || '').replace('/static/', '');
+            await loadBackground(bgPath);
+            Toast.fire({ icon: 'success', title: 'Background pronto' });
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro de conexão no upload' });
+        }
+    }
+
+    async function loadBackground(path) {
+        if (!path) {
+            designer.setBackgroundImage(null, designer.renderAll.bind(designer));
+            document.getElementById('noBgMsg').classList.remove('d-none');
+            renderGridOverlay();
+            return;
+        }
+
+        const url = path.startsWith('/') ? path : `/static/${path}`;
+        document.getElementById('noBgMsg').classList.add('d-none');
+        await new Promise((resolve) => {
+            fabric.Image.fromURL(url, (img) => {
+                const scale = Math.min(W / img.width, H / img.height);
+                img.scale(scale);
+                designer.setBackgroundImage(img, () => {
+                    renderGridOverlay();
+                    designer.renderAll();
+                    resolve();
+                });
+            }, { crossOrigin: 'anonymous' });
+        });
     }
 
     async function salvarConfiguracao() {
         const formData = new FormData();
-        formData.append('template', JSON.stringify(currentConfig.elements));
+        formData.append('template', JSON.stringify(exportTemplate()));
         try {
-            await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
+            const res = await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
+            const json = await res.json();
+            if (!res.ok) {
+                Toast.fire({ icon: 'error', title: json.erro || 'Erro ao salvar' });
+                return;
+            }
             Toast.fire({ icon: 'success', title: 'Design salvo com sucesso!' });
-        } catch (e) {}
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Falha de conexão ao salvar' });
+        }
     }
 
     function resetarLayout() {
-        Swal.fire({ title: 'Limpar Design?', text: 'Isso removerá todos os textos customizados e manterá apenas os itens de validação.', icon: 'warning', showCancelButton: true }).then(r => {
-            if(r.isConfirmed) { currentConfig.elements = { hash: defaultElements.hash, qrcode: defaultElements.qrcode }; updateOverlays(); updateElementsList(); }
+        Swal.fire({
+            title: 'Limpar Design?',
+            text: 'Isso removerá os elementos customizados e manterá hash e QR.',
+            icon: 'warning',
+            showCancelButton: true
+        }).then((r) => {
+            if (!r.isConfirmed) return;
+            pushHistory();
+            const keep = exportTemplate().elements.filter((el) => ['hash', 'qrcode'].includes(el.id));
+            applyTemplateOnCanvas({
+                version: 2,
+                document: template.document,
+                bg: bgPath,
+                elements: keep
+            });
         });
     }
 
     async function confirmarEnvioLote() {
-        Swal.fire({ title: 'Confirmar Envio?', text: 'Os certificados serão enviados agora para todos os participantes presentes.', icon: 'question', showCancelButton: true }).then(async r => {
-            if (r.isConfirmed) {
-                Toast.fire({ icon: 'info', title: 'Agendando...' });
-                await fetch(`/api/certificates/send_batch/${eventId}`, { method: 'POST' });
-                Swal.fire('Processando', 'A fila de e-mails foi iniciada no servidor.', 'success');
-            }
+        Swal.fire({
+            title: 'Confirmar Envio?',
+            text: 'Os certificados serão enviados agora para todos os participantes presentes.',
+            icon: 'question',
+            showCancelButton: true
+        }).then(async (r) => {
+            if (!r.isConfirmed) return;
+            Toast.fire({ icon: 'info', title: 'Agendando...' });
+            await fetch(`/api/certificates/send_batch/${eventId}`, { method: 'POST' });
+            Swal.fire('Processando', 'A fila de e-mails foi iniciada no servidor.', 'success');
         });
     }
 
     async function limparBackground() {
         const confirm = await Swal.fire({ title: 'Remover Background?', icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
+
         const formData = new FormData();
         formData.append('remove_bg', 'true');
-        await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
-        currentConfig.bg = ''; init();
+        formData.append('template', JSON.stringify(exportTemplate()));
+        const res = await fetch(`/api/certificates/setup/${eventId}`, { method: 'POST', body: formData });
+        const json = await res.json();
+        if (!res.ok) {
+            Toast.fire({ icon: 'error', title: json.erro || 'Falha ao remover background' });
+            return;
+        }
+
+        bgPath = '';
+        await loadBackground('');
+        Toast.fire({ icon: 'success', title: 'Background removido' });
     }
 
-    window.addEventListener('resize', updateOverlays);
-    init();
+    function setupDesignerEvents() {
+        designer.on('selection:created', syncToolbarWithSelection);
+        designer.on('selection:updated', syncToolbarWithSelection);
+        designer.on('selection:cleared', () => {
+            toolbar.style.display = 'none';
+            syncAutoFitToggle();
+            syncBlockSizeControls();
+        });
+        designer.on('text:changed', (e) => {
+            const obj = e.target;
+            if (obj && obj.data?.type === 'text' && obj.data?.autoFit !== false) {
+                fitTextToBlock(obj);
+            }
+            designer.requestRenderAll();
+            updateElementsList();
+            syncToolbarWithSelection();
+            syncBlockSizeControls();
+        });
+        designer.on('object:scaling', (e) => {
+            const obj = e.target;
+            if (!obj || obj.data?.type !== 'text') return;
+            obj.data.blockWidth = Math.max(20, obj.getScaledWidth());
+            obj.data.blockHeight = Math.max(12, obj.getScaledHeight());
+        });
+        designer.on('object:modified', (e) => {
+            const obj = e?.target;
+            if (obj && obj.data?.type === 'text') {
+                if (obj.data?.blockWidth) {
+                    obj.set({ width: obj.data.blockWidth, scaleX: 1, scaleY: 1 });
+                }
+                if (obj.data?.autoFit !== false) {
+                    fitTextToBlock(obj);
+                }
+            }
+            hideGuides();
+            updateElementsList();
+            syncBlockSizeControls();
+            pushHistory();
+        });
+        designer.on('object:moving', (e) => {
+            const obj = e.target;
+            if (!obj) return;
+
+            const grid = Math.max(1, Number(template.document.gridSize || 2));
+            const gridPxX = (grid / 100) * W;
+            const gridPxY = (grid / 100) * H;
+            if (template.document.snap) {
+                obj.set({
+                    left: Math.round(obj.left / gridPxX) * gridPxX,
+                    top: Math.round(obj.top / gridPxY) * gridPxY
+                });
+            }
+            showGuidesForObject(obj);
+        });
+        designer.on('mouse:wheel', (opt) => {
+            if (!(opt.e.ctrlKey || opt.e.metaKey)) return;
+            opt.e.preventDefault();
+            const delta = opt.e.deltaY;
+            setZoom(zoomLevel + (delta < 0 ? 0.08 : -0.08));
+        });
+    }
+
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                undoAction();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                redoAction();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+                e.preventDefault();
+                duplicateSelected();
+                return;
+            }
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                const active = designer.getActiveObject();
+                if (active && active.isEditing) return;
+                deleteSelected();
+            }
+            if (e.code === 'Space') {
+                isSpacePanning = true;
+                designer.defaultCursor = 'grab';
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePanning = false;
+                designer.defaultCursor = 'default';
+            }
+        });
+
+        let lastPosX = 0;
+        let lastPosY = 0;
+        designer.on('mouse:down', (opt) => {
+            if (!isSpacePanning) return;
+            const evt = opt.e;
+            designer.isDragging = true;
+            designer.selection = false;
+            lastPosX = evt.clientX;
+            lastPosY = evt.clientY;
+        });
+        designer.on('mouse:move', (opt) => {
+            if (!designer.isDragging) return;
+            const evt = opt.e;
+            const vpt = designer.viewportTransform;
+            vpt[4] += evt.clientX - lastPosX;
+            vpt[5] += evt.clientY - lastPosY;
+            designer.requestRenderAll();
+            lastPosX = evt.clientX;
+            lastPosY = evt.clientY;
+        });
+        designer.on('mouse:up', () => {
+            designer.isDragging = false;
+            designer.selection = true;
+        });
+    }
+
+    async function boot() {
+        designer = new fabric.Canvas('certCanvas', {
+            width: W,
+            height: H,
+            preserveObjectStacking: true,
+            selection: true
+        });
+
+        try {
+            if (persistedTemplateRaw) {
+                const parsed = JSON.parse(persistedTemplateRaw);
+                template = applyTemplateDefaults(parsed);
+            }
+        } catch (e) {
+            template = JSON.parse(JSON.stringify(defaultTemplate));
+        }
+        bgPath = template.bg || '';
+
+        await loadBackground(bgPath);
+        applyTemplateOnCanvas(template);
+        renderGridOverlay();
+        renderRulerLabels();
+        setupDesignerEvents();
+        setupKeyboardShortcuts();
+        syncControlsFromTemplate();
+        syncAutoFitToggle();
+    }
+
+    window.addEventListener('resize', syncToolbarWithSelection);
+    boot();
 </script>
 {% endblock %}

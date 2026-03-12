@@ -171,7 +171,7 @@ class EventService:
                 # However, it only happens if the user explicitly removes the activity from the UI.
                 self.activity_repo.delete(activity)
 
-    def get_events_for_user_paginated(self, user, page=1, per_page=10, filters=None):
+    def get_events_for_user_paginated(self, user, page=1, per_page=12, filters=None):
         """Lists events visible to a specific user with chronological sorting and filters."""
         query = Event.query
         if user.role not in ['admin', 'participante']:

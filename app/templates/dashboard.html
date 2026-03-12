@@ -1475,7 +1475,15 @@
     // SCANNER OTIMIZADO
     // --------------------------
     let scanner = null;
+    let locationPromise = null;
+
     function iniciarScanner() {
+        // Solicita localização imediatamente no clique (necessário para iOS Safari)
+        locationPromise = getPreciseLocation().catch(e => {
+            console.warn("Localização falhou/negada:", e);
+            throw e;
+        });
+
         document.getElementById('scanControl').style.display = 'none';
         document.getElementById('areaCamera').style.display = 'block';
         document.getElementById('feedback').innerHTML = "";
@@ -1548,9 +1556,14 @@
 
         let coords = { latitude: null, longitude: null };
         try {
-            coords = await getPreciseLocation();
+            // Usa a promise iniciada no clique do botão
+            if (locationPromise) {
+                coords = await locationPromise;
+            } else {
+                coords = await getPreciseLocation();
+            }
         } catch (e) {
-            console.warn("Geolocation Error:", e.message);
+            console.warn("Geolocation Error:", e.message || e);
             // We proceed, the server will handle the error if coordinates are required for that specific activity
         }
 

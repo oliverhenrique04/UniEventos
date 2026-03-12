@@ -1,8 +1,9 @@
 import os
 import json
 import secrets
+import html
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.pagesizes import landscape, A4
 from app.repositories.event_repository import EventRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.activity_repository import ActivityRepository
@@ -18,12 +19,169 @@ class CertificateService:
         self.activity_repo = ActivityRepository()
         self.notifier = NotificationService()
 
+    def _parse_template_elements(self, event):
+        """Loads and normalizes template elements with legacy compatibility."""
+        legacy_defaults = {
+            'txt1': {'text': 'CERTIFICADO', 'x': 50, 'y': 20, 'w': 80, 'h': 10, 'font': 40, 'color': '#1e293b', 'align': 'center', 'bold': True, 'font_family': 'Helvetica'},
+            'txt2': {'text': 'Certificamos que {{NOME}} participou do evento {{EVENTO}}.', 'x': 50, 'y': 50, 'w': 70, 'h': 20, 'font': 20, 'color': '#475569', 'align': 'center', 'bold': False, 'font_family': 'Helvetica'},
+            'qrcode': {'x': 85, 'y': 85, 'size': 80}
+        }
+
+        if not event.cert_template_json:
+            return self._normalize_legacy_elements(legacy_defaults)
+
+        try:
+            template = json.loads(event.cert_template_json)
+        except Exception:
+            return self._normalize_legacy_elements(legacy_defaults)
+
+        if isinstance(template, dict) and isinstance(template.get('elements'), list):
+            return template.get('elements', [])
+
+        if isinstance(template, dict):
+            return self._normalize_legacy_elements(template)
+
+        return self._normalize_legacy_elements(legacy_defaults)
+
+    def _normalize_legacy_elements(self, legacy_dict):
+        """Converts old dictionary schema into list-based schema."""
+        elements = []
+        for idx, (key, config) in enumerate(legacy_dict.items()):
+            if key == 'qrcode':
+                size = config.get('size')
+                elements.append({
+                    'id': key,
+                    'type': 'qr',
+                    'x': config.get('x', 85),
+                    'y': config.get('y', 85),
+                    'w': config.get('w', 12),
+                    'h': config.get('h', 12),
+                    'size': size,
+                    'zIndex': config.get('zIndex', idx + 1),
+                    'locked': config.get('locked', False),
+                    'visible': config.get('visible', True)
+                })
+                continue
+
+            elements.append({
+                'id': key,
+                'type': config.get('type', 'text'),
+                'text': config.get('text', ''),
+                'x': config.get('x', 50),
+                'y': config.get('y', 50),
+                'w': config.get('w', 50),
+                'h': config.get('h', 10),
+                'font': config.get('font', 20),
+                'color': config.get('color', '#000000'),
+                'align': config.get('align', 'center'),
+                'bold': config.get('bold', False),
+                'italic': config.get('italic', False),
+                'font_family': config.get('font_family', 'Helvetica'),
+                'text_styles': config.get('text_styles', {}),
+                'zIndex': config.get('zIndex', idx + 1),
+                'locked': config.get('locked', False),
+                'visible': config.get('visible', True),
+                'src': config.get('src')
+            })
+
+        return elements
+
+    def _resolve_font_name(self, family, is_bold=False, is_italic=False):
+        family = family or 'Helvetica'
+        font_name = family
+        if family == 'Helvetica':
+            if is_bold and is_italic:
+                font_name = "Helvetica-BoldOblique"
+            elif is_bold:
+                font_name = "Helvetica-Bold"
+            elif is_italic:
+                font_name = "Helvetica-Oblique"
+        elif family == 'Times-Roman':
+            if is_bold and is_italic:
+                font_name = "Times-BoldItalic"
+            elif is_bold:
+                font_name = "Times-Bold"
+            elif is_italic:
+                font_name = "Times-Italic"
+        elif family == 'Courier':
+            if is_bold and is_italic:
+                font_name = "Courier-BoldOblique"
+            elif is_bold:
+                font_name = "Courier-Bold"
+            elif is_italic:
+                font_name = "Courier-Oblique"
+        return font_name
+
+    def _build_rich_text_markup(self, raw_text, text_styles, config, tags):
+        text_styles = text_styles or {}
+        base_family = config.get('font_family', 'Helvetica')
+        base_bold = bool(config.get('bold', False))
+        base_italic = bool(config.get('italic', False))
+        base_color = config.get('color', '#000000')
+        base_size = config.get('font', 20)
+
+        lines = raw_text.split('\n')
+        line_markup = []
+
+        for line_idx, line in enumerate(lines):
+            line_styles = text_styles.get(str(line_idx), {})
+            if not isinstance(line_styles, dict):
+                line_styles = {}
+
+            runs = []
+            current_state = None
+            current_chars = []
+
+            for char_idx, char in enumerate(line):
+                char_style = line_styles.get(str(char_idx), {})
+                if not isinstance(char_style, dict):
+                    char_style = {}
+
+                family = char_style.get('fontFamily', base_family)
+                weight = char_style.get('fontWeight', 'bold' if base_bold else 'normal')
+                style = char_style.get('fontStyle', 'italic' if base_italic else 'normal')
+                color = char_style.get('fill', base_color)
+                size = char_style.get('fontSize', base_size)
+
+                font_name = self._resolve_font_name(family, weight == 'bold', style == 'italic')
+                state = (font_name, color, size)
+
+                if current_state is None:
+                    current_state = state
+
+                if state != current_state:
+                    runs.append((current_state, ''.join(current_chars)))
+                    current_chars = [char]
+                    current_state = state
+                else:
+                    current_chars.append(char)
+
+            if current_state is not None:
+                runs.append((current_state, ''.join(current_chars)))
+
+            if not runs:
+                line_markup.append('')
+                continue
+
+            chunk_markup = []
+            for (font_name, color, size), run_text in runs:
+                safe_text = html.escape(run_text)
+                chunk_markup.append(
+                    f'<font name="{font_name}" color="{color}" size="{size}">{safe_text}</font>'
+                )
+            line_markup.append(''.join(chunk_markup))
+
+        rich_markup = '<br/>'.join(line_markup)
+        for tag, val in tags.items():
+            rich_markup = rich_markup.replace(tag, html.escape(str(val)))
+        return rich_markup
+
     def generate_pdf(self, event, user, activities, total_hours, enrollment=None):
         """Generates a single certificate PDF for a user using professional layout blocks."""
         import hashlib
         from reportlab.lib.styles import ParagraphStyle
-        from reportlab.platypus import Paragraph, Frame
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        from reportlab.platypus import Paragraph, Frame, KeepInFrame
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
         
         # 0. Handle Validation Hash
         if enrollment and not enrollment.cert_hash:
@@ -38,14 +196,7 @@ class CertificateService:
         filename = f"cert_{event.id}_{user.cpf}.pdf"
         filepath = os.path.join(current_app.root_path, 'static', 'certificates', 'generated', filename)
         
-        from PIL import Image as PILImage
-        page_width, page_height = landscape(letter) 
-        
-        if event.cert_bg_path and os.path.exists(os.path.join(current_app.root_path, 'static', event.cert_bg_path)):
-            full_bg_path = os.path.join(current_app.root_path, 'static', event.cert_bg_path)
-            with PILImage.open(full_bg_path) as img:
-                img_w, img_h = img.size
-                page_height = (img_h / img_w) * page_width
+        page_width, page_height = landscape(A4)
 
         c = canvas.Canvas(filepath, pagesize=(page_width, page_height))
         
@@ -54,16 +205,7 @@ class CertificateService:
             c.drawImage(os.path.join(current_app.root_path, 'static', event.cert_bg_path), 0, 0, width=page_width, height=page_height)
         
         # 2. Parse Template
-        elements = {
-            'txt1': {'text': 'CERTIFICADO', 'x': 50, 'y': 20, 'w': 80, 'h': 10, 'font': 40, 'color': '#1e293b', 'align': 'center', 'bold': True, 'font_family': 'Helvetica'},
-            'txt2': {'text': 'Certificamos que {{NOME}} participou do evento {{EVENTO}}.', 'x': 50, 'y': 50, 'w': 70, 'h': 20, 'font': 20, 'color': '#475569', 'align': 'center', 'bold': False, 'font_family': 'Helvetica'},
-            'qrcode': {'x': 85, 'y': 85, 'size': 80}
-        }
-        
-        if event.cert_template_json:
-            try:
-                elements = json.loads(event.cert_template_json)
-            except: pass
+        elements = self._parse_template_elements(event)
         
         # 3. Draw Elements
         tags = {
@@ -75,8 +217,16 @@ class CertificateService:
             '{{HASH}}': cert_hash
         }
 
-        for key, config in elements.items():
-            if key == 'qrcode':
+        ordered_elements = sorted(
+            [e for e in elements if e.get('visible', True)],
+            key=lambda item: item.get('zIndex', 0)
+        )
+
+        for config in ordered_elements:
+            element_type = config.get('type', 'text')
+            element_id = config.get('id', '')
+
+            if element_type == 'qr' or element_id == 'qrcode':
                 import qrcode
                 from io import BytesIO
                 qr = qrcode.QRCode(box_size=10, border=0)
@@ -87,14 +237,36 @@ class CertificateService:
                 img_qr.save(qr_buffer, format="PNG")
                 qr_buffer.seek(0)
                 
-                abs_x = (config['x'] / 100) * page_width
-                abs_y = (1 - (config['y'] / 100)) * page_height
-                qr_size = config.get('size', 80)
+                abs_x = (config.get('x', 85) / 100) * page_width
+                abs_y = (1 - (config.get('y', 85) / 100)) * page_height
+                abs_w = (config.get('w', 12) / 100) * page_width
+                abs_h = (config.get('h', 12) / 100) * page_height
+                qr_size = config.get('size') or min(abs_w, abs_h)
                 c.drawInlineImage(img_qr, abs_x - (qr_size/2), abs_y - (qr_size/2), width=qr_size, height=qr_size)
                 continue
 
+            if element_type == 'image' and config.get('src'):
+                src = config.get('src')
+                if src.startswith('/static/'):
+                    image_path = os.path.join(current_app.root_path, 'static', src.replace('/static/', '', 1))
+                elif src.startswith('static/'):
+                    image_path = os.path.join(current_app.root_path, src)
+                else:
+                    image_path = os.path.join(current_app.root_path, 'static', src)
+
+                if os.path.exists(image_path):
+                    abs_w = (config.get('w', 15) / 100) * page_width
+                    abs_h = (config.get('h', 15) / 100) * page_height
+                    abs_x_center = (config.get('x', 50) / 100) * page_width
+                    abs_y_center = (1 - (config.get('y', 50) / 100)) * page_height
+                    frame_x = abs_x_center - (abs_w / 2)
+                    frame_y = abs_y_center - (abs_h / 2)
+                    c.drawImage(image_path, frame_x, frame_y, width=abs_w, height=abs_h, mask='auto')
+                continue
+
             raw_text = config.get('text', '')
-            if not raw_text: continue
+            if not raw_text:
+                continue
             
             final_text = raw_text
             for tag, val in tags.items():
@@ -104,20 +276,7 @@ class CertificateService:
             family = config.get('font_family', 'Helvetica')
             is_bold = config.get('bold', False)
             is_italic = config.get('italic', False)
-            
-            font_name = family
-            if family == 'Helvetica':
-                if is_bold and is_italic: font_name = "Helvetica-BoldOblique"
-                elif is_bold: font_name = "Helvetica-Bold"
-                elif is_italic: font_name = "Helvetica-Oblique"
-            elif family == 'Times-Roman':
-                if is_bold and is_italic: font_name = "Times-BoldItalic"
-                elif is_bold: font_name = "Times-Bold"
-                elif is_italic: font_name = "Times-Italic"
-            elif family == 'Courier':
-                if is_bold and is_italic: font_name = "Courier-BoldOblique"
-                elif is_bold: font_name = "Courier-Bold"
-                elif is_italic: font_name = "Courier-Oblique"
+            font_name = self._resolve_font_name(family, is_bold, is_italic)
 
             # Dimensions
             w_perc = config.get('w', 50)
@@ -132,10 +291,10 @@ class CertificateService:
             frame_x = abs_x_center - (abs_w / 2)
             frame_y = abs_y_center - (abs_h / 2)
 
-            align_map = {'center': TA_CENTER, 'left': TA_LEFT, 'right': TA_RIGHT}
+            align_map = {'center': TA_CENTER, 'left': TA_LEFT, 'right': TA_RIGHT, 'justify': TA_JUSTIFY}
             
             style = ParagraphStyle(
-                name=f'Style_{key}',
+                name=f"Style_{element_id or 'text'}",
                 fontName=font_name,
                 fontSize=(config.get('font', 20) / 1000) * page_width,
                 textColor=config.get('color', '#000000'),
@@ -143,13 +302,18 @@ class CertificateService:
                 leading=(config.get('font', 20) / 1000) * page_width * 1.2
             )
 
-            p = Paragraph(final_text, style)
+            text_styles = config.get('text_styles', {})
+            paragraph_content = final_text
+            if isinstance(text_styles, dict) and text_styles:
+                paragraph_content = self._build_rich_text_markup(raw_text, text_styles, config, tags)
+
+            p = Paragraph(paragraph_content, style)
+            frame_y = abs_y_center - (abs_h / 2)
+
+            # Respect the configured block and shrink text content when it overflows.
+            story = [KeepInFrame(abs_w, abs_h, [p], mode='shrink')]
             f = Frame(frame_x, frame_y, abs_w, abs_h, showBoundary=0, leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0)
-            f.addFromList([p], c)
-        
-        c.showPage()
-        c.save()
-        return filepath
+            f.addFromList(story, c)
         
         c.showPage()
         c.save()

@@ -190,7 +190,8 @@
 
     function abrirPreview(enrollId) {
         const frame = document.getElementById('framePreview');
-        frame.src = `/api/certificates/preview/${enrollId}`;
+        frame.src = '';
+        frame.src = `/api/certificates/preview/${enrollId}?t=${Date.now()}`;
         new bootstrap.Modal(document.getElementById('modalPreviewCert')).show();
     }
 
