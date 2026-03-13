@@ -1,5 +1,6 @@
 import json
 from app.models import Event
+from app.extensions import db
 
 
 def _login_admin(client):
@@ -91,7 +92,7 @@ def test_certificate_setup_accepts_v2_template(client, app, admin_user):
 
     assert res.status_code == 200
     with app.app_context():
-        event = Event.query.get(event_id)
+        event = db.session.get(Event, event_id)
         saved = json.loads(event.cert_template_json)
         assert saved['version'] == 2
         assert saved['elements'][0]['id'] == 'txt1'

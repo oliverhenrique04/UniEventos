@@ -91,8 +91,8 @@ class SystemTestCase(unittest.TestCase):
         res = self.client.get('/api/eventos')
         self.assertEqual(res.status_code, 200)
         events = res.get_json()
-        self.assertEqual(len(events), 1)
-        self.assertEqual(events[0]['nome'], "Semana de TI")
+        self.assertEqual(len(events['items']), 1)
+        self.assertEqual(events['items'][0]['nome'], "Semana de TI")
         print(" -> Listagem OK")
 
     def test_pages_load(self):

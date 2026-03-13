@@ -28,4 +28,6 @@ def admin_user(app):
         user.set_password('1234')
         db.session.add(user)
         db.session.commit()
+        db.session.refresh(user)
+        db.session.expunge(user)
         return user

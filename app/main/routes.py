@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template, redirect, url_for, abort
 from flask_login import current_user, login_required
 from datetime import datetime
+from app.extensions import db
 
 
 bp = Blueprint('main', __name__)
@@ -35,20 +36,24 @@ def inscrever_via_link(token):
 @login_required
 def designer_certificado(event_id):
     """Page for visually designing and configuring certificates."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador']:
         return "Acesso negado", 403
     from app.models import Event
-    event = Event.query.get_or_404(event_id)
+    event = db.session.get(Event, event_id)
+    if not event:
+        abort(404)
     return render_template('certificate_designer.html', user=current_user, event=event)
 
 @bp.route('/gerenciar_entregas/<int:event_id>')
 @login_required
 def gerenciar_entregas(event_id):
     """Page for managing individual certificate deliveries and status."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador']:
         return "Acesso negado", 403
     from app.models import Event
-    event = Event.query.get_or_404(event_id)
+    event = db.session.get(Event, event_id)
+    if not event:
+        abort(404)
     return render_template('certificate_delivery.html', user=current_user, event=event)
 
 @bp.route('/usuarios')
@@ -115,7 +120,9 @@ def editar_evento_page(event_id):
     if current_user.role not in ['admin', 'professor', 'coordenador']:
         return "Acesso negado", 403
     from app.models import Event
-    event = Event.query.get_or_404(event_id)
+    event = db.session.get(Event, event_id)
+    if not event:
+        abort(404)
     # Check permission
     if current_user.role != 'admin' and event.owner_username != current_user.username:
         return "Acesso negado", 403
@@ -139,7 +146,7 @@ def validar_hash(cert_hash):
     # Actually, in our logic, one hash represents the participation in the event.
     activities = Activity.query.filter_by(event_id=enrollment.event_id).all()
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
-    event = Event.query.get(enrollment.event_id)
+    event = db.session.get(Event, enrollment.event_id)
     curso = event.curso if event and event.curso else "N/A"
     
     # Sum hours of activities where this user was present in this event
@@ -147,7 +154,7 @@ def validar_hash(cert_hash):
     from app.models import Enrollment as E2
     all_user_enrollments = E2.query.filter_by(event_id=enrollment.event_id, user_cpf=enrollment.user_cpf, presente=True).all()
     for e in all_user_enrollments:
-        atv = Activity.query.get(e.activity_id)
+        atv = db.session.get(Activity, e.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
 
     data_iso = event.data_inicio

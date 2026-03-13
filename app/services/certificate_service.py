@@ -112,6 +112,46 @@ class CertificateService:
                 font_name = "Courier-Oblique"
         return font_name
 
+    @staticmethod
+    def _convert_jodit_html(html_content):
+        """Converts Jodit-produced HTML to ReportLab Paragraph-compatible markup.
+
+        ReportLab Paragraph supports: <b>, <i>, <u>, <strike>, <br/>, <font>, <a>.
+        Other tags are converted to their closest equivalents or stripped.
+        """
+        import re
+        h = html_content or ''
+        # Normalize line endings
+        h = h.replace('\r\n', ' ').replace('\r', ' ')
+        # <strong> -> <b>, <em> -> <i>
+        h = re.sub(r'<strong([^>]*)>', '<b>', h, flags=re.IGNORECASE)
+        h = re.sub(r'</strong>', '</b>', h, flags=re.IGNORECASE)
+        h = re.sub(r'<em([^>]*)>', '<i>', h, flags=re.IGNORECASE)
+        h = re.sub(r'</em>', '</i>', h, flags=re.IGNORECASE)
+        # <br> normalisation
+        h = re.sub(r'<br\s*/?>', '<br/>', h, flags=re.IGNORECASE)
+        # <p ...>content</p> -> content<br/>
+        h = re.sub(r'<p[^>]*>(.*?)</p>', r'\1<br/>', h, flags=re.IGNORECASE | re.DOTALL)
+        # Lists: ul/ol wrappers removed; li -> bullet + line break
+        h = re.sub(r'<(ul|ol)[^>]*>', '', h, flags=re.IGNORECASE)
+        h = re.sub(r'</(ul|ol)>', '', h, flags=re.IGNORECASE)
+        h = re.sub(r'<li[^>]*>', '• ', h, flags=re.IGNORECASE)
+        h = re.sub(r'</li>', '<br/>', h, flags=re.IGNORECASE)
+        # <span style="color:#..."> -> <font color="...">
+        h = re.sub(
+            r'<span\s+style="[^"]*?color\s*:\s*(#[\w]+)[^"]*">(.*?)</span>',
+            r'<font color="\1">\2</font>',
+            h, flags=re.IGNORECASE | re.DOTALL
+        )
+        # Strip remaining unsupported/unknown tags but preserve their content
+        h = re.sub(
+            r'<(?!/?(b|i|u|strike|br|font|a)(\s[^>]*)?/?>)[^>]+>',
+            '', h, flags=re.IGNORECASE
+        )
+        # Collapse multiple consecutive <br/>
+        h = re.sub(r'(<br/>){3,}', '<br/><br/>', h, flags=re.IGNORECASE)
+        return h.strip()
+
     def _build_rich_text_markup(self, raw_text, text_styles, config, tags):
         text_styles = text_styles or {}
         base_family = config.get('font_family', 'Helvetica')
@@ -265,7 +305,8 @@ class CertificateService:
                 continue
 
             raw_text = config.get('text', '')
-            if not raw_text:
+            html_content = config.get('html_content') if config.get('is_html') else None
+            if not raw_text and not html_content:
                 continue
             
             final_text = raw_text
@@ -302,10 +343,21 @@ class CertificateService:
                 leading=(config.get('font', 20) / 1000) * page_width * 1.2
             )
 
-            text_styles = config.get('text_styles', {})
-            paragraph_content = final_text
-            if isinstance(text_styles, dict) and text_styles:
-                paragraph_content = self._build_rich_text_markup(raw_text, text_styles, config, tags)
+            # Determine paragraph content:
+            # 1. Jodit HTML (is_html) - rich HTML converted to ReportLab markup
+            # 2. Fabric.js per-character styles (text_styles)
+            # 3. Plain text fallback
+            if html_content:
+                substituted_html = html_content
+                for tag_k, tag_v in tags.items():
+                    substituted_html = substituted_html.replace(tag_k, html.escape(str(tag_v)))
+                paragraph_content = self._convert_jodit_html(substituted_html)
+            else:
+                text_styles = config.get('text_styles', {})
+                if isinstance(text_styles, dict) and text_styles:
+                    paragraph_content = self._build_rich_text_markup(raw_text, text_styles, config, tags)
+                else:
+                    paragraph_content = final_text
 
             p = Paragraph(paragraph_content, style)
             frame_y = abs_y_center - (abs_h / 2)

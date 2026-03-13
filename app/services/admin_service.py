@@ -66,7 +66,7 @@ class AdminService:
 
     def create_user(self, data):
         """Creates a new user manually."""
-        if User.query.get(data.get('username')) or User.query.filter_by(cpf=data.get('cpf')).first():
+        if db.session.get(User, data.get('username')) or User.query.filter_by(cpf=data.get('cpf')).first():
             return None, "Usuário ou CPF já cadastrado."
             
         user = User(
@@ -104,7 +104,7 @@ class AdminService:
 
     def delete_user(self, username):
         """Deletes a user and their associations."""
-        user = User.query.get(username)
+        user = db.session.get(User, username)
         if not user: return False
         db.session.delete(user)
         db.session.commit()
@@ -113,7 +113,7 @@ class AdminService:
     def manual_enroll(self, user_cpf, activity_id):
         """Manually enrolls a user into an activity."""
         user = User.query.filter_by(cpf=user_cpf).first()
-        activity = Activity.query.get(activity_id)
+        activity = db.session.get(Activity, activity_id)
         
         if not user or not activity:
             return False, "Usuário ou Atividade não encontrados."

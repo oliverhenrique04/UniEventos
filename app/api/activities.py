@@ -77,7 +77,7 @@ def validar_presenca():
         return jsonify({"erro": "Código expirado ou inválido (tente novamente)"}), 400
     
     # 2. Geofencing Validation (Physical presence)
-    activity = Activity.query.get(atv_id)
+    activity = db.session.get(Activity, atv_id)
     if activity and activity.latitude and activity.longitude:
         if not user_lat or not user_lon:
             return jsonify({"erro": "Localização necessária para confirmar presença"}), 403

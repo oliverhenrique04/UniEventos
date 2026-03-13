@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, abort
 from flask_login import login_required, current_user
 from app.models import Event, Activity, db
 from app.services.event_service import EventService
@@ -174,7 +174,9 @@ def deletar_evento(event_id):
 def remover_inscricao(enrollment_id):
     """Deletes a specific enrollment record."""
     from app.models import Enrollment, db
-    enrollment = Enrollment.query.get_or_404(enrollment_id)
+    enrollment = db.session.get(Enrollment, enrollment_id)
+    if not enrollment:
+        abort(404)
     db.session.delete(enrollment)
     db.session.commit()
     return jsonify({"mensagem": "Inscrição removida!"})
@@ -189,7 +191,11 @@ def meu_historico():
     if type == 'stats':
         from app.models import Enrollment, Activity
         presences = Enrollment.query.filter_by(user_cpf=current_user.cpf, presente=True).all()
-        total_hours = sum([Activity.query.get(p.activity_id).carga_horaria for p in presences if Activity.query.get(p.activity_id)])
+        total_hours = 0
+        for presence in presences:
+            activity = db.session.get(Activity, presence.activity_id)
+            if activity:
+                total_hours += activity.carga_horaria or 0
         event_count = db.session.query(Enrollment.event_id).filter_by(user_cpf=current_user.cpf).distinct().count()
         return jsonify({"total_hours": total_hours, "total_events": event_count})
 

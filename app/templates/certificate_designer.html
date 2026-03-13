@@ -140,18 +140,15 @@
     .canvas-overlay-item[data-align="right"] { text-align: right; justify-content: flex-end; }
     .canvas-overlay-item[data-align="left"] { text-align: left; justify-content: flex-start; }
 
-    /* Floating Toolbar */
-    #floatingToolbar {
-        position: fixed;
+    /* Text Formatting Panel (sidebar) */
+    #textFormattingPanel {
         display: none;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
-        padding: 6px;
-        z-index: 2000;
-        border: 1px solid #e2e8f0;
-        gap: 4px;
+    }
+    #textFormattingPanel .toolbar-row {
+        display: flex;
+        flex-wrap: wrap;
         align-items: center;
+        gap: 4px;
     }
 
     .toolbar-btn {
@@ -282,43 +279,27 @@
             grid-template-columns: 1fr;
         }
     }
+
+    /* Jodit modal overrides */
+    #joditModal .jodit-container {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+    .var-chip-btn {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 999px;
+    }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jodit@3/build/jodit.min.css">
 {% endblock %}
 
 {% block content %}
 <!-- Floating WYSIWYG Toolbar -->
-<div id="floatingToolbar" class="d-flex shadow-lg animate__animated animate__fadeIn">
-    <div class="dropdown">
-        <button class="toolbar-btn" data-bs-toggle="dropdown" title="Inserir Variável"><i class="fa-solid fa-brackets-curly"></i></button>
-        <ul class="dropdown-menu shadow border-0">
-            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{NOME}}', event)">Nome</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EVENTO}}', event)">Evento</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">Horas</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">Data</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">CPF</a></li>
-            <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HASH}}', event)">Hash</a></li>
-        </ul>
-    </div>
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn" id="btn-bold" onclick="toggleStyle('bold')" title="Negrito"><i class="fa-solid fa-bold"></i></button>
-    <button class="toolbar-btn" id="btn-italic" onclick="toggleStyle('italic')" title="Itálico"><i class="fa-solid fa-italic"></i></button>
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn" id="btn-align-left" onclick="setStyle('align', 'left')" title="Alinhar à esquerda"><i class="fa-solid fa-align-left"></i></button>
-    <button class="toolbar-btn" id="btn-align-center" onclick="setStyle('align', 'center')" title="Centralizar"><i class="fa-solid fa-align-center"></i></button>
-    <button class="toolbar-btn" id="btn-align-right" onclick="setStyle('align', 'right')" title="Alinhar à direita"><i class="fa-solid fa-align-right"></i></button>
-    <button class="toolbar-btn" id="btn-align-justify" onclick="setStyle('align', 'justify')" title="Justificar"><i class="fa-solid fa-align-justify"></i></button>
-    <div class="toolbar-divider"></div>
-    <select class="form-select form-select-sm border-0 py-0" style="width: 110px; background: transparent;" onchange="setStyle('font_family', this.value)" id="select-font">
-        <option value="Helvetica">Sans Serif</option>
-        <option value="Times-Roman">Serif</option>
-        <option value="Courier">Monospace</option>
-    </select>
-    <input type="number" class="form-control form-control-sm border-0 py-0 text-center" style="width: 50px; background: transparent;" id="input-size" oninput="setStyle('font', parseInt(this.value))">
-    <div class="toolbar-divider"></div>
-    <input type="color" class="form-control form-control-color border-0 p-0" style="width: 24px; height: 24px;" id="input-color" onchange="setStyle('color', this.value)">
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn text-danger" onclick="deleteSelected()" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
-</div>
+<!-- Floating toolbar element kept for JS compatibility, hidden permanently -->
+<div id="floatingToolbar" style="display:none !important;"></div>
 
 <div class="container-fluid px-4 fade-in-up">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -365,6 +346,52 @@
         </div>
 
         <div class="control-panel">
+            <!-- Text Formatting Panel: visible only when a text element is selected -->
+            <div id="textFormattingPanel" class="glass-panel p-3 mb-4 border-top border-2 border-warning">
+                <h6 class="fw-bold mb-3"><i class="fa-solid fa-pen-nib text-warning me-2"></i>Elemento de Texto</h6>
+                <div class="d-grid mb-2">
+                    <button class="btn btn-warning fw-semibold" onclick="openJoditEditor()">
+                        <i class="fa-solid fa-pen-nib me-2"></i>Editar Conteúdo
+                    </button>
+                </div>
+                <p class="text-muted small mb-3 text-center"><i class="fa-solid fa-computer-mouse me-1"></i>Clique duplo no canvas para editar</p>
+                <hr class="my-2">
+                <div class="toolbar-row gap-2 mb-2">
+                    <select class="form-select form-select-sm" style="width:auto;flex:1;" onchange="setStyle('font_family', this.value)" id="select-font">
+                        <option value="Helvetica">Sans Serif</option>
+                        <option value="Times-Roman">Serif</option>
+                        <option value="Courier">Monospace</option>
+                    </select>
+                    <input type="number" class="form-control form-control-sm text-center" style="width:60px;" id="input-size" placeholder="pt" oninput="setStyle('font', parseInt(this.value))">
+                    <div class="d-flex align-items-center gap-1">
+                        <label class="small mb-0 text-muted">Cor</label>
+                        <input type="color" class="form-control form-control-color border-0 p-0" style="width:28px;height:28px;" id="input-color" onchange="setStyle('color', this.value)">
+                    </div>
+                </div>
+                <div class="toolbar-row justify-content-between mb-2">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" id="btn-align-left" onclick="setStyle('align', 'left')" title="Esquerda"><i class="fa-solid fa-align-left"></i></button>
+                        <button class="btn btn-outline-secondary" id="btn-align-center" onclick="setStyle('align', 'center')" title="Centralizar"><i class="fa-solid fa-align-center"></i></button>
+                        <button class="btn btn-outline-secondary" id="btn-align-right" onclick="setStyle('align', 'right')" title="Direita"><i class="fa-solid fa-align-right"></i></button>
+                        <button class="btn btn-outline-secondary" id="btn-align-justify" onclick="setStyle('align', 'justify')" title="Justificar"><i class="fa-solid fa-align-justify"></i></button>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSelected()" title="Excluir elemento"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-brackets-curly me-1"></i>Inserir Variável
+                    </button>
+                    <ul class="dropdown-menu shadow border-0 w-100">
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{NOME}}', event)">{{NOME}} — Nome</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EVENTO}}', event)">{{EVENTO}} — Evento</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">{{HORAS}} — Horas</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">{{DATA}} — Data</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">{{CPF}} — CPF</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HASH}}', event)">{{HASH}} — Hash</a></li>
+                    </ul>
+                </div>
+            </div>
+
             <div class="glass-panel p-4 mb-4 border-top border-2 border-primary">
                 <h6 class="fw-bold mb-3">Template Base</h6>
                 <div class="d-grid gap-2">
@@ -480,11 +507,48 @@
         </div>
     </div>
 </div>
+
+<!-- ====== Jodit Rich Text Editor Modal ====== -->
+<div class="modal fade" id="joditModal" tabindex="-1" aria-labelledby="joditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="joditModalLabel">
+                    <i class="fa-solid fa-pen-nib text-primary me-2"></i>Editor de Texto Rico
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-3 p-2 rounded-3" style="background:#f1f5f9;border:1px solid #e2e8f0;">
+                    <span class="small text-muted fw-semibold me-1">Inserir variável:</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{NOME}}' }}')">{{ '{{NOME}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{EVENTO}}' }}')">{{ '{{EVENTO}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HORAS}}' }}')">{{ '{{HORAS}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA}}' }}')">{{ '{{DATA}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{CPF}}' }}')">{{ '{{CPF}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HASH}}' }}')">{{ '{{HASH}}' }}</button>
+                </div>
+                <textarea id="joditEditor"></textarea>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <span class="small text-muted me-auto"><i class="fa-solid fa-circle-info me-1"></i>Formatação aplicada no PDF gerado.</span>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveJoditContent()">
+                    <i class="fa-solid fa-check me-1"></i>Aplicar ao Certificado
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jodit@3/build/jodit.min.js"></script>
 <script>
     const eventId = {{ event.id }};
     const toolbar = document.getElementById('floatingToolbar');
@@ -517,6 +581,9 @@
     let historyFuture = [];
     let isHydrating = false;
     let gridObjects = [];
+    let joditInstance = null;
+    let joditTargetObj = null;
+    let _joditPendingContent = '';
 
     function generateId(prefix) {
         return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -527,6 +594,255 @@
     function pctToPxX(x) { return (x / 100) * W; }
     function pctToPxY(y) { return (y / 100) * H; }
 
+    const MIN_LEGIBLE_FONT_SIZE = 10;
+    const CANVAS_PADDING = 12;
+
+    function clampTextObjectIntoCanvas(obj) {
+        if (!obj) return;
+
+        obj.setCoords();
+        const bounds = obj.getBoundingRect(true, true);
+        let nextLeft = obj.left;
+        let nextTop = obj.top;
+
+        if (bounds.left < CANVAS_PADDING) {
+            nextLeft += CANVAS_PADDING - bounds.left;
+        }
+        if (bounds.top < CANVAS_PADDING) {
+            nextTop += CANVAS_PADDING - bounds.top;
+        }
+        if ((bounds.left + bounds.width) > (W - CANVAS_PADDING)) {
+            nextLeft -= (bounds.left + bounds.width) - (W - CANVAS_PADDING);
+        }
+        if ((bounds.top + bounds.height) > (H - CANVAS_PADDING)) {
+            nextTop -= (bounds.top + bounds.height) - (H - CANVAS_PADDING);
+        }
+
+        obj.set({
+            left: Math.min(Math.max(nextLeft, 0), W),
+            top: Math.min(Math.max(nextTop, 0), H)
+        });
+        obj.setCoords();
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function plainTextToHtml(value) {
+        return escapeHtml(value || '').replace(/\r?\n/g, '<br>');
+    }
+
+    function compactFabricStyle(style, fallback) {
+        const out = {};
+        const keys = ['fontWeight', 'fontStyle', 'underline', 'linethrough', 'fill', 'fontFamily', 'fontSize'];
+        keys.forEach((key) => {
+            if (style[key] !== undefined && style[key] !== fallback[key]) {
+                out[key] = style[key];
+            }
+        });
+        return Object.keys(out).length ? out : null;
+    }
+
+    function buildFabricTextPreview(htmlContent, options = {}) {
+        const fallback = {
+            fontFamily: options.fontFamily || 'Helvetica',
+            fontSize: Math.max(8, Number(options.fontSize || 20)),
+            fill: options.color || '#000000',
+            fontWeight: options.bold ? 'bold' : 'normal',
+            fontStyle: options.italic ? 'italic' : 'normal',
+            underline: false,
+            linethrough: false,
+            textAlign: options.align || 'center'
+        };
+
+        const root = document.createElement('div');
+        root.innerHTML = htmlContent || '';
+
+        const lines = [''];
+        const styles = { 0: {} };
+        let lineIndex = 0;
+        let charIndex = 0;
+        let detectedAlign = fallback.textAlign;
+
+        function ensureLine() {
+            if (!styles[lineIndex]) styles[lineIndex] = {};
+            if (lines[lineIndex] === undefined) lines[lineIndex] = '';
+        }
+
+        function lineBreak() {
+            const current = lines[lineIndex] || '';
+            if (!current.length && lineIndex > 0 && !(lines[lineIndex - 1] || '').length) {
+                return;
+            }
+            lineIndex += 1;
+            charIndex = 0;
+            ensureLine();
+        }
+
+        function pushText(text, style) {
+            const normalized = String(text || '')
+                .replace(/\r/g, '')
+                .replace(/\u00a0/g, ' ')
+                .replace(/[\t\f\v]+/g, ' ');
+
+            for (const ch of normalized) {
+                if (ch === '\n') {
+                    lineBreak();
+                    continue;
+                }
+                ensureLine();
+                lines[lineIndex] += ch;
+                const compact = compactFabricStyle(style, fallback);
+                if (compact) styles[lineIndex][charIndex] = compact;
+                charIndex += 1;
+            }
+        }
+
+        function parseInlineStyle(node, inherited) {
+            const next = { ...inherited };
+            const tag = (node.tagName || '').toLowerCase();
+
+            if (tag === 'b' || tag === 'strong') next.fontWeight = 'bold';
+            if (tag === 'i' || tag === 'em') next.fontStyle = 'italic';
+            if (tag === 'u') next.underline = true;
+            if (tag === 's' || tag === 'strike' || tag === 'del') next.linethrough = true;
+
+            const inlineStyle = node.getAttribute ? (node.getAttribute('style') || '') : '';
+            inlineStyle.split(';').forEach((rule) => {
+                const [rawKey, rawValue] = rule.split(':');
+                if (!rawKey || !rawValue) return;
+                const key = rawKey.trim().toLowerCase();
+                const value = rawValue.trim();
+
+                if (key === 'font-weight' && value) next.fontWeight = value === 'normal' ? 'normal' : 'bold';
+                if (key === 'font-style' && value) next.fontStyle = value === 'normal' ? 'normal' : 'italic';
+                if (key === 'text-decoration') {
+                    if (value.includes('underline')) next.underline = true;
+                    if (value.includes('line-through')) next.linethrough = true;
+                }
+                if (key === 'color' && value) next.fill = value;
+                if (key === 'font-family' && value) next.fontFamily = value.split(',')[0].replace(/["']/g, '').trim() || next.fontFamily;
+                if (key === 'font-size') {
+                    const parsed = parseFloat(value);
+                    if (Number.isFinite(parsed)) next.fontSize = Math.max(8, parsed);
+                }
+                if (key === 'text-align' && value) detectedAlign = value;
+            });
+
+            if (node.align) detectedAlign = String(node.align).toLowerCase();
+            return next;
+        }
+
+        function walk(node, style, listContext = null) {
+            if (!node) return;
+
+            if (node.nodeType === Node.TEXT_NODE) {
+                const text = node.nodeValue.replace(/\s+/g, ' ');
+                if (text.trim() || /\s/.test(text)) pushText(text, style);
+                return;
+            }
+
+            if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+            const tag = (node.tagName || '').toLowerCase();
+            const nextStyle = parseInlineStyle(node, style);
+            const isBlock = ['p', 'div', 'section', 'article', 'header', 'footer', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag);
+
+            if (tag === 'br') {
+                lineBreak();
+                return;
+            }
+
+            if (tag === 'ul' || tag === 'ol') {
+                let index = 0;
+                Array.from(node.childNodes).forEach((child) => {
+                    if (child.nodeType === Node.ELEMENT_NODE && child.tagName.toLowerCase() === 'li') {
+                        index += 1;
+                        walk(child, nextStyle, { type: tag, index });
+                    }
+                });
+                return;
+            }
+
+            if (tag === 'li') {
+                if ((lines[lineIndex] || '').length) lineBreak();
+                const marker = listContext?.type === 'ol' ? `${listContext.index}. ` : '• ';
+                pushText(marker, nextStyle);
+                Array.from(node.childNodes).forEach((child) => walk(child, nextStyle, listContext));
+                lineBreak();
+                return;
+            }
+
+            Array.from(node.childNodes).forEach((child) => walk(child, nextStyle, listContext));
+
+            if (isBlock) {
+                lineBreak();
+            }
+        }
+
+        Array.from(root.childNodes).forEach((child) => walk(child, fallback));
+
+        while (lines.length > 1 && !(lines[lines.length - 1] || '').trim()) {
+            lines.pop();
+            delete styles[lineIndex];
+            lineIndex -= 1;
+        }
+
+        const text = lines.join('\n') || ' ';
+        Object.keys(styles).forEach((key) => {
+            if (!Object.keys(styles[key] || {}).length) delete styles[key];
+        });
+
+        return {
+            text,
+            styles,
+            textAlign: detectedAlign || fallback.textAlign,
+            fontFamily: fallback.fontFamily,
+            fontSize: fallback.fontSize,
+            fill: fallback.fill,
+            fontWeight: fallback.fontWeight,
+            fontStyle: fallback.fontStyle
+        };
+    }
+
+    function applyRichTextPreview(obj, htmlContent) {
+        if (!obj || obj.data?.type !== 'text') return;
+
+        const preview = buildFabricTextPreview(htmlContent, {
+            fontFamily: obj.data?.font_family || obj.fontFamily || 'Helvetica',
+            fontSize: obj.data?.baseFontSize || obj.fontSize || 20,
+            color: obj.data?.color || obj.fill || '#000000',
+            align: obj.data?.align || obj.textAlign || 'center',
+            bold: obj.fontWeight === 'bold',
+            italic: obj.fontStyle === 'italic'
+        });
+
+        obj.set({
+            text: preview.text,
+            styles: preview.styles,
+            fontSize: preview.fontSize,
+            fill: obj.data?.color || preview.fill,
+            textAlign: preview.textAlign,
+            fontFamily: obj.data?.font_family || preview.fontFamily,
+            fontWeight: preview.fontWeight,
+            fontStyle: preview.fontStyle,
+            width: Math.max(20, Number(obj.data?.blockWidth || obj.width || 120)),
+            scaleX: 1,
+            scaleY: 1
+        });
+
+        obj.data.text = preview.text;
+        obj.data.text_styles = preview.styles;
+        obj.data.align = preview.textAlign;
+        obj.setCoords();
+    }
+
     function scaleTextStyles(obj, ratio) {
         if (!obj.styles || ratio >= 1) return;
         Object.keys(obj.styles).forEach((lineKey) => {
@@ -534,7 +850,7 @@
             Object.keys(line).forEach((charKey) => {
                 const st = line[charKey];
                 if (st && st.fontSize) {
-                    st.fontSize = Math.max(6, st.fontSize * ratio);
+                    st.fontSize = Math.max(MIN_LEGIBLE_FONT_SIZE, st.fontSize * ratio);
                 }
             });
         });
@@ -544,24 +860,36 @@
         if (!obj || obj.data?.type !== 'text') return;
 
         const targetW = Math.max(20, Number(obj.data?.blockWidth || obj.width || 120));
-        const targetH = Math.max(12, Number(obj.data?.blockHeight || obj.height || 40));
+        let targetH = Math.max(12, Number(obj.data?.blockHeight || obj.height || 40));
+        const baseFontSize = Math.max(
+            MIN_LEGIBLE_FONT_SIZE,
+            Number(obj.data?.baseFontSize || obj.fontSize || 16)
+        );
 
         obj.set({
             width: targetW,
+            fontSize: baseFontSize,
             scaleX: 1,
             scaleY: 1
         });
 
+        obj.data.baseFontSize = baseFontSize;
+
         let guard = 0;
-        while (obj.calcTextHeight() > targetH && guard < 60) {
+        while (obj.calcTextHeight() > targetH && (obj.fontSize || baseFontSize) > MIN_LEGIBLE_FONT_SIZE && guard < 60) {
             const ratio = 0.96;
-            obj.set('fontSize', Math.max(6, (obj.fontSize || 16) * ratio));
+            obj.set('fontSize', Math.max(MIN_LEGIBLE_FONT_SIZE, (obj.fontSize || baseFontSize) * ratio));
             scaleTextStyles(obj, ratio);
             guard += 1;
         }
 
+        if (obj.calcTextHeight() > targetH) {
+            targetH = Math.min(H - (CANVAS_PADDING * 2), Math.ceil(obj.calcTextHeight() + 8));
+        }
+
         obj.data.blockWidth = targetW;
         obj.data.blockHeight = targetH;
+        clampTextObjectIntoCanvas(obj);
         obj.setCoords();
     }
 
@@ -678,6 +1006,8 @@
                 italic: !!el.italic,
                 font_family: el.font_family || 'Helvetica',
                 text_styles: el.text_styles || {},
+                is_html: !!el.is_html,
+                html_content: el.html_content || null,
                 size: Number(el.size ?? 80),
                 zIndex: Number(el.zIndex ?? idx + 1),
                 locked: ['qrcode', 'hash'].includes(el.id) ? false : !!el.locked,
@@ -718,6 +1048,8 @@
                         italic: !!el.italic,
                         font_family: el.font_family || 'Helvetica',
                         text_styles: el.text_styles || {},
+                        is_html: !!el.is_html,
+                        html_content: el.html_content || null,
                         zIndex: Number(el.zIndex ?? idx + 1),
                         locked: ['qrcode', 'hash'].includes(key) ? false : !!el.locked,
                         visible: el.visible !== false
@@ -783,37 +1115,24 @@
     }
 
     function syncToolbarWithSelection() {
+        const panel = document.getElementById('textFormattingPanel');
         const selected = getActiveObjects();
         if (selected.length !== 1 || selected[0].data?.type !== 'text') {
             toolbar.style.display = 'none';
+            if (panel) panel.style.display = 'none';
             return;
         }
 
         const obj = selected[0];
-        toolbar.style.display = 'flex';
-        const rect = designer.upperCanvasEl.getBoundingClientRect();
-        const objRect = obj.getBoundingRect(true, true);
-        toolbar.style.top = `${rect.top + objRect.top - 50}px`;
-        toolbar.style.left = `${rect.left + objRect.left + (objRect.width / 2) - (toolbar.offsetWidth / 2)}px`;
+        // Keep legacy toolbar hidden; show sidebar panel instead
+        toolbar.style.display = 'none';
+        if (panel) panel.style.display = 'block';
 
-        document.getElementById('btn-bold').classList.toggle('active', obj.fontWeight === 'bold');
-        document.getElementById('btn-italic').classList.toggle('active', obj.fontStyle === 'italic');
-
-        if (hasTextSelection(obj)) {
-            const partialBold = getSelectionStyleValue(obj, 'fontWeight', obj.fontWeight) === 'bold';
-            const partialItalic = getSelectionStyleValue(obj, 'fontStyle', obj.fontStyle) === 'italic';
-            document.getElementById('btn-bold').classList.toggle('active', partialBold);
-            document.getElementById('btn-italic').classList.toggle('active', partialItalic);
-            document.getElementById('input-size').value = Math.max(8, Math.round(getSelectionStyleValue(obj, 'fontSize', obj.fontSize || 20)));
-            document.getElementById('input-color').value = getSelectionStyleValue(obj, 'fill', obj.fill || '#000000');
-            document.getElementById('select-font').value = getSelectionStyleValue(obj, 'fontFamily', obj.data?.font_family || 'Helvetica');
-        } else {
-            document.getElementById('input-size').value = Math.max(8, Math.round(obj.fontSize || 20));
-            document.getElementById('input-color').value = obj.fill || '#000000';
-            const family = (obj.data?.font_family || 'Helvetica');
-            document.getElementById('select-font').value = family;
-        }
-        updateAlignButtons(obj.textAlign || 'center');
+        // Populate sidebar controls from object state
+        document.getElementById('input-size').value = Math.max(8, Math.round(obj.data?.baseFontSize || obj.fontSize || 20));
+        document.getElementById('input-color').value = obj.data?.color || obj.fill || '#000000';
+        document.getElementById('select-font').value = obj.data?.font_family || 'Helvetica';
+        updateAlignButtons(obj.data?.align || obj.textAlign || 'center');
         syncAutoFitToggle();
         syncBlockSizeControls();
     }
@@ -898,28 +1217,46 @@
             if (el.visible === false) return;
 
             if (el.type === 'text') {
-                const txt = new fabric.IText(el.text || '', {
+                const resolvedHtmlContent = el.html_content || plainTextToHtml(el.text || '');
+                const preview = buildFabricTextPreview(resolvedHtmlContent, {
+                    fontFamily: el.font_family || 'Helvetica',
+                    fontSize: Math.max(8, Number(el.font || 20)),
+                    color: el.color || '#000000',
+                    align: el.align || 'center',
+                    bold: !!el.bold,
+                    italic: !!el.italic
+                });
+                const txt = new fabric.Textbox(preview.text, {
                     left: pctToPxX(el.x),
                     top: pctToPxY(el.y),
                     originX: 'center',
                     originY: 'center',
                     width: pctToPxX(el.w),
-                    fontSize: Math.max(8, el.font),
+                    fontSize: preview.fontSize,
                     fill: el.color || '#000000',
-                    textAlign: el.align || 'center',
+                    textAlign: preview.textAlign,
                     fontStyle: el.italic ? 'italic' : 'normal',
                     fontWeight: el.bold ? 'bold' : 'normal',
                     fontFamily: el.font_family || 'Helvetica',
-                    styles: el.text_styles || {},
-                    editable: !el.locked,
+                    styles: preview.styles,
+                    editable: false,
+                    hoverCursor: 'pointer',
                     lockMovementX: !!el.locked,
                     lockMovementY: !!el.locked,
                     lockScalingX: !!el.locked,
                     lockScalingY: !!el.locked,
                     hasControls: !el.locked
                 });
+                // Normalize legacy elements: ensure all text is Jodit-managed
                 txt.data = {
                     ...el,
+                    is_html: true,
+                    html_content: resolvedHtmlContent,
+                    text: preview.text,
+                    text_styles: preview.styles,
+                    color: el.color || '#000000',
+                    align: preview.textAlign,
+                    baseFontSize: Math.max(MIN_LEGIBLE_FONT_SIZE, Number(el.font || 20)),
                     blockWidth: pctToPxX(el.w),
                     blockHeight: pctToPxY(el.h),
                     autoFit: el.auto_fit !== false
@@ -1018,18 +1355,23 @@
             };
 
             if (base.type === 'text') {
-                doc.elements.push({
+                const textExport = {
                     ...base,
-                    text: obj.text || '',
-                    font: Math.round(obj.fontSize || 20),
-                    color: obj.fill || '#000000',
-                    align: obj.textAlign || 'center',
+                    text: obj.data?.text || obj.text || '',
+                    font: Math.round(obj.data?.baseFontSize || obj.fontSize || 20),
+                    color: obj.data?.color || obj.fill || '#000000',
+                    align: obj.data?.align || obj.textAlign || 'center',
                     bold: obj.fontWeight === 'bold',
                     italic: obj.fontStyle === 'italic',
                     font_family: obj.data.font_family || 'Helvetica',
-                    text_styles: obj.styles || {},
+                    text_styles: obj.data?.text_styles || obj.styles || {},
                     auto_fit: obj.data?.autoFit !== false
-                });
+                };
+                if (obj.data?.is_html && obj.data?.html_content) {
+                    textExport.is_html = true;
+                    textExport.html_content = obj.data.html_content;
+                }
+                doc.elements.push(textExport);
                 return;
             }
 
@@ -1105,7 +1447,11 @@
         const snapshot = exportTemplate();
         const allText = snapshot.elements
             .filter((el) => el.type === 'text')
-            .map((el) => el.text || '')
+            .map((el) => {
+                const plain = el.text || '';
+                const rich = (el.is_html && el.html_content) ? stripHtml(el.html_content) : '';
+                return plain + ' ' + rich;
+            })
             .join(' ');
 
         const hasQR = snapshot.elements.some((el) => el.type === 'qr' || el.id === 'qrcode');
@@ -1149,7 +1495,7 @@
             lockMovementY: lock,
             lockScalingX: lock,
             lockScalingY: lock,
-            editable: !lock,
+            editable: false,
             hasControls: !lock
         });
         designer.requestRenderAll();
@@ -1273,26 +1619,42 @@
         }
     }
 
-    function addTextElement(text = 'Clique para editar o conteúdo') {
+    function addTextElement() {
         pushHistory();
-        const obj = new fabric.IText(text, {
+        const preview = buildFabricTextPreview('Novo texto', {
+            fontFamily: 'Helvetica',
+            fontSize: 22,
+            color: '#000000',
+            align: 'center'
+        });
+        const obj = new fabric.Textbox(preview.text, {
             left: W * 0.5,
             top: H * 0.5,
             originX: 'center',
             originY: 'center',
             width: W * 0.4,
-            fontSize: 22,
+            fontSize: preview.fontSize,
             fill: '#000000',
-            textAlign: 'center',
-            fontFamily: 'Helvetica'
+            textAlign: preview.textAlign,
+            fontFamily: 'Helvetica',
+            styles: preview.styles,
+            editable: false,
+            hoverCursor: 'pointer'
         });
         obj.data = {
             id: generateId('txt'),
             type: 'text',
+            text: preview.text,
+            text_styles: preview.styles,
+            color: '#000000',
+            align: 'center',
             font_family: 'Helvetica',
+            baseFontSize: 22,
             blockWidth: W * 0.4,
             blockHeight: H * 0.12,
-            autoFit: true
+            autoFit: true,
+            is_html: true,
+            html_content: ''
         };
         fitTextToBlock(obj);
         designer.add(obj);
@@ -1300,15 +1662,103 @@
         designer.requestRenderAll();
         updateElementsList();
         syncToolbarWithSelection();
+        // Open Jodit immediately for the new element
+        openJoditEditor(obj);
     }
 
     function adicionarTexto() { addTextElement(); }
 
-    function injectVar(tag, evt) {
-        if (evt && typeof evt.preventDefault === 'function') {
-            evt.preventDefault();
-        }
+    // =====================================================
+    // Jodit Rich Text Editor Integration
+    // =====================================================
 
+    function stripHtml(htmlStr) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = htmlStr || '';
+        return tmp.textContent || tmp.innerText || '';
+    }
+
+    function openJoditEditor(targetObj) {
+        const selected = targetObj ? [targetObj] : getActiveObjects();
+        if (selected.length !== 1 || selected[0].data?.type !== 'text') {
+            Toast.fire({ icon: 'warning', title: 'Selecione um elemento de texto primeiro' });
+            return;
+        }
+        joditTargetObj = selected[0];
+        _joditPendingContent = joditTargetObj.data?.html_content || joditTargetObj.text || '';
+
+        const modalEl = document.getElementById('joditModal');
+        const doSetup = () => {
+            if (!joditInstance) {
+                joditInstance = Jodit.make('#joditEditor', {
+                    height: 420,
+                    toolbarAdaptive: false,
+                    removeButtons: ['source', 'fullsize', 'about', 'speechRecognize', 'print', 'file', 'video'],
+                    buttons: [
+                        'bold', 'italic', 'underline', 'strikethrough', '|',
+                        'ul', 'ol', '|',
+                        'fontsize', 'font', 'brush', '|',
+                        'align', '|',
+                        'indent', 'outdent', '|',
+                        'undo', 'redo', '|',
+                        'eraser', 'copyformat'
+                    ],
+                    enter: 'BR',
+                    showCharsCounter: false,
+                    showWordsCounter: false,
+                    showXPathInStatusbar: false,
+                    defaultFontSizePoints: 'px'
+                });
+            }
+            joditInstance.value = _joditPendingContent;
+            joditInstance.focus();
+        };
+
+        if (modalEl.classList.contains('show')) {
+            doSetup();
+        } else {
+            modalEl.addEventListener('shown.bs.modal', function handler() {
+                modalEl.removeEventListener('shown.bs.modal', handler);
+                doSetup();
+            });
+            (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
+        }
+    }
+
+    function saveJoditContent() {
+        if (!joditInstance || !joditTargetObj) return;
+        pushHistory();
+        const htmlContent = joditInstance.value;
+
+        joditTargetObj.data.html_content = htmlContent;
+        joditTargetObj.data.is_html = true;
+        applyRichTextPreview(joditTargetObj, htmlContent);
+
+        if (joditTargetObj.data?.autoFit !== false) {
+            fitTextToBlock(joditTargetObj);
+        }
+        designer.requestRenderAll();
+        updateElementsList();
+
+        const inst = bootstrap.Modal.getInstance(document.getElementById('joditModal'));
+        if (inst) inst.hide();
+        joditTargetObj = null;
+    }
+
+    function insertVarInJodit(tag) {
+        if (!joditInstance) return;
+        joditInstance.selection.insertHTML(tag);
+        joditInstance.focus();
+    }
+
+    // =====================================================
+    // End Jodit Integration
+    // =====================================================
+
+    function injectVar(tag, evt) {
+        if (evt && typeof evt.preventDefault === 'function') evt.preventDefault();
+
+        // Always inject through Jodit
         let selected = getActiveObjects();
         let obj = selected.length && selected[0].data?.type === 'text' ? selected[0] : null;
 
@@ -1321,30 +1771,40 @@
         }
 
         if (!obj) {
-            addTextElement(tag);
+            // Create a new element then inject
+            addTextElement();
+            // Jodit opened automatically; tag will be inserted once modal is shown
+            // Defer insertion until editor is ready
+            const modalEl = document.getElementById('joditModal');
+            const insertOnReady = () => {
+                modalEl.removeEventListener('shown.bs.modal', insertOnReady);
+                if (joditInstance) joditInstance.selection.insertHTML(tag);
+            };
+            modalEl.addEventListener('shown.bs.modal', insertOnReady);
             return false;
         }
 
-        pushHistory();
-        const text = obj.text || '';
-        const start = Number.isInteger(obj.selectionStart) ? obj.selectionStart : text.length;
-        const end = Number.isInteger(obj.selectionEnd) ? obj.selectionEnd : start;
-        const nextText = `${text.slice(0, start)}${tag}${text.slice(end)}`;
-
-        obj.set('text', nextText);
-        const cursor = start + tag.length;
-        obj.selectionStart = cursor;
-        obj.selectionEnd = cursor;
-        if (!obj.isEditing) {
-            obj.enterEditing();
+        // If Jodit modal is already open, insert directly
+        const modalEl = document.getElementById('joditModal');
+        if (modalEl.classList.contains('show') && joditInstance) {
+            joditInstance.selection.insertHTML(tag);
+            joditInstance.focus();
+            return false;
         }
 
-        if (obj.data?.autoFit !== false) {
-            fitTextToBlock(obj);
-        }
-
-        designer.requestRenderAll();
-        syncToolbarWithSelection();
+        // Open Jodit and insert tag after it's ready
+        joditTargetObj = obj;
+        _joditPendingContent = obj.data?.html_content || obj.text || '';
+        const doInsert = () => {
+            modalEl.removeEventListener('shown.bs.modal', doInsert);
+            if (joditInstance) {
+                joditInstance.selection.setCursorAfter(joditInstance.editor.lastChild || joditInstance.editor);
+                joditInstance.selection.insertHTML(tag);
+                joditInstance.focus();
+            }
+        };
+        modalEl.addEventListener('shown.bs.modal', doInsert);
+        openJoditEditor(obj);
         return false;
     }
 
@@ -1356,27 +1816,25 @@
         const obj = selected[0];
         if (prop === 'font') {
             const size = Math.max(8, Number(val || 20));
-            if (hasTextSelection(obj)) applySelectionStyle(obj, { fontSize: size });
-            else obj.set('fontSize', size);
+            obj.data.baseFontSize = size;
         }
         if (prop === 'font_family') {
-            if (hasTextSelection(obj)) applySelectionStyle(obj, { fontFamily: val });
-            else obj.set('fontFamily', val);
             obj.data.font_family = val;
         }
         if (prop === 'color') {
-            const color = val || '#000000';
-            if (hasTextSelection(obj)) applySelectionStyle(obj, { fill: color });
-            else obj.set('fill', color);
+            obj.data.color = val || '#000000';
         }
         if (prop === 'align') {
-            obj.set('textAlign', val || 'center');
-            updateAlignButtons(obj.textAlign || 'center');
+            obj.data.align = val || 'center';
+            updateAlignButtons(obj.data.align || 'center');
         }
+
+        applyRichTextPreview(obj, obj.data?.html_content || plainTextToHtml(obj.data?.text || obj.text || ''));
         if (obj.data?.autoFit !== false) {
             fitTextToBlock(obj);
         }
         designer.requestRenderAll();
+        updateElementsList();
         syncToolbarWithSelection();
     }
 
@@ -1463,6 +1921,8 @@
         designer.discardActiveObject();
         designer.requestRenderAll();
         toolbar.style.display = 'none';
+        const panel = document.getElementById('textFormattingPanel');
+        if (panel) panel.style.display = 'none';
         syncAutoFitToggle();
     }
 
@@ -1631,6 +2091,8 @@
         designer.on('selection:updated', syncToolbarWithSelection);
         designer.on('selection:cleared', () => {
             toolbar.style.display = 'none';
+            const panel = document.getElementById('textFormattingPanel');
+            if (panel) panel.style.display = 'none';
             syncAutoFitToggle();
             syncBlockSizeControls();
         });
@@ -1643,6 +2105,14 @@
             updateElementsList();
             syncToolbarWithSelection();
             syncBlockSizeControls();
+        });
+        // Double-click on a text element opens Jodit
+        designer.on('mouse:dblclick', (e) => {
+            const obj = e.target;
+            if (obj && obj.data?.type === 'text') {
+                designer.setActiveObject(obj);
+                openJoditEditor(obj);
+            }
         });
         designer.on('object:scaling', (e) => {
             const obj = e.target;
@@ -1777,7 +2247,7 @@
         syncAutoFitToggle();
     }
 
-    window.addEventListener('resize', syncToolbarWithSelection);
+    window.addEventListener('resize', () => { /* reserved */ });
     boot();
 </script>
 {% endblock %}

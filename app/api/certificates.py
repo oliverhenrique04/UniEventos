@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, abort
 from flask_login import login_required, current_user
 from app.services.certificate_service import CertificateService
 from werkzeug.utils import secure_filename
@@ -7,6 +7,7 @@ import json
 import re
 
 from app.models import Event, Enrollment, User, Activity
+from app.extensions import db
 
 ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
 MAX_DESIGN_IMAGE_SIZE = 8 * 1024 * 1024
@@ -39,6 +40,13 @@ def _validate_image_file(file_storage):
     return True, None
 
 
+def _get_or_404(model, pk):
+    entity = db.session.get(model, pk)
+    if entity is None:
+        abort(404)
+    return entity
+
+
 def _normalize_template(template_json):
     if template_json is None:
         return None, None
@@ -51,6 +59,11 @@ def _normalize_template(template_json):
     if not isinstance(parsed, dict):
         return None, "Template inválido: estrutura esperada é um objeto"
 
+    # Sanitize HTML content in text elements that use the Jodit rich editor
+    for element in parsed.get('elements', []):
+        if element.get('is_html') and element.get('html_content'):
+            element['html_content'] = _sanitize_html_content(element['html_content'])
+
     return json.dumps(parsed, ensure_ascii=False), None
 
 
@@ -58,6 +71,35 @@ def _can_manage_event(event):
     if current_user.role == 'admin':
         return True
     return event and event.owner_username == current_user.username
+
+
+def _can_manage_certificates(event):
+    if current_user.role not in ['admin', 'coordenador']:
+        return False
+    return _can_manage_event(event)
+
+
+def _sanitize_html_content(html_content):
+    """Strips dangerous tags and event-handler attributes to prevent XSS."""
+    if not html_content or not isinstance(html_content, str):
+        return html_content
+    # Remove script / iframe / object / embed blocks
+    html_content = re.sub(
+        r'<(script|iframe|object|embed|frame|frameset|applet|meta|link|style)[^>]*>.*?</\1>',
+        '', html_content, flags=re.DOTALL | re.IGNORECASE
+    )
+    # Remove self-closing dangerous tags
+    html_content = re.sub(
+        r'<(script|iframe|meta|link|style|base)[^>]*/?>',
+        '', html_content, flags=re.IGNORECASE
+    )
+    # Remove inline event handlers (on<event>="..." / on<event>='...')
+    html_content = re.sub(r'\s+on\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)',
+                          '', html_content, flags=re.IGNORECASE)
+    # Remove javascript: / data: URIs from href/src attributes
+    html_content = re.sub(r'(href|src)\s*=\s*["\']?\s*(javascript|data):[^"\'>\s]*["\']?',
+                          '', html_content, flags=re.IGNORECASE)
+    return html_content
 
 
 def _is_valid_email(email):
@@ -72,10 +114,10 @@ def setup_certificate(event_id):
     Configures the certificate background and template for an event.
     Expects a background image file and a template JSON string.
     """
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador']:
         return jsonify({"erro": "Permissão negada"}), 403
         
-    event = Event.query.get_or_404(event_id)
+    event = _get_or_404(Event, event_id)
     if not _can_manage_event(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
@@ -117,10 +159,10 @@ def setup_certificate(event_id):
 @login_required
 def upload_asset(event_id):
     """Uploads an image asset for inline certificate elements."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador']:
         return jsonify({"erro": "Permissão negada"}), 403
 
-    event = Event.query.get_or_404(event_id)
+    event = _get_or_404(Event, event_id)
     if not _can_manage_event(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
@@ -145,10 +187,10 @@ def upload_asset(event_id):
 @login_required
 def send_batch(event_id):
     """Triggers the mass generation and queued delivery of certificates."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador']:
         return jsonify({"erro": "Permissão negada"}), 403
-    event = Event.query.get_or_404(event_id)
-    if not _can_manage_event(event):
+    event = _get_or_404(Event, event_id)
+    if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     success, message = cert_service.queue_event_certificates(event_id)
@@ -159,8 +201,8 @@ def send_batch(event_id):
 @login_required
 def list_delivery(event_id):
     """Lists all participants eligible for certificates with pagination."""
-    event = Event.query.get_or_404(event_id)
-    if not _can_manage_event(event):
+    event = _get_or_404(Event, event_id)
+    if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     page = request.args.get('page', 1, type=int)
@@ -198,9 +240,9 @@ def update_email(enrollment_id):
     if not _is_valid_email(new_email):
         return jsonify({"erro": "E-mail inválido"}), 400
 
-    enrollment = Enrollment.query.get_or_404(enrollment_id)
-    event = Event.query.get(enrollment.event_id)
-    if not _can_manage_event(event):
+    enrollment = _get_or_404(Enrollment, enrollment_id)
+    event = db.session.get(Event, enrollment.event_id)
+    if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     enrollment.cert_email_alternativo = new_email
@@ -211,9 +253,9 @@ def update_email(enrollment_id):
 @login_required
 def resend_single(enrollment_id):
     """Triggers a resend for a single certificate."""
-    enrollment = Enrollment.query.get_or_404(enrollment_id)
-    event = Event.query.get(enrollment.event_id)
-    if not _can_manage_event(event):
+    enrollment = _get_or_404(Enrollment, enrollment_id)
+    event = db.session.get(Event, enrollment.event_id)
+    if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
@@ -224,7 +266,7 @@ def resend_single(enrollment_id):
     total_hours = 0
     presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
     for p in presences:
-        atv = Activity.query.get(p.activity_id)
+        atv = db.session.get(Activity, p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
 
     target_email = enrollment.cert_email_alternativo or user.email
@@ -251,9 +293,9 @@ def resend_single(enrollment_id):
 @login_required
 def download_single(enrollment_id):
     # ... (Keep existing download_single code)
-    enrollment = Enrollment.query.get_or_404(enrollment_id)
-    event = Event.query.get(enrollment.event_id)
-    if not _can_manage_event(event):
+    enrollment = _get_or_404(Enrollment, enrollment_id)
+    event = db.session.get(Event, enrollment.event_id)
+    if not _can_manage_certificates(event):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
@@ -261,7 +303,7 @@ def download_single(enrollment_id):
     total_hours = 0
     presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
     for p in presences:
-        atv = Activity.query.get(p.activity_id)
+        atv = db.session.get(Activity, p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
     from flask import send_file
     pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
@@ -271,9 +313,9 @@ def download_single(enrollment_id):
 @login_required
 def preview_single(enrollment_id):
     """Generates and serves a certificate PDF for inline viewing (preview)."""
-    enrollment = Enrollment.query.get_or_404(enrollment_id)
-    event = Event.query.get(enrollment.event_id)
-    if not _can_manage_event(event):
+    enrollment = _get_or_404(Enrollment, enrollment_id)
+    event = db.session.get(Event, enrollment.event_id)
+    if not _can_manage_certificates(event):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
@@ -283,7 +325,7 @@ def preview_single(enrollment_id):
     total_hours = 0
     presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
     for p in presences:
-        atv = Activity.query.get(p.activity_id)
+        atv = db.session.get(Activity, p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
 
     from flask import send_file

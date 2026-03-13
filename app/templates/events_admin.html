@@ -252,9 +252,10 @@
                             <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes">
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
+                            ${['admin', 'coordenador'].includes('{{ user.role }}') ? `
                             <a href="/designer_certificado/${ev.id}" class="btn btn-sm btn-light border" title="Certificado">
                                 <i class="fa-solid fa-certificate text-warning"></i>
-                            </a>
+                            </a>` : ''}
                             <button class="btn btn-sm btn-light border text-danger" onclick="confirmarExcluirEvento(${ev.id})">
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>

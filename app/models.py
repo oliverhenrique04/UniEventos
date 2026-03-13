@@ -18,7 +18,7 @@ class User(UserMixin, db.Model):
 
     username = db.Column(db.String(50), primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=True) # Added for notifications
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20))
     nome = db.Column(db.String(100))
     cpf = db.Column(db.String(14), unique=True)
@@ -55,6 +55,20 @@ class User(UserMixin, db.Model):
             str: The username.
         """
         return self.username
+
+    def to_dict(self):
+        """Serialize user data for API responses or tests."""
+        return {
+            'username': self.username,
+            'email': self.email,
+            'role': self.role,
+            'nome': self.nome,
+            'cpf': self.cpf,
+            'ra': self.ra,
+            'curso': self.curso,
+            'course_id': self.course_id,
+            'can_create_events': self.can_create_events,
+        }
 
 
 class Course(db.Model):
