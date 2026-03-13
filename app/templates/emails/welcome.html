@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro confirmado - UniEventos</title>
+</head>
+
+<body>
+    <!-- Conteúdo para ser inserido no template base -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <!-- Título -->
+        <tr>
+            <td style="color: #1a202c; font-size: 24px; font-weight: bold; text-align: center;">
+                Cadastro confirmado na plataforma UniEventos
+            </td>
+        </tr>
+
+        <!-- Separador -->
+        <tr>
+            <td style="padding: 20px 0;">
+                <hr style="border: 0; border-top: 1px solid #e2e8f0;">
+            </td>
+        </tr>
+
+        <!-- Saudação -->
+        <tr>
+            <td style="color: #4a5568; font-size: 16px; line-height: 1.6;">
+                <p style="margin: 0 0 25px 0;">Prezado(a) <strong>{{ user_name }}</strong>,</p>
+                <p style="margin: 0 0 25px 0;">Seu cadastro foi confirmado na plataforma <strong>UniEventos</strong>, ambiente oficial de gestão acadêmica de eventos da UNIEURO.</p>
+                <p style="margin: 0 0 25px 0;">A partir deste momento, você poderá:</p>
+                
+                <ul style="margin: 0 0 25px 0; padding-left: 20px; color: #4a5568;">
+                    <li style="margin-bottom: 8px;">Consultar eventos acadêmicos disponíveis</li>
+                    <li style="margin-bottom: 8px;">Realizar inscrições em cursos, oficinas e palestras</li>
+                    <li style="margin-bottom: 8px;">Acompanhar seu histórico de participação</li>
+                    <li style="margin-bottom: 8px;">Acessar certificados emitidos pelo sistema</li>
+                </ul>
+            </td>
+        </tr>
+
+        <!-- Destaque -->
+        <tr>
+            <td style="background-color: #edf2f7; border-left: 4px solid #005A9C; padding: 20px; font-size: 16px; border-radius: 4px;">
+                <p style="margin: 0 0 10px 0; color: #2d3748;"><strong>Recomendação:</strong></p>
+                <p style="margin: 0; color: #2d3748;">Mantenha seus dados acadêmicos e de contato atualizados para assegurar o recebimento correto das comunicações institucionais.</p>
+            </td>
+        </tr>
+
+        <!-- Botão de Ação -->
+        <tr>
+            <td align="center" style="padding: 30px 0;">
+                <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                    <tr>
+                        <td align="center" bgcolor="#005A9C" style="border-radius: 5px;">
+                            <a href="{{ app_url }}" 
+                               target="_blank"
+                               style="display: inline-block; background-color: #005A9C; color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 5px; font-size: 16px; font-weight: bold; line-height: 1.2;">
+                                Acessar UniEventos
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        <!-- Informações de Acesso -->
+        <tr>
+            <td style="color: #4a5568; font-size: 14px; line-height: 1.6; padding: 20px 0;">
+                <p style="margin: 0 0 15px 0;"><strong>Dados de acesso:</strong></p>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f7fafc; padding: 15px; border-radius: 4px;">
+                    <tr>
+                        <td style="padding: 8px 0; color: #2d3748;"><strong>E-mail:</strong></td>
+                        <td style="padding: 8px 0; color: #4a5568;">{{ email }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #2d3748;"><strong>Senha:</strong></td>
+                        <td style="padding: 8px 0; color: #4a5568;">Definir no primeiro acesso</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

@@ -856,7 +856,7 @@ async function enviarCertificado(id, buttonEl = null) {
         if (!resp.ok || data.resultado === 'erro') {
             Swal.fire({
                 icon: 'error',
-                title: 'Problema no envio',
+                title: 'Falha no envio',
                 text: `${data.erro || data.mensagem || 'Falha ao enviar'}. Enviados: ${data.total_enviado || 0}. Sem e-mail: ${data.sem_email || 0}. Falhas de fila: ${data.falha_fila || 0}`,
             });
             await carregarCertificadosInstitucionais(paginaAtual);
@@ -866,7 +866,7 @@ async function enviarCertificado(id, buttonEl = null) {
         if (data.resultado === 'parcial') {
             Swal.fire({
                 icon: 'warning',
-                title: 'Problema no envio',
+                title: 'Envio parcial',
                 text: `${data.mensagem}. Enviados: ${data.total_enviado}. Sem e-mail: ${data.sem_email}. Falhas de fila: ${data.falha_fila}`,
             });
             await carregarCertificadosInstitucionais(paginaAtual);
@@ -1136,7 +1136,7 @@ async function reenviarDestinatario(recipientId, buttonEl = null) {
         });
         const data = await resp.json();
         if (!resp.ok) {
-            uiError(data.erro || 'Problema no envio');
+            uiError(data.erro || 'Falha no envio');
             return;
         }
         uiSuccess(data.mensagem || 'Reenvio solicitado.');

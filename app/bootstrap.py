@@ -19,7 +19,7 @@ def seed_default_users():
             "username": "coord",
             "email": "coord@example.com",
             "role": "coordenador",
-            "nome": "Coord. UniEventos",
+            "nome": "Coord. EuroEventos",
             "cpf": "333.333.333-33",
             "ra": "COORD-001",
             "curso": "TI",

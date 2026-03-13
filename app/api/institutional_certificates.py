@@ -876,6 +876,47 @@ def download_recipient_pdf(certificate_id, recipient_id):
     return send_file(pdf_path, as_attachment=True, download_name=filename)
 
 
+@bp.route('/download_public/<string:cert_hash>', methods=['GET'])
+def download_public_by_hash(cert_hash):
+    """Public download endpoint for institutional certificate by certificate hash."""
+    recipient = InstitutionalCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
+    if not recipient:
+        return jsonify({'erro': 'Certificado nao encontrado'}), 404
+
+    cert = db.session.get(InstitutionalCertificate, recipient.certificate_id)
+    if not cert:
+        return jsonify({'erro': 'Certificado nao encontrado'}), 404
+
+    pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+    if not pdf_path:
+        return jsonify({'erro': 'Falha ao gerar PDF'}), 500
+
+    filename = f'institutional_{cert.id}_{recipient.id}.pdf'
+    return send_file(pdf_path, as_attachment=True, download_name=filename)
+
+
+@bp.route('/preview_public/<string:cert_hash>', methods=['GET'])
+def preview_public_by_hash(cert_hash):
+    """Public preview endpoint for institutional certificate by certificate hash."""
+    recipient = InstitutionalCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
+    if not recipient:
+        return jsonify({'erro': 'Certificado nao encontrado'}), 404
+
+    cert = db.session.get(InstitutionalCertificate, recipient.certificate_id)
+    if not cert:
+        return jsonify({'erro': 'Certificado nao encontrado'}), 404
+
+    pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+    if not pdf_path:
+        return jsonify({'erro': 'Falha ao gerar PDF'}), 500
+
+    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
 @bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/preview', methods=['GET'])
 @login_required
 def preview_recipient_pdf(certificate_id, recipient_id):

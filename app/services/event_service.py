@@ -5,6 +5,7 @@ from app.services.notification_service import NotificationService
 from app.models import Event, Activity, Enrollment, Course, db
 import secrets
 from datetime import datetime
+from flask import current_app
 
 class EventService:
     """
@@ -269,12 +270,24 @@ class EventService:
         cpfs = set([e.user_cpf for e in enrollments])
         
         count = 0
+        event = self.event_repo.get_by_id(event_id)
+        event_name = event.nome if event else 'Evento'
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
         for cpf in cpfs:
             user = User.query.filter_by(cpf=cpf).first()
             if user and user.email:
-                # Add a small note about the event context to the body
-                full_body = f"{body}\n\n---\nEsta é uma mensagem automática do sistema UniEventos."
-                self.notification_service.send_email_task(user.email, subject, full_body)
+                self.notification_service.send_email_task(
+                    to_email=user.email,
+                    subject=subject,
+                    template_name='event_broadcast.html',
+                    template_data={
+                        'subject': subject,
+                        'event_name': event_name,
+                        'user_name': user.nome,
+                        'message_text': body,
+                        'app_url': app_url,
+                    },
+                )
                 count += 1
         return count
 
@@ -310,7 +323,26 @@ class EventService:
             enrollment = Enrollment(activity_id=activity_id, user_cpf=user.cpf, nome=user.nome, presente=False)
             saved = self.enrollment_repo.save(enrollment)
             if user.email:
-                self.notification_service.send_email_task(user.email, f"Inscrição Confirmada: {activity.nome}", f"Olá {user.nome}, sua inscrição na atividade {activity.nome} do evento {activity.event.nome} foi confirmada!")
+                app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+                event_date = activity.event.data_inicio.strftime('%d/%m/%Y') if activity.event and activity.event.data_inicio else ''
+                event_time = activity.hora_atv.strftime('%H:%M') if activity.hora_atv else ''
+                self.notification_service.send_email_task(
+                    to_email=user.email,
+                    subject=f"Inscrição Confirmada: {activity.nome}",
+                    template_name='enrollment_confirmation.html',
+                    template_data={
+                        'user_name': user.nome,
+                        'event_name': activity.event.nome if activity.event else activity.nome,
+                        'event_date': event_date,
+                        'event_time': event_time,
+                        'event_location': activity.local or '-',
+                        'event_type': 'Atividade',
+                        'event_description': activity.descricao or '',
+                        'event_details_url': app_url,
+                        'my_events_url': f"{app_url}/meus-eventos" if app_url else '',
+                        'cancel_url': '',
+                    },
+                )
             return saved, "Inscrição Realizada!"
         elif action == 'sair':
             if existing: self.enrollment_repo.delete(existing)
@@ -335,7 +367,18 @@ class EventService:
             self.enrollment_repo.save(enrollment)
 
         if user.email:
-            self.notification_service.send_email_task(user.email, f"Presença Confirmada: {activity.nome}", f"Parabéns {user.nome}! Sua presença na atividade {activity.nome} foi registrada com sucesso.")
+            app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+            self.notification_service.send_email_task(
+                to_email=user.email,
+                subject=f"Presença Confirmada: {activity.nome}",
+                template_name='presence_confirmation.html',
+                template_data={
+                    'user_name': user.nome,
+                    'event_name': activity.event.nome if activity.event else '-',
+                    'activity_name': activity.nome,
+                    'app_url': f"{app_url}/meus-eventos" if app_url else '',
+                },
+            )
         return True, "Presença confirmada!", enrollment
 
     def get_user_events_paginated(self, user_cpf, page=1, per_page=10, filters=None):

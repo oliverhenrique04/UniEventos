@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrição Confirmada - {{ event_name }}</title>
+</head>
+
+<body>
+    <!-- Conteúdo para ser inserido no template base -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <!-- Título -->
+        <tr>
+            <td style="color: #1a202c; font-size: 24px; font-weight: bold; text-align: center;">
+                Confirmação de inscrição
+            </td>
+        </tr>
+
+        <!-- Separador -->
+        <tr>
+            <td style="padding: 20px 0;">
+                <hr style="border: 0; border-top: 1px solid #e2e8f0;">
+            </td>
+        </tr>
+
+        <!-- Saudação -->
+        <tr>
+            <td style="color: #4a5568; font-size: 16px; line-height: 1.6;">
+                <p style="margin: 0 0 25px 0;">Prezado(a) <strong>{{ user_name }}</strong>,</p>
+                <p style="margin: 0 0 25px 0;">Confirmamos sua inscrição na atividade acadêmica descrita abaixo.</p>
+            </td>
+        </tr>
+
+        <!-- Detalhes do Evento -->
+        <tr>
+            <td style="background-color: #edf2f7; border-left: 4px solid #005A9C; padding: 20px; font-size: 16px; border-radius: 4px;">
+                <p style="margin: 0 0 15px 0; color: #2d3748; font-size: 18px; font-weight: bold;">
+                    {{ event_name }}
+                </p>
+                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Data:</strong> {{ event_date }}</p>
+                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Horário:</strong> {{ event_time }}</p>
+                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Local:</strong> {{ event_location }}</p>
+                {% if event_type %}
+                <p style="margin: 0 0 15px 0; color: #2d3748;"><strong>Modalidade:</strong> {{ event_type }}</p>
+                {% endif %}
+            </td>
+        </tr>
+
+        <!-- Informações Adicionais -->
+        {% if event_description %}
+        <tr>
+            <td style="color: #4a5568; font-size: 15px; line-height: 1.6; padding: 20px 0;">
+                <p style="margin: 0 0 15px 0;"><strong>Descrição:</strong></p>
+                <p style="margin: 0;">{{ event_description }}</p>
+            </td>
+        </tr>
+        {% endif %}
+
+        <!-- Instruções -->
+        <tr>
+            <td style="background-color: #fffaf0; border-left: 4px solid #f59e0b; padding: 15px; font-size: 15px; border-radius: 4px; color: #744210;">
+                <p style="margin: 0 0 10px 0;"><strong>Orientações:</strong></p>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li style="margin-bottom: 5px;">Apresente-se com antecedência mínima de 15 minutos</li>
+                    <li style="margin-bottom: 5px;">Leve um documento de identidade</li>
+                    <li style="margin-bottom: 0;">A certificação será emitida após confirmação de presença</li>
+                </ul>
+            </td>
+        </tr>
+
+        <!-- Botões de Ação -->
+        <tr>
+            <td align="center" style="padding: 30px 0;">
+                <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                    <tr>
+                        <td align="center" bgcolor="#005A9C" style="border-radius: 5px; margin-bottom: 10px;">
+                            <a href="{{ event_details_url }}" 
+                               target="_blank"
+                               style="display: inline-block; background-color: #005A9C; color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 5px; font-size: 16px; font-weight: bold; line-height: 1.2;">
+                                Consultar detalhes da atividade
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+                
+                {% if my_events_url %}
+                <p style="margin: 15px 0 0 0; color: #718096; font-size: 14px;">
+                    <a href="{{ my_events_url }}" style="color: #005A9C; text-decoration: none;">Acessar meus eventos</a>
+                </p>
+                {% endif %}
+            </td>
+        </tr>
+
+        <!-- Cancelamento -->
+        {% if cancel_url %}
+        <tr>
+            <td style="color: #718096; font-size: 13px; line-height: 1.5; padding-top: 20px; text-align: center;">
+                <p style="margin: 0;">Solicitação de cancelamento:</p>
+                <p style="margin: 10px 0 0 0;">
+                    <a href="{{ cancel_url }}" style="color: #e53e3e; text-decoration: underline;">Cancelar inscrição</a>
+                </p>
+            </td>
+        </tr>
+        {% endif %}
+    </table>
+</body>
+
+</html>

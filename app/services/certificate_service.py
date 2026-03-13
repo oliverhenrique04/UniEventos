@@ -2,12 +2,14 @@ import os
 import json
 import secrets
 import html
+from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, A4
 from app.repositories.event_repository import EventRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.services.notification_service import NotificationService
+from app.extensions import db
 from flask import current_app
 
 class CertificateService:
@@ -376,6 +378,7 @@ class CertificateService:
         event = self.event_repo.get_by_id(event_id)
         if not event:
             return False, "Evento não encontrado"
+        base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
             
         # Group by user to sum hours across activities of the same event
         # Note: In a 'PADRAO' event, a user might be in multiple activities.
@@ -405,20 +408,32 @@ class CertificateService:
                 
             # Generate PDF passing the enrollment to generate/store hash
             pdf_path = self.generate_pdf(event, user, [], data['hours'], enrollment=data['enrollment'])
+            cert_hash = data['enrollment'].cert_hash
+            validation_url = f"{base_url}/validar/{cert_hash}" if base_url and cert_hash else ''
+            download_url = f"{base_url}/api/certificates/download_public/{cert_hash}" if base_url and cert_hash else ''
+            event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
             
             # Queue Email
             self.notifier.send_email_task(
                 to_email=user.email,
                 subject=f"Seu Certificado: {event.nome}",
-                body=f"Olá {user.nome}, seu certificado de participação no evento {event.nome} está disponível para validação em nossa plataforma e segue em anexo.",
+                template_name='certificate_ready.html',
+                template_data={
+                    'user_name': user.nome,
+                    'event_name': event.nome,
+                    'event_date': event_date,
+                    'course_hours': data['hours'],
+                    'certificate_number': cert_hash,
+                    'certificate_download_url': download_url,
+                    'view_certificate_url': f"{base_url}/api/certificates/preview_public/{cert_hash}" if base_url and cert_hash else '',
+                    'my_certificates_url': validation_url,
+                },
                 attachment_path=pdf_path
             )
             
             # Update tracking
-            from datetime import datetime
             data['enrollment'].cert_data_envio = datetime.now()
             data['enrollment'].cert_entregue = True
-            from app.extensions import db
             db.session.commit()
             
             count += 1

@@ -103,7 +103,7 @@ class SystemTestCase(unittest.TestCase):
         # Note: Render template returns 200, but content differs based on auth. 
         # Since logic handles auth inside index route (if not current_user.is_authenticated return login_register.html)
         # It should always return 200 HTML.
-        self.assertIn(b'UniEventos', res.data)
+        self.assertIn(b'EuroEventos', res.data)
         print(" -> Index/Login Page OK")
 
 if __name__ == '__main__':

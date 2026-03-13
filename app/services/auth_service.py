@@ -1,6 +1,8 @@
 from app.models import User
 from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
+from flask import current_app
+from datetime import datetime
 
 class AuthService:
     """
@@ -50,10 +52,18 @@ class AuthService:
         
         # Send welcome email via RabbitMQ
         if saved_user.email:
+            app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
             self.notifier.send_email_task(
                 to_email=saved_user.email,
-                subject="Bem-vindo ao UniEventos!",
-                body=f"Olá {saved_user.nome}, seu cadastro foi realizado com sucesso. Aproveite os eventos!"
+                subject="Bem-vindo ao EuroEventos!",
+                template_name='welcome.html',
+                template_data={
+                    'user_name': saved_user.nome,
+                    'email': saved_user.email,
+                    'app_url': app_url,
+                    'year': datetime.now().year,
+                    'unsubscribe_url': f"{app_url}/unsubscribe/" if app_url else '',
+                },
             )
         
         return saved_user

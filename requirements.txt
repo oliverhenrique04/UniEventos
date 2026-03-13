@@ -11,3 +11,4 @@ pytest
 qrcode
 reportlab
 Werkzeug
+python-dotenv

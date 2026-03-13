@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disponibilização de Certificado Institucional - {{ certificate_title }}</title>
+</head>
+
+<body>
+    <!-- Conteúdo para ser inserido no template base -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <!-- Título com Ícone Especial -->
+        <tr>
+            <td style="color: #1a202c; font-size: 24px; font-weight: bold; text-align: center;">
+                Certificado Institucional Disponibilizado
+            </td>
+        </tr>
+
+        <!-- Separador -->
+        <tr>
+            <td style="padding: 20px 0;">
+                <hr style="border: 0; border-top: 1px solid #e2e8f0;">
+            </td>
+        </tr>
+
+        <!-- Saudação Personalizada -->
+        <tr>
+            <td style="color: #4a5568; font-size: 16px; line-height: 1.6;">
+                <p style="margin: 0 0 25px 0;">Prezado(a) <strong>{{ recipient_name }}</strong>,</p>
+                <p style="margin: 0 0 25px 0;">Informamos que o certificado institucional abaixo foi emitido e está disponível para download.</p>
+            </td>
+        </tr>
+
+        <!-- Detalhes do Certificado Institucional -->
+        <tr>
+            <td style="background-color: #edf2f7; border-left: 4px solid #005A9C; padding: 20px; font-size: 16px; border-radius: 4px;">
+                <p style="margin: 0 0 15px 0; color: #2d3748; font-size: 18px; font-weight: bold;">
+                    {{ certificate_title }}
+                </p>
+                
+                {% if category_name %}
+                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Categoria:</strong> {{ category_name }}</p>
+                {% endif %}
+                
+                {% if issue_date %}
+                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Data de emissão:</strong> {{ issue_date }}</p>
+                {% endif %}
+                
+                {% if certificate_number %}
+                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Número do certificado:</strong> {{ certificate_number }}</p>
+                {% endif %}
+                
+                {% if signer_name %}
+                <p style="margin: 0 0 15px 0; color: #2d3748;"><strong>Autoridade signatária:</strong> {{ signer_name }}</p>
+                {% endif %}
+                
+                {% if recipient_cpf %}
+                <p style="margin: 0; color: #2d3748;"><strong>CPF:</strong> {{ recipient_cpf }}</p>
+                {% endif %}
+            </td>
+        </tr>
+
+        <!-- Destaque - Diferente do certificado de evento -->
+        <tr>
+            <td style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; font-size: 15px; border-radius: 4px; color: #92400e;">
+                <p style="margin: 0 0 10px 0;"><strong>Natureza da certificação:</strong></p>
+                <p style="margin: 0; line-height: 1.5;">Este documento possui caráter institucional e não está vinculado a um evento específico, registrando participação, conclusão ou reconhecimento em atividade acadêmica institucional.</p>
+            </td>
+        </tr>
+
+        <!-- Informações Adicionais (se houver) -->
+        {% if additional_info %}
+        <tr>
+            <td style="color: #4a5568; font-size: 15px; line-height: 1.6; padding: 20px 0;">
+                <p style="margin: 0 0 10px 0;"><strong>Informações complementares:</strong></p>
+                <p style="margin: 0;">{{ additional_info }}</p>
+            </td>
+        </tr>
+        {% endif %}
+
+        <!-- Botões de Ação -->
+        <tr>
+            <td align="center" style="padding: 30px 0;">
+                <!-- Botão Principal - Baixar -->
+                <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                    <tr>
+                        <td align="center" bgcolor="#005A9C" style="border-radius: 5px; margin-bottom: 10px;">
+                            <a href="{{ download_url }}" 
+                               target="_blank"
+                               style="display: inline-block; background-color: #005A9C; color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 5px; font-size: 16px; font-weight: bold; line-height: 1.2;">
+                                Baixar certificado (PDF)
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+                
+                <!-- Botões Secundários -->
+                {% if preview_url %}
+                <p style="margin: 15px 0 0 0; color: #718096; font-size: 14px;">
+                    <a href="{{ preview_url }}" style="color: #005A9C; text-decoration: none;">Visualizar certificado</a>
+                </p>
+                {% endif %}
+                
+                {% if validation_url %}
+                <p style="margin: 10px 0 0 0; color: #718096; font-size: 14px;">
+                    <a href="{{ validation_url }}" style="color: #005A9C; text-decoration: none;">Validar autenticidade</a>
+                </p>
+                {% endif %}
+            </td>
+        </tr>
+
+        <!-- Instruções de Validação -->
+        <tr>
+            <td style="background-color: #f0fff4; border-left: 4px solid #38a169; padding: 15px; font-size: 14px; border-radius: 4px; color: #22543d;">
+                <p style="margin: 0 0 10px 0;"><strong>Procedimento de validação:</strong></p>
+                <ol style="margin: 0; padding-left: 20px; line-height: 1.6;">
+                    <li>Acesse o site da UNIEURO</li>
+                    <li>Navegue até a área de validação de certificados</li>
+                    <li>Digite o número do certificado (acima)</li>
+                    <li>Confirme seus dados pessoais</li>
+                </ol>
+            </td>
+        </tr>
+
+        <!-- Dicas Importantes -->
+        <tr>
+            <td style="color: #718096; font-size: 13px; line-height: 1.5; padding-top: 20px;">
+                <p style="margin: 0 0 10px 0;"><strong>Orientações:</strong></p>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li style="margin-bottom: 5px;">Armazene uma cópia do certificado em local seguro</li>
+                    <li style="margin-bottom: 5px;">Verifique se todos os dados estão corretos</li>
+                    <li style="margin-bottom: 5px;">O certificado é válido sem necessidade de carimbo ou assinatura adicional</li>
+                    <li style="margin-bottom: 0;">Use o número do certificado para validação pública</li>
+                </ul>
+            </td>
+        </tr>
+
+        <!-- Assinatura Institucional -->
+        <tr>
+            <td style="color: #4a5568; font-size: 14px; line-height: 1.5; padding-top: 30px; border-top: 2px solid #005A9C;">
+                <p style="margin: 0;"><strong>NUTED - Núcleo de Tecnologia Educacional</strong></p>
+                <p style="margin: 5px 0 0 0;">UNIEURO - Centro Universitário</p>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #718096;">Certificado emitido através do sistema UniEventos</p>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

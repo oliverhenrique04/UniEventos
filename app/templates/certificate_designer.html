@@ -2740,7 +2740,7 @@
                 const response = await fetch(sendBatchUrl, { method: 'POST' });
                 const payload = await response.json();
                 if (!response.ok || payload.resultado === 'erro') {
-                    Swal.fire('Problema no envio', payload.erro || payload.mensagem || 'Nao foi possivel concluir o envio.', 'error');
+                    Swal.fire('Falha no envio', payload.erro || payload.mensagem || 'Nao foi possivel concluir o envio.', 'error');
                     return;
                 }
                 if (payload.resultado === 'parcial') {

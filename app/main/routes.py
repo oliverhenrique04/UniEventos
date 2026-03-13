@@ -162,62 +162,79 @@ def validar_busca():
 
 @bp.route('/validar/<cert_hash>')
 def validar_hash(cert_hash):
-    """Public page to show validation results for a specific hash."""
+    """Public page to show validation results for a specific hash.
+    
+    Supports both event certificates and institutional certificates.
+    """
     from app.models import Enrollment, Activity, Event, User, InstitutionalCertificateRecipient
-    enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
-    if not enrollment:
-        institutional_recipient = InstitutionalCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
-        if not institutional_recipient:
-            return render_template('validation.html', erro="Certificado não encontrado ou inválido.")
-
+    
+    # Try to find institutional certificate first
+    institutional_recipient = InstitutionalCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
+    if institutional_recipient:
         cert = institutional_recipient.certificate
+        
+        # Format date
         data_br = cert.data_emissao
         try:
             data_br = datetime.strptime(cert.data_emissao, "%Y-%m-%d").strftime("%d/%m/%Y")
         except Exception:
             pass
-
+        
         return render_template(
             'validation.html',
             success=True,
+            certificado_tipo='institucional',  # Flag for institutional certificate
             nome=institutional_recipient.nome,
             evento=cert.titulo,
             data=data_br,
-            horas='-',
-            curso=cert.categoria,
+            horas=None,  # No hours for institutional certificates
+            curso=cert.categoria if cert.categoria else 'N/A',
+            signatario=cert.signer_name or 'N/A',
+            cpf=institutional_recipient.cpf or 'N/A',
             hash=cert_hash,
         )
     
-    # Calculate total hours for this user in this event
-    # (Since hash is linked to one enrollment, but certificates are usually event-wide)
-    # Actually, in our logic, one hash represents the participation in the event.
+    # Try to find event certificate
+    enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
+    if not enrollment:
+        return render_template('validation.html', erro="Certificado não encontrado ou inválido.")
+    
+    # Get activity and event details
     activity_ref = db.session.get(Activity, enrollment.activity_id)
     if not activity_ref:
         return render_template('validation.html', erro="Atividade relacionada não encontrada.")
-    activities = Activity.query.filter_by(event_id=activity_ref.event_id).all()
+    
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
     event = db.session.get(Event, activity_ref.event_id)
     curso = event.curso if event and event.curso else "N/A"
     
-    # Sum hours of activities where this user was present in this event
-    total_hours = 0
+    # Calculate total hours for this user in this event
     from app.models import Enrollment as E2
     all_user_enrollments = E2.query.join(Activity, E2.activity_id == Activity.id).filter(
         Activity.event_id == activity_ref.event_id,
         E2.user_cpf == enrollment.user_cpf,
         E2.presente == True,
     ).all()
+    
+    total_hours = 0
     for e in all_user_enrollments:
         atv = db.session.get(Activity, e.activity_id)
-        if atv: total_hours += (atv.carga_horaria or 0)
-
+        if atv:
+            total_hours += (atv.carga_horaria or 0)
+    
+    # Format event date
     data_br = event.data_inicio.strftime("%d/%m/%Y") if event and event.data_inicio else ""
-
-    return render_template('validation.html', 
-                           success=True, 
-                           nome=user.nome if user else enrollment.nome,
-                           evento=event.nome,
-                           data=data_br,
-                           horas=total_hours,
-                           curso=curso,
-                           hash=cert_hash)
+    
+    return render_template(
+        'validation.html',
+        success=True,
+        certificado_tipo='evento',  # Flag for event certificate
+        nome=user.nome if user else enrollment.nome,
+        evento=event.nome,
+        data=data_br,
+        horas=total_hours,
+        curso=curso,
+        signatario=None,  # No signer for event certificates
+        cpf=enrollment.user_cpf,
+        hash=cert_hash
+    )

@@ -247,7 +247,6 @@ def list_delivery(event_id):
 @login_required
 def update_email(enrollment_id):
     """Updates the target email for a specific certificate delivery."""
-    from app.models import db
     new_email = request.json.get('email')
     if not _is_valid_email(new_email):
         return jsonify({"erro": "E-mail inválido"}), 400
@@ -290,20 +289,100 @@ def resend_single(enrollment_id):
 
     # Generate and Queue
     pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+    validation_url = f"{base_url}/validar/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else ''
+    download_url = f"{base_url}/api/certificates/download_public/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else ''
+    event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
     cert_service.notifier.send_email_task(
         to_email=target_email,
         subject=f"Reenvio de Certificado: {event.nome}",
-        body=f"Olá {user.nome}, seu certificado de participação foi reenviado.",
+        template_name='certificate_ready.html',
+        template_data={
+            'user_name': user.nome,
+            'event_name': event.nome,
+            'event_date': event_date,
+            'course_hours': total_hours,
+            'certificate_number': enrollment.cert_hash,
+            'certificate_download_url': download_url,
+            'view_certificate_url': f"{base_url}/api/certificates/preview_public/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else '',
+            'my_certificates_url': validation_url,
+        },
         attachment_path=pdf_path
     )
     
     from datetime import datetime
     enrollment.cert_data_envio = datetime.now()
     enrollment.cert_entregue = True # Mark as initiated
-    from app.extensions import db
     db.session.commit()
     
     return jsonify({"mensagem": "Reenvio solicitado!"})
+
+
+@bp.route('/download_public/<string:cert_hash>')
+def download_public(cert_hash):
+    """Public download endpoint for event certificates using certificate hash."""
+    enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
+    if not enrollment:
+        return "Certificado não encontrado", 404
+
+    event = _event_from_enrollment(enrollment)
+    if not event:
+        return "Evento não encontrado", 404
+
+    user = User.query.filter_by(cpf=enrollment.user_cpf).first()
+    if not user:
+        return "Usuário não encontrado", 404
+
+    total_hours = 0
+    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event.id,
+        Enrollment.user_cpf == user.cpf,
+        Enrollment.presente == True,
+    ).all()
+    for p in presences:
+        atv = db.session.get(Activity, p.activity_id)
+        if atv:
+            total_hours += (atv.carga_horaria or 0)
+
+    from flask import send_file
+    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    filename = f"Certificado_{user.nome.replace(' ', '_')}.pdf"
+    return send_file(pdf_path, as_attachment=True, download_name=filename)
+
+
+@bp.route('/preview_public/<string:cert_hash>')
+def preview_public(cert_hash):
+    """Public preview endpoint for event certificates using certificate hash."""
+    enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
+    if not enrollment:
+        return "Certificado não encontrado", 404
+
+    event = _event_from_enrollment(enrollment)
+    if not event:
+        return "Evento não encontrado", 404
+
+    user = User.query.filter_by(cpf=enrollment.user_cpf).first()
+    if not user:
+        return "Usuário não encontrado", 404
+
+    total_hours = 0
+    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event.id,
+        Enrollment.user_cpf == user.cpf,
+        Enrollment.presente == True,
+    ).all()
+    for p in presences:
+        atv = db.session.get(Activity, p.activity_id)
+        if atv:
+            total_hours += (atv.carga_horaria or 0)
+
+    from flask import send_file
+    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @bp.route('/download/<int:enrollment_id>')
 @login_required

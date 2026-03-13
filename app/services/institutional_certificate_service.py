@@ -117,13 +117,22 @@ class InstitutionalCertificateService:
             return False
 
         subject = f"Certificado Institucional - {certificate.titulo}"
-        body = (
-            f"Ola {recipient.nome}, seu certificado institucional foi emitido. "
-            f"Use o codigo {recipient.cert_hash} para validacao publica."
-        )
+        base_url = current_app.config.get('BASE_URL', '').rstrip('/')
         return self.notifier.send_email_task(
             to_email=recipient.email,
             subject=subject,
-            body=body,
+            template_name='institutional_certificate_ready.html',
+            template_data={
+                'recipient_name': recipient.nome,
+                'certificate_title': certificate.titulo,
+                'category_name': certificate.categoria,
+                'issue_date': certificate.data_emissao,
+                'certificate_number': recipient.cert_hash,
+                'signer_name': certificate.signer_name,
+                'recipient_cpf': recipient.cpf,
+                'download_url': f"{base_url}/api/institutional_certificates/download_public/{recipient.cert_hash}",
+                'preview_url': f"{base_url}/api/institutional_certificates/preview_public/{recipient.cert_hash}",
+                'validation_url': f"{base_url}/validar/{recipient.cert_hash}",
+            },
             attachment_path=attachment_path,
         )
