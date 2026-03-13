@@ -6,6 +6,7 @@ from app.models import Event, Activity, Enrollment, Course, db
 import secrets
 from datetime import datetime
 from flask import current_app
+from sqlalchemy.exc import IntegrityError
 
 class EventService:
     """
@@ -321,7 +322,14 @@ class EventService:
                 return None, "Lotado!"
             
             enrollment = Enrollment(activity_id=activity_id, user_cpf=user.cpf, nome=user.nome, presente=False)
-            saved = self.enrollment_repo.save(enrollment)
+            try:
+                saved = self.enrollment_repo.save(enrollment)
+            except IntegrityError:
+                # Covers concurrent insert attempts after uniqueness hardening.
+                existing = self.get_enrollment(activity_id, user.cpf)
+                if existing:
+                    return existing, "Já inscrito"
+                raise
             if user.email:
                 app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
                 event_date = activity.event.data_inicio.strftime('%d/%m/%Y') if activity.event and activity.event.data_inicio else ''

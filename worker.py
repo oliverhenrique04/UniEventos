@@ -62,7 +62,7 @@ def build_email_body(payload):
     if raw_body:
         return raw_body
 
-    return "<p>Mensagem automática do sistema UniEventos.</p>"
+    return "<p>Mensagem automática do sistema EuroEventos.</p>"
 
 def send_email(to, subject, body, attachment_path=None):
     """

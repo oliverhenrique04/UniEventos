@@ -28,6 +28,11 @@ class User(UserMixin, db.Model):
 
     course_obj = db.relationship('Course', backref='students')
     institutional_certificates = db.relationship('InstitutionalCertificate', backref='creator')
+    institutional_recipient_links = db.relationship(
+        'InstitutionalCertificateRecipient',
+        back_populates='linked_user',
+        foreign_keys='InstitutionalCertificateRecipient.user_username',
+    )
 
     @property
     def curso(self):
@@ -228,6 +233,10 @@ class Enrollment(db.Model):
     lat_checkin = db.Column(db.Float, nullable=True)
     lon_checkin = db.Column(db.Float, nullable=True)
 
+    __table_args__ = (
+        db.UniqueConstraint('activity_id', 'user_cpf', name='uq_activity_enrollment_user_activity'),
+    )
+
 
 class InstitutionalCertificate(db.Model):
     """Certificate batch for institutional (non-event) use cases."""
@@ -279,6 +288,7 @@ class InstitutionalCertificateRecipient(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     certificate_id = db.Column(db.Integer, db.ForeignKey('institutional_certificates.id'), nullable=False)
+    user_username = db.Column(db.String(50), db.ForeignKey('users.username'), nullable=True)
     nome = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), nullable=True)
     cpf = db.Column(db.String(14), nullable=True)
@@ -288,10 +298,17 @@ class InstitutionalCertificateRecipient(db.Model):
     cert_data_envio = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
+    linked_user = db.relationship(
+        'User',
+        back_populates='institutional_recipient_links',
+        foreign_keys=[user_username],
+    )
+
     __table_args__ = (
         db.UniqueConstraint('certificate_id', 'email', name='uq_institutional_recipient_email_per_cert'),
         db.UniqueConstraint('certificate_id', 'cpf', name='uq_institutional_recipient_cpf_per_cert'),
         db.Index('ix_institutional_recipient_certificate_id', 'certificate_id'),
+        db.Index('ix_institutional_recipient_user_username', 'user_username'),
         db.Index('ix_institutional_recipient_entregue', 'cert_entregue'),
         db.Index('ix_institutional_recipient_data_envio', 'cert_data_envio'),
     )

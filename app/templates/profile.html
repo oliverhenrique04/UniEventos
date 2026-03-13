@@ -20,18 +20,24 @@
                     <i class="fa-solid fa-book-open me-1"></i> {{ user.curso or 'Curso não informado' }}
                 </div>
             </div>
-            <div class="col-md-4 mt-4 mt-md-0">
+            <div class="col-md-6 mt-6 mt-md-0">
                 <div class="row text-center g-2">
-                    <div class="col-6">
+                    <div class="col-4">
                         <div class="p-2 bg-light rounded-4">
                             <div class="fw-bold text-primary fs-4" id="stat-hours">0</div>
                             <div class="text-muted x-small text-uppercase fw-bold">Horas Totais</div>
                         </div>
                     </div>
-                    <div class="col-6">
+                    <div class="col-4">
                         <div class="p-2 bg-light rounded-4">
                             <div class="fw-bold text-primary fs-4" id="stat-events">0</div>
                             <div class="text-muted x-small text-uppercase fw-bold">Eventos</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded-4">
+                            <div class="fw-bold text-primary fs-4" id="stat-institutional-certs">0</div>
+                            <div class="text-muted x-small text-uppercase fw-bold">Institucional</div>
                         </div>
                     </div>
                 </div>
@@ -105,20 +111,45 @@
     });
 
     async function carregarEstatisticas() {
-        const res = await fetch('/api/me/history?type=stats');
-        const stats = await res.json();
-        document.getElementById('stat-hours').innerText = stats.total_hours;
-        document.getElementById('stat-events').innerText = stats.total_events;
+        try {
+            const res = await fetch('/api/me/history?type=stats');
+            if (!res.ok) return;
+            const stats = await res.json();
+            document.getElementById('stat-hours').innerText = stats.total_hours ?? 0;
+            document.getElementById('stat-events').innerText = stats.total_events ?? 0;
+            document.getElementById('stat-institutional-certs').innerText = stats.total_institutional_certificates ?? 0;
+        } catch (_) {
+            // Keep default zero values when stats endpoint is unavailable.
+        }
     }
 
     async function carregarHistorico(type, page) {
         CURRENT_TAB = type;
         const res = await fetch(`/api/me/history?type=${type}&page=${page}`);
+        if (!res.ok) {
+            if (type === 'events') {
+                document.getElementById('lista-eventos').innerHTML = '<div class="col-12 text-center py-5 text-danger">Falha ao carregar agenda.</div>';
+            } else if (type === 'activities') {
+                document.getElementById('tabela-atividades').innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Falha ao carregar linha do tempo.</td></tr>';
+            } else {
+                document.getElementById('lista-certificados').innerHTML = '<div class="col-12 text-center py-5 text-danger">Falha ao carregar certificados.</div>';
+            }
+            return;
+        }
         const data = await res.json();
         
         if (type === 'events') renderEventos(data);
         else if (type === 'activities') renderAtividades(data);
         else renderCertificados(data);
+    }
+
+    function formatIsoDate(value) {
+        if (!value) return '-';
+        if (typeof value !== 'string') return value;
+        const normalized = value.includes('T') ? value.split('T')[0] : value;
+        const parts = normalized.split('-');
+        if (parts.length !== 3) return value;
+        return [parts[2], parts[1], parts[0]].join('/');
     }
 
     function renderEventos(data) {
@@ -139,7 +170,7 @@
                         ${ev.curso ? `<div class="text-primary x-small fw-bold mb-3"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</div>` : ''}
                         <p class="text-muted small mb-4 flex-grow-1">${ev.descricao || ''}</p>
                         <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
-                            <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${ev.data_inicio.split('-').reverse().join('/')}</small>
+                            <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${formatIsoDate(ev.data_inicio)}</small>
                             <a href="/inscrever/${ev.token_publico}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>
                         </div>
                     </div>
@@ -151,17 +182,26 @@
     function renderAtividades(data) {
         const tbody = document.getElementById('tabela-atividades');
         tbody.innerHTML = '';
+        if (!data.items || data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Nenhuma atividade registrada.</td></tr>';
+            renderPaginacao(1, 0, 'pag-atividades', (p) => carregarHistorico('activities', p));
+            return;
+        }
         data.items.forEach(atv => {
-            const status = atv.presente 
-                ? '<span class="badge bg-success-subtle text-success rounded-pill px-3">Confirmada</span>' 
-                : '<span class="badge bg-slate-100 text-slate-400 rounded-pill px-3">Inscrito</span>';
+            const isInstitutional = atv.entry_type === 'institucional';
+            const status = isInstitutional
+                ? '<span class="badge bg-info-subtle text-info rounded-pill px-3">Institucional</span>'
+                : (atv.presente
+                    ? '<span class="badge bg-success-subtle text-success rounded-pill px-3">Confirmada</span>'
+                    : '<span class="badge bg-slate-100 text-slate-400 rounded-pill px-3">Inscrito</span>');
+            const horas = (atv.horas === null || atv.horas === undefined || atv.horas === '') ? '-' : `${atv.horas}h`;
             
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn">
                     <td class="ps-4 fw-bold text-dark">${atv.atv_nome}</td>
                     <td><small class="text-muted">${atv.event_nome}</small></td>
-                    <td><small>${atv.data.split('-').reverse().join('/')}</small></td>
-                    <td><span class="badge bg-light text-dark border">${atv.horas}h</span></td>
+                    <td><small>${formatIsoDate(atv.data)}</small></td>
+                    <td><span class="badge bg-light text-dark border">${horas}</span></td>
                     <td class="text-end pe-4">${status}</td>
                 </tr>`;
         });
@@ -172,26 +212,39 @@
         const div = document.getElementById('lista-certificados');
         div.innerHTML = '';
         if (data.items.length === 0) {
-            div.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="fa-solid fa-stamp fs-1 mb-3 text-slate-200"></i><p>Nenhum certificado emitido ainda. Confirme sua presença nos eventos!</p></div>';
+            div.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="fa-solid fa-stamp fs-1 mb-3 text-slate-200"></i><p>Nenhum certificado emitido ainda.</p></div>';
             return;
         }
         data.items.forEach(cert => {
+            const isInstitutional = cert.certificate_type === 'institucional';
+            const titulo = cert.title || cert.atv_nome || 'Certificado';
+            const subtitulo = isInstitutional ? (cert.category || 'Institucional') : (cert.event_nome || 'Evento');
+            const dataReferencia = formatIsoDate(cert.data);
+            const horas = cert.horas ? `${cert.horas} Horas` : '-';
+            const downloadUrl = cert.download_url || (cert.enrollment_id ? `/api/certificates/download/${cert.enrollment_id}` : '#');
+            const previewUrl = cert.preview_url || null;
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
                     <div class="glass-panel text-center p-4 bg-white border-top border-2 border-success h-100 shadow-sm">
                         <div class="bg-success-subtle text-success rounded-circle d-inline-flex p-3 mb-3">
                             <i class="fa-solid fa-certificate fa-2x"></i>
                         </div>
-                        <h6 class="fw-bold mb-1">${cert.atv_nome}</h6>
-                        <p class="text-muted x-small mb-3">${cert.event_nome}</p>
+                        <h6 class="fw-bold mb-1">${titulo}</h6>
+                        <p class="text-muted x-small mb-2">${subtitulo}</p>
+                        <div class="x-small text-muted mb-3"><i class="fa-regular fa-calendar me-1"></i>${dataReferencia}</div>
                         <div class="bg-light p-2 rounded-3 mb-3 border">
                             <div class="x-small text-muted mb-1">Carga Horária</div>
-                            <div class="fw-bold text-dark">${cert.horas} Horas</div>
+                            <div class="fw-bold text-dark">${horas}</div>
                         </div>
                         <div class="d-grid gap-2">
-                            <a href="/api/certificates/download/${cert.enrollment_id}" class="btn btn-sm btn-primary rounded-pill">
+                            <a href="${downloadUrl}" class="btn btn-sm btn-primary rounded-pill" target="_blank" rel="noopener noreferrer">
                                 <i class="fa-solid fa-download me-1"></i> Baixar PDF
                             </a>
+                            ${previewUrl ? `
+                            <a href="${previewUrl}" class="btn btn-sm btn-outline-secondary rounded-pill" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-regular fa-eye me-1"></i> Preview
+                            </a>
+                            ` : ''}
                             <small class="text-muted font-monospace" style="font-size: 0.6rem;">HASH: ${cert.hash || '---'}</small>
                         </div>
                     </div>

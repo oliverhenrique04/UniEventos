@@ -89,9 +89,9 @@ html_body = template_service.render_institutional_certificate_ready(
     signer_name="Prof. Dr. João Santos - Diretor do NUTED",
     recipient_cpf="123.456.789-00",
     additional_info="Participação especial na comissão organizacional.",
-    download_url="https://unieventos.local/institutional-certificates/download/123",
-    preview_url="https://unieventos.local/institutional-certificates/preview/123",
-    validation_url="https://unieventos.local/validate/INST-2026-005678"
+    download_url="https://EuroEventos.local/institutional-certificates/download/123",
+    preview_url="https://EuroEventos.local/institutional-certificates/preview/123",
+    validation_url="https://EuroEventos.local/validate/INST-2026-005678"
 )
 
 # Enviar via RabbitMQ
@@ -112,9 +112,9 @@ html_body = template_service.render_certificate_ready(
     event_date="10/03/2026",
     course_hours="40 horas",
     certificate_number="CERT-2026-001234",
-    certificate_download_url="https://unieventos.local/certificates/download/567",
-    view_certificate_url="https://unieventos.local/certificates/view/567",
-    my_certificates_url="https://unieventos.local/my-certificates"
+    certificate_download_url="https://EuroEventos.local/certificates/download/567",
+    view_certificate_url="https://EuroEventos.local/certificates/view/567",
+    my_certificates_url="https://EuroEventos.local/my-certificates"
 )
 
 notification_service.send_email_task(

@@ -1,12 +1,72 @@
+import json
 from flask import Blueprint, request, jsonify, abort
 from flask_login import login_required, current_user
-from app.models import Event, Activity, db
+from sqlalchemy import or_, func
+from app.models import Event, Activity, Enrollment, InstitutionalCertificate, InstitutionalCertificateRecipient, db
 from app.services.event_service import EventService
 from app.serializers import serialize_event
 from datetime import datetime
 
 bp = Blueprint('events', __name__, url_prefix='/api')
 event_service = EventService()
+
+
+def _paginate_items(items, page, per_page):
+    total = len(items)
+    pages = (total + per_page - 1) // per_page if total > 0 else 0
+    if pages == 0:
+        return {
+            'items': [],
+            'total': 0,
+            'pages': 0,
+            'current_page': 1,
+        }
+
+    current_page = max(1, min(page, pages))
+    start = (current_page - 1) * per_page
+    end = start + per_page
+    return {
+        'items': items[start:end],
+        'total': total,
+        'pages': pages,
+        'current_page': current_page,
+    }
+
+
+def _safe_workload_hours(value):
+    raw = str(value or '').strip().replace(',', '.')
+    if not raw:
+        return 0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _get_user_institutional_recipients(user):
+    recipient_filters = []
+    if user.username:
+        recipient_filters.append(InstitutionalCertificateRecipient.user_username == user.username)
+    if user.cpf:
+        recipient_filters.append(InstitutionalCertificateRecipient.cpf == user.cpf)
+    if user.email:
+        recipient_filters.append(
+            func.lower(InstitutionalCertificateRecipient.email) == user.email.lower()
+        )
+
+    if not recipient_filters:
+        return []
+
+    return (
+        InstitutionalCertificateRecipient.query
+        .join(
+            InstitutionalCertificate,
+            InstitutionalCertificate.id == InstitutionalCertificateRecipient.certificate_id,
+        )
+        .filter(InstitutionalCertificateRecipient.cert_hash.isnot(None))
+        .filter(or_(*recipient_filters))
+        .all()
+    )
 
 @bp.route('/criar_evento', methods=['POST'])
 @login_required
@@ -187,22 +247,47 @@ def meu_historico():
     """Endpoint for the current user to retrieve their participation history and stats."""
     type = request.args.get('type', 'events') 
     page = request.args.get('page', 1, type=int)
+
+    allowed_types = {'stats', 'participated', 'events', 'activities', 'certificates'}
+    if type not in allowed_types:
+        return jsonify({'erro': 'Tipo de historico invalido'}), 400
     
     if type == 'stats':
-        from app.models import Enrollment, Activity
         presences = Enrollment.query.filter_by(user_cpf=current_user.cpf, presente=True).all()
-        total_hours = 0
+        total_event_hours = 0
         for presence in presences:
             activity = db.session.get(Activity, presence.activity_id)
             if activity:
-                total_hours += activity.carga_horaria or 0
+                total_event_hours += activity.carga_horaria or 0
         event_count = db.session.query(Activity.event_id).join(Enrollment, Enrollment.activity_id == Activity.id).filter(
             Enrollment.user_cpf == current_user.cpf
         ).distinct().count()
-        return jsonify({"total_hours": total_hours, "total_events": event_count})
+
+        institutional_recipients = _get_user_institutional_recipients(current_user)
+        seen_inst = set()
+        institutional_hours = 0
+        for recipient in institutional_recipients:
+            inst_key = recipient.cert_hash or recipient.id
+            if inst_key in seen_inst:
+                continue
+            seen_inst.add(inst_key)
+            metadata = {}
+            if recipient.metadata_json:
+                try:
+                    metadata = json.loads(recipient.metadata_json)
+                except Exception:
+                    metadata = {}
+            institutional_hours += _safe_workload_hours(metadata.get('carga_horaria'))
+
+        total_hours = total_event_hours + institutional_hours
+
+        return jsonify({
+            "total_hours": int(total_hours) if float(total_hours).is_integer() else round(total_hours, 2),
+            "total_events": event_count,
+            "total_institutional_certificates": len(seen_inst),
+        })
 
     if type == 'participated':
-        from app.models import Event, Enrollment, Activity
         # Join Events with Enrollments where presente=True
         query = db.session.query(Event).join(Activity, Event.id == Activity.event_id).join(Enrollment, Enrollment.activity_id == Activity.id)\
             .filter(Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).distinct()
@@ -236,26 +321,126 @@ def meu_historico():
         pagination = event_service.get_user_events_paginated(current_user.cpf, page=page)
         items = [serialize_event(e, current_user) for e in pagination.items]
     elif type == 'activities':
-        pagination = event_service.get_user_activities_paginated(current_user.cpf, page=page)
-        items = [{
-            "id": e.id,
+        event_activities = (
+            Enrollment.query
+            .filter_by(user_cpf=current_user.cpf)
+            .join(Activity)
+            .order_by(Activity.data_atv.desc(), Activity.hora_atv.desc())
+            .all()
+        )
+
+        merged_timeline = [{
+            "id": f"event-{e.id}",
+            "entry_type": "evento",
             "atv_nome": e.activity.nome,
             "event_nome": e.activity.event.nome,
             "data": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
             "horas": e.activity.carga_horaria,
             "presente": e.presente
-        } for e in pagination.items]
+        } for e in event_activities]
+
+        institutional_recipients = _get_user_institutional_recipients(current_user)
+        seen_timeline_inst = set()
+        for recipient in institutional_recipients:
+            unique_key = recipient.cert_hash or recipient.id
+            if unique_key in seen_timeline_inst:
+                continue
+            seen_timeline_inst.add(unique_key)
+
+            cert = recipient.certificate
+            metadata = {}
+            if recipient.metadata_json:
+                try:
+                    metadata = json.loads(recipient.metadata_json)
+                except Exception:
+                    metadata = {}
+
+            merged_timeline.append({
+                "id": f"inst-{recipient.id}",
+                "entry_type": "institucional",
+                "atv_nome": cert.titulo,
+                "event_nome": cert.categoria,
+                "data": cert.data_emissao,
+                "horas": metadata.get('carga_horaria'),
+                "presente": True,
+            })
+
+        merged_timeline.sort(key=lambda item: item.get('data') or '', reverse=True)
+        paged = _paginate_items(merged_timeline, page=page, per_page=10)
+        return jsonify(paged)
     else: # certificates
-        pagination = event_service.get_user_certificates_paginated(current_user.cpf, page=page)
-        items = [{
-            "enrollment_id": e.id,
-            "atv_nome": e.activity.nome,
-            "event_id": e.activity.event_id,
-            "event_nome": e.activity.event.nome,
-            "data": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
-            "horas": e.activity.carga_horaria,
-            "hash": e.cert_hash
-        } for e in pagination.items]
+        event_certificates = (
+            Enrollment.query
+            .filter_by(user_cpf=current_user.cpf, presente=True)
+            .filter(Enrollment.cert_hash.isnot(None))
+            .join(Activity)
+            .order_by(Activity.data_atv.desc(), Activity.hora_atv.desc())
+            .all()
+        )
+
+        merged_items = [
+            {
+                "certificate_type": "evento",
+                "enrollment_id": e.id,
+                "title": e.activity.nome,
+                "atv_nome": e.activity.nome,
+                "event_id": e.activity.event_id,
+                "event_nome": e.activity.event.nome,
+                "category": "Evento",
+                "data": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
+                "horas": e.activity.carga_horaria,
+                "hash": e.cert_hash,
+                "download_url": f"/api/certificates/download_public/{e.cert_hash}" if e.cert_hash else f"/api/certificates/download/{e.id}",
+                "preview_url": f"/api/certificates/preview_public/{e.cert_hash}" if e.cert_hash else None,
+                "issued_at": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
+            }
+            for e in event_certificates
+        ]
+
+        institutional_recipients = _get_user_institutional_recipients(current_user)
+
+        if institutional_recipients:
+
+            for recipient in institutional_recipients:
+                cert = recipient.certificate
+                metadata = {}
+                if recipient.metadata_json:
+                    try:
+                        metadata = json.loads(recipient.metadata_json)
+                    except Exception:
+                        metadata = {}
+
+                merged_items.append({
+                    "certificate_type": "institucional",
+                    "recipient_id": recipient.id,
+                    "institutional_certificate_id": cert.id,
+                    "title": cert.titulo,
+                    "atv_nome": cert.titulo,
+                    "event_nome": cert.categoria,
+                    "category": cert.categoria,
+                    "data": cert.data_emissao,
+                    "horas": metadata.get('carga_horaria'),
+                    "hash": recipient.cert_hash,
+                    "download_url": f"/api/institutional_certificates/download_public/{recipient.cert_hash}",
+                    "preview_url": f"/api/institutional_certificates/preview_public/{recipient.cert_hash}",
+                    "issued_at": cert.data_emissao,
+                })
+
+        deduped_items = []
+        seen = set()
+        for item in merged_items:
+            if item.get('certificate_type') == 'institucional':
+                key = ('institucional', item.get('hash') or item.get('recipient_id'))
+            else:
+                key = ('evento', item.get('hash') or item.get('enrollment_id'))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped_items.append(item)
+
+        deduped_items.sort(key=lambda item: item.get('issued_at') or '', reverse=True)
+        paged = _paginate_items(deduped_items, page=page, per_page=12)
+        return jsonify(paged)
 
     return jsonify({
         "items": items,

@@ -93,6 +93,7 @@
     const eventId = {{ event.id }};
     const isParticipant = {{ 'true' if user.role == 'participante' else 'false' }};
     const isAuthenticated = {{ 'true' if user.is_authenticated else 'false' }};
+    const pendingEnrollmentActions = new Set();
 
     // Monta a lista em JS com loop Jinja (sem comprehension, compatível com Jinja2)
     const activitiesData = [
@@ -154,6 +155,7 @@
 
                 btnHtml = `
           <button onclick="toggleInscricao(event, ${a.id}, '${acao}')"
+                        data-atv-id="${a.id}"
             class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
             style="font-size: 0.65rem;">
             ${btnText}
@@ -202,10 +204,18 @@
     }
 
     async function toggleInscricao(event, atvId, acao) {
+        if (pendingEnrollmentActions.has(atvId)) return;
+
         const btn = event.currentTarget;
         const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        btn.disabled = true;
+        pendingEnrollmentActions.add(atvId);
+
+        const activityButtons = document.querySelectorAll(`button[data-atv-id="${atvId}"]`);
+        activityButtons.forEach((b) => {
+            b.dataset.prevHtml = b.innerHTML;
+            b.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            b.disabled = true;
+        });
 
         try {
             const res = await fetch('/api/toggle_inscricao', {
@@ -217,15 +227,35 @@
             const json = await res.json();
 
             if (res.ok) {
-                window.location.reload();
+                const target = activitiesData.find((item) => item.id === atvId);
+                if (target) {
+                    if (acao === 'inscrever') {
+                        target.inscrito = true;
+                        target.total_inscritos = Number(target.total_inscritos || 0) + 1;
+                    } else if (acao === 'sair') {
+                        target.inscrito = false;
+                        target.total_inscritos = Math.max(0, Number(target.total_inscritos || 0) - 1);
+                    }
+                }
+                renderAtividades(activitiesData);
+                Toast.fire({ icon: 'success', title: json.mensagem || 'Inscrição atualizada.' });
             } else {
                 Swal.fire('Atenção', json.erro || json.mensagem || 'Falha ao atualizar inscrição.', 'warning');
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
             }
         } catch (e) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
+            Swal.fire('Erro', 'Falha de comunicação ao atualizar inscrição.', 'error');
+        } finally {
+            pendingEnrollmentActions.delete(atvId);
+
+            activityButtons.forEach((b) => {
+                if (b.dataset.prevHtml) {
+                    b.innerHTML = b.dataset.prevHtml;
+                    delete b.dataset.prevHtml;
+                } else {
+                    b.innerHTML = originalHtml;
+                }
+                b.disabled = false;
+            });
         }
     }
 </script>

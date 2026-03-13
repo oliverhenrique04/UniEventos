@@ -1,4 +1,6 @@
 from app.extensions import db
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from typing import Type, TypeVar, Generic, List, Optional
 
 T = TypeVar('T')
@@ -68,8 +70,65 @@ class BaseRepository(Generic[T]):
             T: The saved entity with updated state (e.g., auto-incremented ID).
         """
         db.session.add(entity)
+        try:
+            db.session.commit()
+            return entity
+        except IntegrityError as exc:
+            db.session.rollback()
+
+            # Recovery path for PostgreSQL sequence drift (id sequence behind MAX(id)).
+            if self._is_postgres_pk_conflict(exc):
+                if self._resync_pk_sequence():
+                    db.session.add(entity)
+                    db.session.commit()
+                    return entity
+
+            raise
+
+    def _is_postgres_pk_conflict(self, exc: IntegrityError) -> bool:
+        bind = db.session.get_bind()
+        if not bind or bind.dialect.name != 'postgresql':
+            return False
+
+        if not hasattr(self.model, '__table__'):
+            return False
+
+        pk_columns = list(self.model.__mapper__.primary_key)
+        if len(pk_columns) != 1:
+            return False
+
+        pk_col = pk_columns[0].name
+        if pk_col != 'id':
+            return False
+
+        message = str(getattr(exc, 'orig', exc)).lower()
+        return ('_pkey' in message) and ('duplicate' in message or 'duplicar valor da chave' in message)
+
+    def _resync_pk_sequence(self) -> bool:
+        bind = db.session.get_bind()
+        if not bind or bind.dialect.name != 'postgresql':
+            return False
+
+        table_name = self.model.__table__.name
+        pk_col = self.model.__mapper__.primary_key[0].name
+
+        seq_name = db.session.execute(
+            text("SELECT pg_get_serial_sequence(:table_name, :pk_col)"),
+            {'table_name': table_name, 'pk_col': pk_col},
+        ).scalar()
+
+        if not seq_name:
+            return False
+
+        db.session.execute(
+            text(
+                f'SELECT setval(CAST(:seq_name AS regclass), '
+                f'COALESCE((SELECT MAX("{pk_col}") FROM "{table_name}"), 0) + 1, false)'
+            ),
+            {'seq_name': seq_name},
+        )
         db.session.commit()
-        return entity
+        return True
 
     def delete(self, entity: T) -> None:
         """Permanently removes an entity from the database.

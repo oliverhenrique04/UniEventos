@@ -7,7 +7,7 @@ import os
 
 from flask import Blueprint, jsonify, request, make_response, send_file, current_app
 from flask_login import current_user, login_required
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
@@ -170,6 +170,37 @@ def _get_or_create_category(nome):
     db.session.add(category)
     db.session.flush()
     return category
+
+
+def _resolve_recipient_user(email=None, cpf=None, username_hint=None, metadata=None):
+    metadata = metadata if isinstance(metadata, dict) else {}
+
+    normalized_cpf = (cpf or '').strip()
+    normalized_email = (email or '').strip().lower()
+    normalized_username = (username_hint or metadata.get('username') or '').strip()
+    normalized_ra = (metadata.get('ra') or '').strip()
+
+    if normalized_cpf:
+        user = User.query.filter_by(cpf=normalized_cpf).first()
+        if user:
+            return user
+
+    if normalized_email:
+        user = User.query.filter(func.lower(User.email) == normalized_email).first()
+        if user:
+            return user
+
+    if normalized_username:
+        user = User.query.filter_by(username=normalized_username).first()
+        if user:
+            return user
+
+    if normalized_ra:
+        user = User.query.filter_by(ra=normalized_ra).first()
+        if user:
+            return user
+
+    return None
 
 
 @bp.route('/<int:certificate_id>/users/search', methods=['GET'])
@@ -573,6 +604,8 @@ def list_recipients(certificate_id):
                 'nome': r.nome,
                 'email': r.email,
                 'cpf': r.cpf,
+                'user_username': r.user_username,
+                'linked_user_nome': r.linked_user.nome if r.linked_user else None,
                 'carga_horaria': _extract_recipient_metadata(r).get('carga_horaria'),
                 'curso_usuario': _extract_recipient_metadata(r).get('curso_usuario'),
                 'cert_hash': r.cert_hash,
@@ -608,6 +641,7 @@ def add_recipients(certificate_id):
         nome = (row.get('nome') or '').strip()
         email = (row.get('email') or '').strip().lower() or None
         cpf = (row.get('cpf') or '').strip() or None
+        username_hint = (row.get('username') or '').strip() or None
         metadata = row.get('metadata') or {}
         if not isinstance(metadata, dict):
             metadata = {}
@@ -616,6 +650,22 @@ def add_recipients(certificate_id):
         curso_usuario_raw = row.get('curso_usuario', metadata.get('curso_usuario'))
         carga_horaria = _normalize_workload_hours(carga_horaria_raw)
         curso_usuario = (str(curso_usuario_raw or '').strip() or None)
+
+        linked_user = _resolve_recipient_user(
+            email=email,
+            cpf=cpf,
+            username_hint=username_hint,
+            metadata=metadata,
+        )
+        if linked_user:
+            nome = nome or linked_user.nome or linked_user.username
+            email = email or (linked_user.email.lower() if linked_user.email else None)
+            cpf = cpf or linked_user.cpf
+            metadata = {
+                **metadata,
+                'username': metadata.get('username') or linked_user.username,
+                'ra': metadata.get('ra') or linked_user.ra,
+            }
 
         if not nome:
             skipped += 1
@@ -641,6 +691,7 @@ def add_recipients(certificate_id):
 
         recipient = InstitutionalCertificateRecipient(
             certificate_id=certificate_id,
+            user_username=linked_user.username if linked_user else None,
             nome=nome,
             email=email,
             cpf=cpf,
@@ -687,8 +738,20 @@ def import_recipients_csv(certificate_id):
         nome = normalized.get('nome', '')
         email = normalized.get('email', '').lower() or None
         cpf = normalized.get('cpf', '') or None
+        username_hint = normalized.get('username') or None
         carga_horaria = _normalize_workload_hours(normalized.get('carga_horaria'))
         curso_usuario = normalized.get('curso_usuario') or None
+
+        linked_user = _resolve_recipient_user(
+            email=email,
+            cpf=cpf,
+            username_hint=username_hint,
+            metadata=normalized,
+        )
+        if linked_user:
+            nome = nome or linked_user.nome or linked_user.username
+            email = email or (linked_user.email.lower() if linked_user.email else None)
+            cpf = cpf or linked_user.cpf
 
         if not nome:
             skipped += 1
@@ -714,10 +777,13 @@ def import_recipients_csv(certificate_id):
 
         recipient = InstitutionalCertificateRecipient(
             certificate_id=cert.id,
+            user_username=linked_user.username if linked_user else None,
             nome=nome,
             email=email,
             cpf=cpf,
             metadata_json=json.dumps({
+                'username': linked_user.username if linked_user else username_hint,
+                'ra': linked_user.ra if linked_user else normalized.get('ra') or None,
                 'carga_horaria': carga_horaria,
                 'curso_usuario': curso_usuario,
             }, ensure_ascii=False),

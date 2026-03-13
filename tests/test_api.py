@@ -1,6 +1,14 @@
 import json
 from datetime import date, time
-from app.models import Event
+from app.models import (
+    Event,
+    Activity,
+    Enrollment,
+    User,
+    InstitutionalCertificateCategory,
+    InstitutionalCertificate,
+    InstitutionalCertificateRecipient,
+)
 from app.extensions import db
 
 
@@ -22,6 +30,87 @@ def _create_event_for_certs(app, owner_username='admin_test'):
         db.session.add(event)
         db.session.commit()
         return event.id
+
+
+def _login_participant(client):
+    client.post('/api/login', json={'username': 'participant_test', 'password': '1234'})
+
+
+def _seed_profile_history_data(app):
+    with app.app_context():
+        participant = User(
+            username='participant_test',
+            role='participante',
+            nome='Participante Teste',
+            cpf='123.456.789-00',
+            email='participant@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+
+        category = InstitutionalCertificateCategory(nome='Extensao')
+        db.session.add(category)
+        db.session.flush()
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Perfil',
+            descricao='Teste de perfil',
+            tipo='PADRAO',
+            data_inicio=date(2030, 5, 10),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade Perfil',
+            palestrante='Docente',
+            local='Sala 1',
+            descricao='Atividade para timeline',
+            data_atv=date(2030, 5, 10),
+            hora_atv=time(10, 0),
+            carga_horaria=4,
+            vagas=100,
+        )
+        db.session.add(activity)
+        db.session.flush()
+
+        enrollment = Enrollment(
+            activity_id=activity.id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=True,
+            cert_hash='EVTHASH001',
+        )
+        db.session.add(enrollment)
+
+        inst_cert = InstitutionalCertificate(
+            created_by_username='admin_test',
+            titulo='Certificado Institucional Perfil',
+            category_id=category.id,
+            descricao='Teste',
+            data_emissao='2030-05-12',
+            signer_name='Coord. NUTED',
+            status='ENVIADO',
+        )
+        db.session.add(inst_cert)
+        db.session.flush()
+
+        inst_recipient = InstitutionalCertificateRecipient(
+            certificate_id=inst_cert.id,
+            user_username=participant.username,
+            nome=participant.nome,
+            email=participant.email,
+            cpf=participant.cpf,
+            metadata_json=json.dumps({'carga_horaria': '2'}),
+            cert_hash='INSTHASH001',
+            cert_entregue=True,
+        )
+        db.session.add(inst_recipient)
+
+        db.session.commit()
 
 def test_login_api(client, admin_user):
     res = client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
@@ -106,3 +195,48 @@ def test_upload_asset_requires_file(client, app, admin_user):
     res = client.post(f'/api/certificates/upload_asset/{event_id}', data={})
     assert res.status_code == 400
     assert 'Arquivo não enviado' in res.json['erro']
+
+
+def test_profile_stats_include_institutional_counts_and_hours(client, app, admin_user):
+    _seed_profile_history_data(app)
+    _login_participant(client)
+
+    res = client.get('/api/me/history?type=stats')
+    assert res.status_code == 200
+
+    payload = res.get_json()
+    assert payload['total_hours'] == 6
+    assert payload['total_events'] == 1
+    assert payload['total_institutional_certificates'] == 1
+
+
+def test_profile_timeline_merges_event_and_institutional_entries(client, app, admin_user):
+    _seed_profile_history_data(app)
+    _login_participant(client)
+
+    res = client.get('/api/me/history?type=activities&page=1')
+    assert res.status_code == 200
+
+    payload = res.get_json()
+    entry_types = {item.get('entry_type') for item in payload['items']}
+    assert 'evento' in entry_types
+    assert 'institucional' in entry_types
+
+
+def test_profile_certificates_return_public_download_and_preview_urls(client, app, admin_user):
+    _seed_profile_history_data(app)
+    _login_participant(client)
+
+    res = client.get('/api/me/history?type=certificates&page=1')
+    assert res.status_code == 200
+
+    payload = res.get_json()
+    assert payload['items']
+
+    event_item = next(item for item in payload['items'] if item.get('certificate_type') == 'evento')
+    inst_item = next(item for item in payload['items'] if item.get('certificate_type') == 'institucional')
+
+    assert event_item['download_url'].startswith('/api/certificates/download_public/')
+    assert event_item['preview_url'].startswith('/api/certificates/preview_public/')
+    assert inst_item['download_url'].startswith('/api/institutional_certificates/download_public/')
+    assert inst_item['preview_url'].startswith('/api/institutional_certificates/preview_public/')

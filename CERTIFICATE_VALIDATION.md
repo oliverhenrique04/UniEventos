@@ -9,7 +9,7 @@ O sistema de validação de certificados foi atualizado para suportar **ambos os
 ## 🔗 URL de Validação
 
 ```
-https://unieventos.local/validar/{HASH}
+https://EuroEventos.local/validar/{HASH}
 ```
 
 Onde `{HASH}` é o código de 16 caracteres impresso no certificado.
@@ -155,7 +155,7 @@ def validar_hash(cert_hash):
 
 1. **Gerar um certificado institucional** (via interface administrativa)
 2. **Obter o HASH** do certificado
-3. **Acessar**: `https://unieventos.local/validar/{HASH}`
+3. **Acessar**: `https://EuroEventos.local/validar/{HASH}`
 4. **Verificar**:
    - ✅ Badge amarelo aparece
    - ✅ Signatário é exibido
@@ -167,7 +167,7 @@ def validar_hash(cert_hash):
 
 1. **Gerar certificado de evento** (via sistema normal)
 2. **Obter o HASH** do certificado
-3. **Acessar**: `https://unieventos.local/validar/{HASH}`
+3. **Acessar**: `https://EuroEventos.local/validar/{HASH}`
 4. **Verificar**:
    - ✅ Badge padrão (verde)
    - ✅ Signatário NÃO aparece

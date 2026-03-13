@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Disponibilização de Certificado - {{ event_name }}</title>
+    <title>Certificado Emitido - {{ event_name }}</title>
 </head>
 
 <body>
@@ -13,7 +13,7 @@
         <!-- Título -->
         <tr>
             <td style="color: #1a202c; font-size: 24px; font-weight: bold; text-align: center;">
-                Certificado Disponibilizado
+                Certificado Emitido
             </td>
         </tr>
 
@@ -74,7 +74,7 @@
                 {% if view_certificate_url %}
                 <p style="margin: 15px 0 0 0; color: #718096; font-size: 14px;">
                     <a href="{{ view_certificate_url }}" style="color: #005A9C; text-decoration: none;">Visualizar certificado</a> • 
-                    <a href="{{ my_certificates_url }}" style="color: #005A9C; text-decoration: none;">Validar autenticidade</a>
+                    <a href="{{ my_certificates_url }}" style="color: #005A9C; text-decoration: none;">Acompanhar meus certificados</a>
                 </p>
                 {% endif %}
             </td>

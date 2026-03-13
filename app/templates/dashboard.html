@@ -635,7 +635,10 @@
     let intervaloQR = null;
     let atividadeAtualID = null;
     let EVENTO_SELECIONADO_ID = null;
+    const pendingEnrollmentActions = new Set();
     let CACHE_EVENTOS = [];
+    let eventosAlunoState = null;
+    let eventosAlunoLastQuery = '';
 
     document.addEventListener("DOMContentLoaded", () => {
         if (userRole === 'admin') carregarUsuarios();
@@ -1082,10 +1085,12 @@
 
         const qs = buildQuery(getFilters(page));
         const url = `/api/eventos?${qs}`;
+        eventosAlunoLastQuery = qs;
 
         const cached = eventosAlunoCache.get(qs);
         const now = Date.now();
         if (cached && (now - cached.ts) < CACHE_TTL_MS) {
+            eventosAlunoState = cached.data;
             renderEventosAluno(cached.data, div);
             return;
         }
@@ -1100,6 +1105,7 @@
             if (reqId !== eventosAlunoReqId) return;
 
             eventosAlunoCache.set(qs, { ts: now, data });
+            eventosAlunoState = data;
             renderEventosAluno(data, div);
         } catch (err) {
             if (err.name === 'AbortError') return;
@@ -1164,7 +1170,7 @@
               </div>
               ${vagasStatus}
             </div>
-            <button onclick="toggleInscricao(event, ${a.id}, '${acao}')" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;">
+                        <button onclick="toggleInscricao(event, ${a.id}, '${acao}')" data-atv-id="${a.id}" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;">
               ${btnText}
             </button>
           </div>
@@ -1211,11 +1217,18 @@
     }
 
     async function toggleInscricao(event, atvId, acao) {
+        if (pendingEnrollmentActions.has(atvId)) return;
+
         const btn = event.currentTarget;
         const originalHtml = btn.innerHTML;
+        pendingEnrollmentActions.add(atvId);
 
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        btn.disabled = true;
+        const activityButtons = document.querySelectorAll(`button[data-atv-id="${atvId}"]`);
+        activityButtons.forEach((b) => {
+            b.dataset.prevHtml = b.innerHTML;
+            b.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            b.disabled = true;
+        });
 
         try {
             const res = await fetch('/api/toggle_inscricao', {
@@ -1227,20 +1240,55 @@
             const json = await res.json();
 
             if (res.ok) {
-                // Mantém paginação atual: tenta ler página ativa, senão 1
-                const active = document.querySelector('#paginacaoAluno .page-item.active .page-link')?.innerText;
-                const page = Number(active) || 1;
-                carregarEventosAluno(page);
+                if (eventosAlunoState?.items?.length) {
+                    for (const ev of eventosAlunoState.items) {
+                        const atv = ev.atividades?.find((x) => x.id === atvId);
+                        if (!atv) continue;
+
+                        if (acao === 'inscrever' && !atv.inscrito) {
+                            atv.inscrito = true;
+                            atv.total_inscritos = Number(atv.total_inscritos || 0) + 1;
+                        } else if (acao === 'sair' && atv.inscrito) {
+                            atv.inscrito = false;
+                            atv.total_inscritos = Math.max(0, Number(atv.total_inscritos || 0) - 1);
+                        }
+                        break;
+                    }
+
+                    // Keep cache coherent for the current filter/page key.
+                    if (eventosAlunoLastQuery && eventosAlunoCache.has(eventosAlunoLastQuery)) {
+                        eventosAlunoCache.set(eventosAlunoLastQuery, {
+                            ts: Date.now(),
+                            data: eventosAlunoState,
+                        });
+                    }
+
+                    const div = document.getElementById('listaEventosAluno');
+                    if (div) renderEventosAluno(eventosAlunoState, div);
+                } else {
+                    // Fallback when there is no local state loaded.
+                    const active = document.querySelector('#paginacaoAluno .page-item.active .page-link')?.innerText;
+                    const page = Number(active) || 1;
+                    await carregarEventosAluno(page);
+                }
 
                 Toast.fire({ icon: 'success', title: json.mensagem });
             } else {
                 Swal.fire('Atenção', json.erro || json.mensagem || 'Falha ao atualizar inscrição.', 'warning');
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
             }
         } catch (e) {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
+            Swal.fire('Erro', 'Falha de comunicação ao atualizar inscrição.', 'error');
+        } finally {
+            pendingEnrollmentActions.delete(atvId);
+            activityButtons.forEach((b) => {
+                if (b.dataset.prevHtml) {
+                    b.innerHTML = b.dataset.prevHtml;
+                    delete b.dataset.prevHtml;
+                } else {
+                    b.innerHTML = originalHtml;
+                }
+                b.disabled = false;
+            });
         }
     }
 

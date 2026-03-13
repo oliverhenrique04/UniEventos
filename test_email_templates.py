@@ -20,14 +20,14 @@ def test_send_welcome_email():
     # Prepare message
     message = {
         'to': 'joao.teste@unieuro.edu.br',
-        'subject': 'Bem-vindo ao UniEventos!',
+        'subject': 'Bem-vindo ao EuroEventos!',
         'template_name': 'welcome.html',
         'template_data': {
             'user_name': 'João Teste',
             'email': 'joao.teste@unieuro.edu.br',
-            'app_url': 'https://unieventos.local',
+            'app_url': 'https://EuroEventos.local',
             'year': 2026,
-            'unsubscribe_url': 'https://unieventos.local/unsubscribe/',
+            'unsubscribe_url': 'https://EuroEventos.local/unsubscribe/',
         },
         'attachment': None
     }
@@ -72,9 +72,9 @@ def test_send_institutional_certificate():
             'signer_name': 'Prof. Dr. João Santos - Diretor do NUTED',
             'recipient_cpf': '123.456.789-00',
             'additional_info': 'Este certificado atesta a participação especial na comissão organizacional.',
-            'download_url': 'https://unieventos.local/institutional-certificates/download/123',
-            'preview_url': 'https://unieventos.local/institutional-certificates/preview/123',
-            'validation_url': 'https://unieventos.local/validate/INST-2026-005678',
+            'download_url': 'https://EuroEventos.local/institutional-certificates/download/123',
+            'preview_url': 'https://EuroEventos.local/institutional-certificates/preview/123',
+            'validation_url': 'https://EuroEventos.local/validate/INST-2026-005678',
         },
         'attachment': None
     }
@@ -95,7 +95,7 @@ def test_send_institutional_certificate():
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("UniEventos - Email Template Test")
+    print("EuroEventos - Email Template Test")
     print("=" * 60)
     
     try:
