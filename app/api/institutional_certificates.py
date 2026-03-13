@@ -347,10 +347,12 @@ def update_institutional_certificate(certificate_id):
 
     data = request.get_json(silent=True) or {}
 
-    titulo = (data.get('titulo') or cert.titulo).strip()
-    categoria = (data.get('categoria') or cert.categoria).strip()
-    data_emissao = (data.get('data_emissao') or cert.data_emissao).strip()
-    status = (data.get('status') or cert.status or 'RASCUNHO').strip().upper()
+    titulo = str(data.get('titulo', cert.titulo) or '').strip()
+    categoria = str(data.get('categoria', cert.categoria) or '').strip()
+    data_emissao = str(data.get('data_emissao', cert.data_emissao) or '').strip()
+    status = str(data.get('status', cert.status or 'RASCUNHO') or '').strip().upper()
+    descricao = str(data.get('descricao', cert.descricao) or '').strip()
+    signer_name = str(data.get('signer_name', cert.signer_name) or '').strip()
 
     if not titulo:
         return jsonify({'erro': 'Titulo e obrigatorio'}), 400
@@ -365,8 +367,8 @@ def update_institutional_certificate(certificate_id):
     cert.titulo = titulo
     cert.category_id = category.id
     cert.data_emissao = data_emissao
-    cert.descricao = (data.get('descricao') or cert.descricao or '').strip() or None
-    cert.signer_name = (data.get('signer_name') or cert.signer_name or '').strip() or None
+    cert.descricao = descricao or None
+    cert.signer_name = signer_name or None
     cert.status = status
 
     db.session.commit()

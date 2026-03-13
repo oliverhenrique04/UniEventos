@@ -67,6 +67,20 @@
     vertical-align: middle;
 }
 
+#tabelaDestinatarios tbody tr.row-missing-items > td {
+    background: #fff7ed;
+}
+
+#tabelaDestinatarios tbody tr.row-missing-items {
+    outline: 1px solid #fdba74;
+    outline-offset: -1px;
+}
+
+.missing-row-badge {
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+}
+
 .mini-help {
     font-size: 0.8rem;
     color: #64748b;
@@ -202,6 +216,56 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalEditarCertificado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header clean-modal-header">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2 text-primary"></i>Editar Certificado Institucional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarCertificado">
+                    <input type="hidden" name="id" id="edit_cert_id">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="small fw-bold">Titulo</label>
+                            <input type="text" class="form-control" name="titulo" id="edit_titulo" required>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="small fw-bold">Categoria</label>
+                            <input type="text" class="form-control" name="categoria" id="edit_categoria" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="small fw-bold">Data de emissao</label>
+                            <input type="date" class="form-control" name="data_emissao" id="edit_data_emissao" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold">Descricao</label>
+                            <textarea class="form-control" name="descricao" id="edit_descricao" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="small fw-bold">Assinante</label>
+                            <input type="text" class="form-control" name="signer_name" id="edit_signer_name" placeholder="Nome do responsavel">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="small fw-bold">Status</label>
+                            <select class="form-select" name="status" id="edit_status">
+                                <option value="RASCUNHO">Rascunho</option>
+                                <option value="ENVIADO">Enviado</option>
+                                <option value="ARQUIVADO">Arquivado</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer clean-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary px-4" id="btnSalvarEdicao">Salvar alteracoes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalDestinatarios" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
@@ -304,6 +368,10 @@
                             </div>
                         </div>
                     </div>
+                    <div class="mini-help mb-2">
+                        <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>
+                        Linhas destacadas indicam destinatarios com itens faltando (nome, e-mail, CPF, carga horaria ou curso).
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle" id="tabelaDestinatarios">
                             <thead>
@@ -377,6 +445,7 @@
 <script>
 const tabelaBody = document.querySelector('#tabelaInstitucionais tbody');
 const formNovo = document.getElementById('formNovoCertificado');
+const formEditar = document.getElementById('formEditarCertificado');
 const tabelaDestinatariosBody = document.querySelector('#tabelaDestinatarios tbody');
 let certificateIdAtivo = null;
 let paginaAtual = 1;
@@ -394,6 +463,7 @@ let recipientsDebounceTimer = null;
 let recipientsSortBy = 'id';
 let recipientsSortDir = 'desc';
 let previewDestinatarioModalInstance = null;
+let editarCertificadoModalInstance = null;
 
 function userSelectionKey(user) {
     if (!user) return '';
@@ -516,6 +586,47 @@ function updateRecipientsSortIndicators() {
     });
 }
 
+function _normalizeRecipientValue(value) {
+    return String(value || '').trim();
+}
+
+function recipientHasMissingItems({ nome, email, cpf, cargaHoraria, cursoUsuario }) {
+    return !(_normalizeRecipientValue(nome)
+        && _normalizeRecipientValue(email)
+        && _normalizeRecipientValue(cpf)
+        && _normalizeRecipientValue(cargaHoraria)
+        && _normalizeRecipientValue(cursoUsuario));
+}
+
+function updateRecipientRowHighlight(recipientId) {
+    const row = tabelaDestinatariosBody.querySelector(`tr[data-recipient-id="${recipientId}"]`);
+    if (!row) return;
+
+    const cargaInput = document.getElementById(`carga_${recipientId}`);
+    const cursoInput = document.getElementById(`curso_${recipientId}`);
+
+    const hasMissing = recipientHasMissingItems({
+        nome: row.dataset.hasNome === '1' ? 'ok' : '',
+        email: row.dataset.hasEmail === '1' ? 'ok' : '',
+        cpf: row.dataset.hasCpf === '1' ? 'ok' : '',
+        cargaHoraria: cargaInput?.value,
+        cursoUsuario: cursoInput?.value,
+    });
+
+    row.classList.toggle('row-missing-items', hasMissing);
+
+    const badge = row.querySelector('.missing-row-badge');
+    if (hasMissing && !badge) {
+        const firstCell = row.querySelector('td');
+        if (firstCell) {
+            firstCell.insertAdjacentHTML('beforeend', ' <span class="badge text-bg-warning text-dark ms-2 missing-row-badge">Incompleto</span>');
+        }
+    }
+    if (!hasMissing && badge) {
+        badge.remove();
+    }
+}
+
 function statusBadge(status) {
     if (status === 'ENVIADO') {
         return '<span class="badge bg-success-subtle text-success border border-success-subtle">ENVIADO</span>';
@@ -596,6 +707,7 @@ async function carregarCertificadosInstitucionais(page = 1) {
                 <div class="btn-group shadow-sm">
                     <button class="btn btn-sm btn-light border" onclick="abrirDestinatarios(${item.id})" title="Destinatarios"><i class="fa-solid fa-users text-primary"></i></button>
                     <button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Designer"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i></button>
+                    <button class="btn btn-sm btn-light border" onclick="abrirEdicaoCertificado(${item.id})" title="Editar"><i class="fa-solid fa-pen-to-square text-info"></i></button>
                     <button class="btn btn-sm btn-light border" onclick="enviarCertificado(${item.id}, this)" title="Enviar"><i class="fa-solid fa-paper-plane text-success"></i></button>
                     <button class="btn btn-sm btn-light border" onclick="duplicarCertificado(${item.id})" title="Duplicar"><i class="fa-regular fa-copy text-indigo-600"></i></button>
                     <button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir"><i class="fa-solid fa-trash-can text-danger"></i></button>
@@ -682,6 +794,55 @@ async function criarCertificadoInstitucional() {
         formNovo.reset();
         uiSuccess('Certificado institucional criado.');
         await carregarCertificadosInstitucionais(1);
+    } finally {
+        setButtonLoading(saveButton, false);
+    }
+}
+
+async function abrirEdicaoCertificado(id) {
+    const resp = await fetch(`/api/institutional_certificates/${id}`);
+    const data = await resp.json();
+    if (!resp.ok) {
+        uiError(data.erro || 'Falha ao carregar dados do certificado');
+        return;
+    }
+
+    document.getElementById('edit_cert_id').value = data.id || '';
+    document.getElementById('edit_titulo').value = data.titulo || '';
+    document.getElementById('edit_categoria').value = data.categoria || '';
+    document.getElementById('edit_data_emissao').value = data.data_emissao || '';
+    document.getElementById('edit_descricao').value = data.descricao || '';
+    document.getElementById('edit_signer_name').value = data.signer_name || '';
+    document.getElementById('edit_status').value = data.status || 'RASCUNHO';
+
+    if (!editarCertificadoModalInstance) {
+        editarCertificadoModalInstance = new bootstrap.Modal(document.getElementById('modalEditarCertificado'));
+    }
+    editarCertificadoModalInstance.show();
+}
+
+async function salvarEdicaoCertificado() {
+    const saveButton = document.getElementById('btnSalvarEdicao');
+    setButtonLoading(saveButton, true, 'Salvando...');
+    const payload = Object.fromEntries(new FormData(formEditar).entries());
+    const id = payload.id;
+    delete payload.id;
+
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            uiError(data.erro || 'Falha ao atualizar certificado');
+            return;
+        }
+
+        uiSuccess(data.mensagem || 'Certificado atualizado com sucesso.');
+        if (editarCertificadoModalInstance) editarCertificadoModalInstance.hide();
+        await carregarCertificadosInstitucionais(paginaAtual);
     } finally {
         setButtonLoading(saveButton, false);
     }
@@ -825,9 +986,20 @@ async function carregarDestinatarios(id, page = 1) {
         tabelaDestinatariosBody.innerHTML = '<tr><td colspan="13" class="text-muted text-center py-4"><i class="fa-regular fa-address-book me-2"></i>Nenhum destinatario cadastrado.</td></tr>';
         return;
     }
-    tabelaDestinatariosBody.innerHTML = items.map(item => `
-        <tr>
-            <td>${item.nome || ''}</td>
+    tabelaDestinatariosBody.innerHTML = items.map(item => {
+        const nomeMissing = !_normalizeRecipientValue(item.nome);
+        const emailMissing = !_normalizeRecipientValue(item.email);
+        const cpfMissing = !_normalizeRecipientValue(item.cpf);
+        const hasMissing = recipientHasMissingItems({
+            nome: item.nome,
+            email: item.email,
+            cpf: item.cpf,
+            cargaHoraria: item.carga_horaria,
+            cursoUsuario: item.curso_usuario,
+        });
+        return `
+        <tr data-recipient-id="${item.id}" data-has-nome="${nomeMissing ? '0' : '1'}" data-has-email="${emailMissing ? '0' : '1'}" data-has-cpf="${cpfMissing ? '0' : '1'}" class="${hasMissing ? 'row-missing-items' : ''}">
+            <td>${item.nome || ''}${hasMissing ? ' <span class="badge text-bg-warning text-dark ms-2 missing-row-badge">Incompleto</span>' : ''}</td>
             <td>${item.email || '-'}</td>
             <td>${item.cpf || '-'}</td>
             <td><input type="text" class="form-control form-control-sm" id="carga_${item.id}" value="${item.carga_horaria || ''}" placeholder="Ex.: 20"></td>
@@ -861,7 +1033,8 @@ async function carregarDestinatarios(id, page = 1) {
                 </button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 async function salvarDadosDestinatario(recipientId, buttonEl = null) {
@@ -889,6 +1062,7 @@ async function salvarDadosDestinatario(recipientId, buttonEl = null) {
         uiSuccess(data.mensagem || 'Dados do destinatario atualizados.');
         if (cargaInput) cargaInput.value = data.recipient?.carga_horaria || '';
         if (cursoInput) cursoInput.value = data.recipient?.curso_usuario || '';
+        updateRecipientRowHighlight(recipientId);
     } finally {
         setButtonLoading(buttonEl, false);
     }
@@ -1162,6 +1336,7 @@ document.getElementById('modalPreviewDestinatario').addEventListener('hidden.bs.
 });
 
 document.getElementById('btnSalvarNovo').addEventListener('click', criarCertificadoInstitucional);
+document.getElementById('btnSalvarEdicao').addEventListener('click', salvarEdicaoCertificado);
 document.getElementById('btnAdicionarDestinatarios').addEventListener('click', adicionarDestinatarios);
 document.getElementById('btnImportarCsv').addEventListener('click', importarDestinatariosCsv);
 document.getElementById('btnExportarCsv').addEventListener('click', exportarDestinatariosCsv);
@@ -1251,6 +1426,14 @@ document.querySelectorAll('.sort-destinatarios').forEach((button) => {
         }
         carregarDestinatarios(certificateIdAtivo, 1);
     });
+});
+tabelaDestinatariosBody.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.id || (!target.id.startsWith('carga_') && !target.id.startsWith('curso_'))) return;
+    const recipientId = Number(target.id.split('_')[1]);
+    if (!Number.isFinite(recipientId)) return;
+    updateRecipientRowHighlight(recipientId);
 });
 resetUserSearchState();
 updateRecipientsSortIndicators();
