@@ -292,6 +292,25 @@
         padding: 2px 10px;
         border-radius: 999px;
     }
+
+    .preview-modal-canvas-wrap {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #f8fafc;
+        padding: 12px;
+        overflow: auto;
+    }
+
+    #previewPdfFrame {
+        border-radius: 8px;
+        box-shadow: 0 20px 40px -14px rgba(15, 23, 42, 0.35);
+        background: #fff;
+        width: 100%;
+        max-width: 100%;
+        aspect-ratio: 297 / 210;
+        height: auto;
+        border: none;
+    }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jodit@3/build/jodit.min.css">
 {% endblock %}
@@ -317,6 +336,7 @@
             <button onclick="undoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-left me-1"></i> Undo</button>
             <button onclick="redoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-right me-1"></i> Redo</button>
             <button onclick="resetarLayout()" class="btn btn-light border">Limpar Tudo</button>
+            <button onclick="openCertificatePreview()" class="btn btn-outline-secondary"><i class="fa-solid fa-eye me-1"></i> Preview</button>
             <button onclick="salvarConfiguracao()" class="btn btn-primary shadow-sm px-4">Salvar Layout</button>
             <button onclick="confirmarEnvioLote()" class="btn btn-dark shadow-sm px-4">Enviar em Lote</button>
         </div>
@@ -387,7 +407,7 @@
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">{{HORAS}} — Horas</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">{{DATA}} — Data</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">{{CPF}} — CPF</a></li>
-                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HASH}}', event)">{{HASH}} — Hash</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{ '{{HASH}}' }}', event)">{{ '{{HASH}}' }} — Hash</a></li>
                     </ul>
                 </div>
             </div>
@@ -470,7 +490,7 @@
                         <div class="fw-bold text-primary small">{{ '{{DATA}}' }}</div>
                         <div class="text-muted x-small">Data de Emissão</div>
                     </div>
-                    <div class="variable-guide-item" onclick="injectVar('{{HASH}}')">
+                    <div class="variable-guide-item" onclick="injectVar('{{ '{{HASH}}' }}')">
                         <div class="fw-bold text-primary small">{{ '{{HASH}}' }}</div>
                         <div class="text-muted x-small">Código de Validação</div>
                     </div>
@@ -503,6 +523,40 @@
                     </div>
                 </div>
                 <div id="elements-list" class="list-group list-group-flush small"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== Certificate Preview Modal ====== -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen-lg-down modal-xl">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-1">
+                <h5 class="modal-title fw-bold" id="previewModalLabel">
+                    <i class="fa-solid fa-eye text-primary me-2"></i>Preview do Certificado
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <div class="row g-3">
+                    <div class="col-lg-9">
+                        <div class="preview-modal-canvas-wrap">
+                            <iframe id="previewPdfFrame" src="" title="Preview PDF do certificado"></iframe>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="glass-panel p-3 h-100">
+                            <h6 class="fw-bold mb-3">Dados Simulados</h6>
+                            <div id="previewDataList" class="small text-slate-700"></div>
+                            <div class="d-grid mt-3">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="regenerateCertificatePreview()">
+                                    <i class="fa-solid fa-shuffle me-1"></i>Gerar Novos Dados
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -549,6 +603,7 @@
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jodit@3/build/jodit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
     const eventId = {{ event.id }};
     const toolbar = document.getElementById('floatingToolbar');
@@ -556,9 +611,21 @@
     const guideH = document.getElementById('guideH');
     const persistedTemplateRaw = {{ (event.cert_template_json or '')|tojson }};
 
+    const A4_LANDSCAPE_MM = { w: 297, h: 210 };
     const W = 1000;
-    const H = 707;
+    const H = Math.round(W * (A4_LANDSCAPE_MM.h / A4_LANDSCAPE_MM.w));
     const MAX_HISTORY = 60;
+    const TAG_NOME = "{{ '{{NOME}}' }}";
+    const TAG_CPF = "{{ '{{CPF}}' }}";
+    const TAG_EVENTO = "{{ '{{EVENTO}}' }}";
+    const TAG_HORAS = "{{ '{{HORAS}}' }}";
+    const TAG_DATA = "{{ '{{DATA}}' }}";
+    const HASH_TAG = "{{ '{{HASH}}' }}";
+    const HASH_ONE_LINE_SAMPLE = 'AAAAAAAAAAAAAAAA';
+    const HASH_DEFAULT_FONT_SIZE = 16;
+    const todayDateLabel = new Date().toLocaleDateString('pt-BR');
+    const defaultFixedDateText = `Data de Emissão: ${todayDateLabel}`;
+    const HASH_QR_GAP_PCT = 1.2;
 
     const defaultTemplate = {
         version: 2,
@@ -567,10 +634,13 @@
         elements: [
             { id: 'txt1', type: 'text', text: 'CERTIFICADO DE PARTICIPAÇÃO', x: 50, y: 20, w: 80, h: 8, font: 34, color: '#1e293b', align: 'center', bold: true, italic: false, font_family: 'Helvetica', zIndex: 1, locked: false, visible: true },
             { id: 'txt2', type: 'text', text: 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.', x: 50, y: 50, w: 82, h: 24, font: 22, color: '#334155', align: 'center', bold: false, italic: false, font_family: 'Helvetica', zIndex: 2, locked: false, visible: true },
-            { id: 'hash', type: 'text', text: 'Código de Validação: {{HASH}}', x: 50, y: 92, w: 60, h: 5, font: 11, color: '#94a3b8', align: 'center', bold: false, italic: false, font_family: 'Courier', zIndex: 3, locked: false, visible: true },
-            { id: 'qrcode', type: 'qr', x: 88, y: 88, w: 12, h: 12, size: 80, zIndex: 4, locked: false, visible: true }
+            { id: 'date_fixed', type: 'text', text: defaultFixedDateText, x: 50, y: 97, w: 70, h: 4, font: 11, color: '#64748b', align: 'center', bold: false, italic: false, font_family: 'Helvetica', zIndex: 3, locked: false, visible: true },
+            { id: 'hash', type: 'text', text: HASH_TAG, x: 88, y: 95, w: 12, h: 4, font: HASH_DEFAULT_FONT_SIZE, color: '#94a3b8', align: 'left', bold: false, italic: false, font_family: 'Courier', zIndex: 4, locked: false, visible: true },
+            { id: 'qrcode', type: 'qr', x: 88, y: 88, w: 12, h: 12, size: 80, zIndex: 5, locked: false, visible: true }
         ]
     };
+
+    const FIXED_ELEMENT_IDS = ['qrcode', 'hash', 'date_fixed'];
 
     let template = JSON.parse(JSON.stringify(defaultTemplate));
     let designer = null;
@@ -584,6 +654,9 @@
     let joditInstance = null;
     let joditTargetObj = null;
     let _joditPendingContent = '';
+    let previewDesigner = null;
+    let previewData = null;
+    let previewPdfUrl = null;
 
     function generateId(prefix) {
         return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -625,6 +698,70 @@
         obj.setCoords();
     }
 
+    function forceHashRules(hashObj) {
+        if (!hashObj || hashObj.data?.id !== 'hash') return;
+        hashObj.data.text = HASH_TAG;
+        hashObj.data.align = 'left';
+        hashObj.data.font_family = hashObj.data.font_family || 'Courier';
+        hashObj.data.baseFontSize = HASH_DEFAULT_FONT_SIZE;
+        hashObj.data.color = hashObj.data.color || '#94a3b8';
+        hashObj.data.is_html = false;
+        hashObj.data.html_content = null;
+        hashObj.data.autoFit = false;
+
+        hashObj.set({
+            text: HASH_TAG,
+            textAlign: 'left',
+            fontFamily: hashObj.data.font_family,
+            fontSize: HASH_DEFAULT_FONT_SIZE,
+            fill: hashObj.data.color
+        });
+    }
+
+    function alignHashWithQr(forceRender = true) {
+        if (!designer) return;
+        const qrObj = designer.getObjects().find((o) => o.data?.id === 'qrcode');
+        const hashObj = designer.getObjects().find((o) => o.data?.id === 'hash');
+        if (!qrObj || !hashObj) return;
+
+        forceHashRules(hashObj);
+
+        const qrBounds = qrObj.getBoundingRect(true, true);
+        const hashHeight = Math.max(12, Number(hashObj.data?.blockHeight || hashObj.height || 24));
+        const gapPx = pctToPxY(HASH_QR_GAP_PCT);
+        const hashLeft = qrBounds.left;
+        const hashTop = qrBounds.top + qrBounds.height + gapPx + (hashHeight / 2);
+
+        const ctx = designer.getContext();
+        let measuredWidth = 160;
+        if (ctx) {
+            ctx.save();
+            ctx.font = `${HASH_DEFAULT_FONT_SIZE}px ${hashObj.data?.font_family || 'Courier'}`;
+            measuredWidth = Math.max(
+                ctx.measureText(HASH_TAG).width,
+                ctx.measureText(HASH_ONE_LINE_SAMPLE).width
+            ) + 24;
+            ctx.restore();
+        }
+
+        hashObj.data.blockWidth = Math.max(40, qrBounds.width, measuredWidth);
+        hashObj.data.blockHeight = Math.max(12, hashHeight);
+
+        hashObj.set({
+            left: hashLeft + (hashObj.data.blockWidth / 2),
+            top: hashTop,
+            width: hashObj.data.blockWidth,
+            originX: 'center',
+            originY: 'center',
+            scaleX: 1,
+            scaleY: 1
+        });
+
+        hashObj.setCoords();
+        clampTextObjectIntoCanvas(hashObj);
+        if (forceRender) designer.requestRenderAll();
+    }
+
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -636,6 +773,323 @@
 
     function plainTextToHtml(value) {
         return escapeHtml(value || '').replace(/\r?\n/g, '<br>');
+    }
+
+    function applyTagsToText(text, tags) {
+        let out = String(text || '');
+        Object.entries(tags || {}).forEach(([tag, value]) => {
+            out = out.split(tag).join(String(value));
+        });
+        return out;
+    }
+
+    function applyTagsToHtml(html, tags) {
+        return applyTagsToText(String(html || ''), tags);
+    }
+
+    function htmlToPreviewText(htmlStr) {
+        const html = String(htmlStr || '');
+        const normalized = html
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<\/div>/gi, '\n')
+            .replace(/<li[^>]*>/gi, '• ')
+            .replace(/<\/li>/gi, '\n');
+        return stripHtml(normalized).replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function buildLiveSnapshotForPreview() {
+        const snapshot = exportTemplate();
+        const modalEl = document.getElementById('joditModal');
+
+        if (!modalEl || !modalEl.classList.contains('show') || !joditInstance || !joditTargetObj?.data?.id) {
+            return snapshot;
+        }
+
+        const targetId = joditTargetObj.data.id;
+        const pendingHtml = String(joditInstance.value || '');
+        const pendingText = htmlToPreviewText(pendingHtml);
+        const target = (snapshot.elements || []).find((el) => el.id === targetId);
+
+        if (target && target.type === 'text' && target.id !== 'hash') {
+            target.is_html = true;
+            target.html_content = pendingHtml;
+            target.text = pendingText;
+        }
+
+        return snapshot;
+    }
+
+    function randomHash16() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let out = '';
+        for (let i = 0; i < 16; i += 1) {
+            out += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return out;
+    }
+
+    function buildRandomPreviewData() {
+        const nomes = [
+            'Ana Beatriz Souza Lima',
+            'Carlos Eduardo Martins Silva',
+            'Fernanda Alves de Oliveira',
+            'Lucas Henrique Pereira Costa',
+            'Mariana Fernandes Rocha'
+        ];
+        const eventos = [
+            '{{ event.nome }}',
+            'Semana Acadêmica de Tecnologia',
+            'Simpósio de Inovação e Pesquisa',
+            'Jornada de Extensão Universitária'
+        ].filter(Boolean);
+        const name = nomes[Math.floor(Math.random() * nomes.length)];
+        const evento = eventos[Math.floor(Math.random() * eventos.length)];
+        const horas = `${8 + Math.floor(Math.random() * 33)} horas`;
+        const cpfNum = `${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}-${Math.floor(10 + Math.random() * 90)}`;
+        const data = new Date().toLocaleDateString('pt-BR');
+        const hash = randomHash16();
+
+        return {
+            [TAG_NOME]: name,
+            [TAG_EVENTO]: evento,
+            [TAG_HORAS]: horas,
+            [TAG_DATA]: data,
+            [TAG_CPF]: cpfNum,
+            [HASH_TAG]: hash
+        };
+    }
+
+    function updatePreviewDataPanel(tags) {
+        const list = document.getElementById('previewDataList');
+        if (!list) return;
+        const rows = [
+            [TAG_NOME, tags[TAG_NOME]],
+            [TAG_CPF, tags[TAG_CPF]],
+            [TAG_EVENTO, tags[TAG_EVENTO]],
+            [TAG_HORAS, tags[TAG_HORAS]],
+            [TAG_DATA, tags[TAG_DATA]],
+            [HASH_TAG, tags[HASH_TAG]]
+        ];
+        list.innerHTML = rows
+            .map(([k, v]) => `<div class="mb-2"><div class="text-muted x-small">${escapeHtml(k)}</div><div class="fw-semibold">${escapeHtml(v)}</div></div>`)
+            .join('');
+    }
+
+    async function renderCertificatePreview() {
+        const pdfFrame = document.getElementById('previewPdfFrame');
+        if (!pdfFrame) return;
+
+        if (previewDesigner) {
+            previewDesigner.dispose();
+        }
+
+        const previewBufferCanvas = document.createElement('canvas');
+        previewBufferCanvas.width = W;
+        previewBufferCanvas.height = H;
+
+        previewDesigner = new fabric.StaticCanvas(previewBufferCanvas, {
+            width: W,
+            height: H,
+            selection: false,
+            renderOnAddRemove: false
+        });
+
+        const snapshot = buildLiveSnapshotForPreview();
+        const tags = previewData || buildRandomPreviewData();
+        previewData = tags;
+        updatePreviewDataPanel(tags);
+
+        if (designer?.backgroundImage) {
+            await new Promise((resolve) => {
+                designer.backgroundImage.clone((clonedBg) => {
+                    previewDesigner.setBackgroundImage(clonedBg, resolve);
+                });
+            });
+        } else if (snapshot.bg) {
+            const bgUrl = snapshot.bg.startsWith('/') ? snapshot.bg : `/static/${snapshot.bg}`;
+            await new Promise((resolve) => {
+                fabric.Image.fromURL(bgUrl, (img) => {
+                    if (!img) return resolve();
+                    const scale = Math.min(W / img.width, H / img.height);
+                    img.scale(scale);
+                    previewDesigner.setBackgroundImage(img, resolve);
+                }, { crossOrigin: 'anonymous' });
+            });
+        }
+
+        const pendingTextById = {};
+        const modalEl = document.getElementById('joditModal');
+        if (modalEl && modalEl.classList.contains('show') && joditInstance && joditTargetObj?.data?.id) {
+            pendingTextById[joditTargetObj.data.id] = htmlToPreviewText(joditInstance.value || '');
+        }
+
+        const liveObjects = (designer?.getObjects() || [])
+            .filter((o) => !o.data?.isGrid && o.visible !== false);
+
+        const loaders = liveObjects.map((obj) => {
+            if (obj.data?.id === 'qrcode' || obj.data?.type === 'qr') {
+                return new Promise((resolve) => {
+                    const qrious = new QRious({
+                        value: `{{ request.host_url if request else '' }}validar/${tags[HASH_TAG]}`,
+                        size: 180,
+                        level: 'H'
+                    });
+                    fabric.Image.fromURL(qrious.toDataURL(), (img) => {
+                        if (!img) return resolve();
+                        img.set({
+                            left: obj.left,
+                            top: obj.top,
+                            originX: obj.originX,
+                            originY: obj.originY,
+                            scaleX: obj.scaleX,
+                            scaleY: obj.scaleY,
+                            angle: obj.angle,
+                            flipX: obj.flipX,
+                            flipY: obj.flipY,
+                            opacity: obj.opacity,
+                            selectable: false,
+                            evented: false
+                        });
+                        previewDesigner.add(img);
+                        resolve();
+                    });
+                });
+            }
+
+            if (obj.type === 'image') {
+                return new Promise((resolve) => {
+                    const src = obj.getSrc ? obj.getSrc() : (obj.data?.src ? (obj.data.src.startsWith('/') ? obj.data.src : `/static/${obj.data.src}`) : null);
+                    if (!src) return resolve();
+                    fabric.Image.fromURL(src, (img) => {
+                        if (!img) return resolve();
+                        img.set({
+                            left: obj.left,
+                            top: obj.top,
+                            originX: obj.originX,
+                            originY: obj.originY,
+                            scaleX: obj.scaleX,
+                            scaleY: obj.scaleY,
+                            angle: obj.angle,
+                            flipX: obj.flipX,
+                            flipY: obj.flipY,
+                            opacity: obj.opacity,
+                            selectable: false,
+                            evented: false
+                        });
+                        previewDesigner.add(img);
+                        resolve();
+                    }, { crossOrigin: 'anonymous' });
+                });
+            }
+
+            if (obj.data?.type === 'text' || obj.type === 'textbox' || obj.type === 'i-text') {
+                const objectId = obj.data?.id;
+                const pendingText = objectId ? pendingTextById[objectId] : null;
+                const pendingHtml = (modalEl && modalEl.classList.contains('show') && joditInstance && joditTargetObj?.data?.id === objectId)
+                    ? String(joditInstance.value || '')
+                    : null;
+                const htmlSource = pendingHtml || (obj.data?.is_html ? (obj.data?.html_content || null) : null);
+
+                let renderedText = ' ';
+                let renderedStyles = {};
+                let renderedAlign = obj.textAlign || obj.data?.align || 'center';
+
+                if (htmlSource) {
+                    const htmlWithTags = applyTagsToHtml(htmlSource, tags);
+                    const richPreview = buildFabricTextPreview(htmlWithTags, {
+                        fontFamily: obj.data?.font_family || obj.fontFamily || 'Helvetica',
+                        fontSize: obj.data?.baseFontSize || obj.fontSize || 20,
+                        color: obj.data?.color || obj.fill || '#000000',
+                        align: obj.data?.align || obj.textAlign || 'center',
+                        bold: obj.fontWeight === 'bold',
+                        italic: obj.fontStyle === 'italic'
+                    });
+                    renderedText = richPreview.text || ' ';
+                    renderedStyles = richPreview.styles || {};
+                    renderedAlign = richPreview.textAlign || renderedAlign;
+                } else {
+                    const sourceText = pendingText || obj.data?.text || obj.text || '';
+                    renderedText = applyTagsToText(sourceText, tags) || ' ';
+                    renderedStyles = obj.styles || {};
+                }
+
+                const textObj = new fabric.Textbox(renderedText, {
+                    left: obj.left,
+                    top: obj.top,
+                    originX: obj.originX,
+                    originY: obj.originY,
+                    width: obj.width,
+                    scaleX: obj.scaleX,
+                    scaleY: obj.scaleY,
+                    angle: obj.angle,
+                    flipX: obj.flipX,
+                    flipY: obj.flipY,
+                    opacity: obj.opacity,
+                    fontSize: obj.fontSize,
+                    fill: obj.fill,
+                    textAlign: renderedAlign,
+                    fontStyle: obj.fontStyle,
+                    fontWeight: obj.fontWeight,
+                    fontFamily: obj.fontFamily,
+                    styles: renderedStyles,
+                    lineHeight: obj.lineHeight,
+                    charSpacing: obj.charSpacing,
+                    selectable: false,
+                    evented: false
+                });
+                previewDesigner.add(textObj);
+            }
+
+            return Promise.resolve();
+        });
+
+        await Promise.all(loaders);
+        previewDesigner.requestRenderAll();
+
+        const renderedImage = previewDesigner.toDataURL({
+            format: 'png',
+            multiplier: 2
+        });
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+        });
+        pdf.addImage(renderedImage, 'PNG', 0, 0, A4_LANDSCAPE_MM.w, A4_LANDSCAPE_MM.h, undefined, 'FAST');
+
+        if (previewPdfUrl) {
+            URL.revokeObjectURL(previewPdfUrl);
+        }
+        previewPdfUrl = URL.createObjectURL(pdf.output('blob'));
+        pdfFrame.src = previewPdfUrl;
+    }
+
+    function regenerateCertificatePreview() {
+        previewData = buildRandomPreviewData();
+        renderCertificatePreview();
+    }
+
+    function openCertificatePreview() {
+        const modalEl = document.getElementById('previewModal');
+        previewData = buildRandomPreviewData();
+        modalEl.addEventListener('hidden.bs.modal', function disposePreviewPdf() {
+            modalEl.removeEventListener('hidden.bs.modal', disposePreviewPdf);
+            const pdfFrame = document.getElementById('previewPdfFrame');
+            if (pdfFrame) pdfFrame.src = '';
+            if (previewPdfUrl) {
+                URL.revokeObjectURL(previewPdfUrl);
+                previewPdfUrl = null;
+            }
+        });
+        modalEl.addEventListener('shown.bs.modal', function handler() {
+            modalEl.removeEventListener('shown.bs.modal', handler);
+            renderCertificatePreview();
+        });
+        (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
     }
 
     function compactFabricStyle(style, fallback) {
@@ -951,6 +1405,12 @@
         const selected = getActiveObjects();
         if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
 
+        if (selected[0].data?.id === 'hash') {
+            forceHashRules(selected[0]);
+            alignHashWithQr();
+            return;
+        }
+
         const widthInput = document.getElementById('blockWidthInput');
         const heightInput = document.getElementById('blockHeightInput');
         const wPct = Number(widthInput?.value);
@@ -993,24 +1453,24 @@
             out.elements = raw.elements.map((el, idx) => ({
                 id: el.id || generateId('el'),
                 type: el.type || (el.src ? 'image' : 'text'),
-                text: el.text || '',
+                text: el.id === 'hash' ? HASH_TAG : (el.text || ''),
                 src: el.src,
                 x: Number(el.x ?? 50),
                 y: Number(el.y ?? 50),
                 w: Number(el.w ?? 20),
                 h: Number(el.h ?? 8),
-                font: Number(el.font ?? 20),
+                font: el.id === 'hash' ? HASH_DEFAULT_FONT_SIZE : Number(el.font ?? 20),
                 color: el.color || '#000000',
-                align: el.align || 'center',
+                align: el.id === 'hash' ? 'left' : (el.align || 'center'),
                 bold: !!el.bold,
                 italic: !!el.italic,
                 font_family: el.font_family || 'Helvetica',
                 text_styles: el.text_styles || {},
-                is_html: !!el.is_html,
-                html_content: el.html_content || null,
+                is_html: el.id === 'hash' ? false : !!el.is_html,
+                html_content: el.id === 'hash' ? null : (el.html_content || null),
                 size: Number(el.size ?? 80),
                 zIndex: Number(el.zIndex ?? idx + 1),
-                locked: ['qrcode', 'hash'].includes(el.id) ? false : !!el.locked,
+                locked: FIXED_ELEMENT_IDS.includes(el.id) ? false : !!el.locked,
                 visible: el.visible !== false
             }));
         } else if (raw.elements === undefined) {
@@ -1035,30 +1495,42 @@
                     return {
                         id: key,
                         type: el.type || (el.src ? 'image' : 'text'),
-                        text: el.text || '',
+                        text: key === 'hash' ? HASH_TAG : (el.text || ''),
                         src: el.src,
                         x: Number(el.x ?? 50),
                         y: Number(el.y ?? 50),
                         w: Number(el.w ?? 20),
                         h: Number(el.h ?? 8),
-                        font: Number(el.font ?? 20),
+                        font: key === 'hash' ? HASH_DEFAULT_FONT_SIZE : Number(el.font ?? 20),
                         color: el.color || '#000000',
-                        align: el.align || 'center',
+                        align: key === 'hash' ? 'left' : (el.align || 'center'),
                         bold: !!el.bold,
                         italic: !!el.italic,
                         font_family: el.font_family || 'Helvetica',
                         text_styles: el.text_styles || {},
-                        is_html: !!el.is_html,
-                        html_content: el.html_content || null,
+                        is_html: key === 'hash' ? false : !!el.is_html,
+                        html_content: key === 'hash' ? null : (el.html_content || null),
                         zIndex: Number(el.zIndex ?? idx + 1),
-                        locked: ['qrcode', 'hash'].includes(key) ? false : !!el.locked,
+                        locked: FIXED_ELEMENT_IDS.includes(key) ? false : !!el.locked,
                         visible: el.visible !== false
                     };
                 });
             }
         }
 
+        // Ensure critical validation and date elements always exist, including legacy templates.
+        const requiredById = new Map(defaultTemplate.elements.map((el) => [el.id, JSON.parse(JSON.stringify(el))]));
+        const existingIds = new Set((out.elements || []).map((el) => el.id));
+        FIXED_ELEMENT_IDS.forEach((id) => {
+            if (!existingIds.has(id) && requiredById.has(id)) {
+                out.elements.push(requiredById.get(id));
+            }
+        });
+
         out.elements.sort((a, b) => a.zIndex - b.zIndex);
+        out.elements.forEach((el, idx) => {
+            el.zIndex = idx + 1;
+        });
         return out;
     }
 
@@ -1261,6 +1733,10 @@
                     blockHeight: pctToPxY(el.h),
                     autoFit: el.auto_fit !== false
                 };
+                if (el.id === 'hash') {
+                    txt.data.autoFit = false;
+                    forceHashRules(txt);
+                }
                 if (txt.data.autoFit) {
                     fitTextToBlock(txt);
                 }
@@ -1270,7 +1746,7 @@
 
             if (el.type === 'qr') {
                 const qrious = new QRious({
-                    value: `{{ request.host_url if request else '' }}validar/{{HASH}}`,
+                    value: `{{ request.host_url if request else '' }}validar/${HASH_TAG}`,
                     size: 180,
                     level: 'H'
                 });
@@ -1320,6 +1796,7 @@
         };
 
         template.elements.forEach(addObjectFromTemplate);
+        alignHashWithQr(false);
         updateElementsList();
         syncControlsFromTemplate();
         isHydrating = false;
@@ -1462,7 +1939,8 @@
             { label: '{{EVENTO}}', ok: allText.includes('{{EVENTO}}') },
             { label: '{{HORAS}}', ok: allText.includes('{{HORAS}}') },
             { label: '{{DATA}}', ok: allText.includes('{{DATA}}') },
-            { label: '{{HASH}}', ok: allText.includes('{{HASH}}') },
+            { label: HASH_TAG, ok: allText.includes(HASH_TAG) },
+            { label: 'Item fixo DATA', ok: snapshot.elements.some((el) => el.id === 'date_fixed') },
             { label: 'QRCode', ok: hasQR }
         ];
 
@@ -1684,6 +2162,10 @@
             Toast.fire({ icon: 'warning', title: 'Selecione um elemento de texto primeiro' });
             return;
         }
+        if (selected[0].data?.id === 'hash') {
+            Toast.fire({ icon: 'info', title: `O item HASH é fixo: ${HASH_TAG}` });
+            return;
+        }
         joditTargetObj = selected[0];
         _joditPendingContent = joditTargetObj.data?.html_content || joditTargetObj.text || '';
 
@@ -1727,6 +2209,16 @@
 
     function saveJoditContent() {
         if (!joditInstance || !joditTargetObj) return;
+
+        if (joditTargetObj.data?.id === 'hash') {
+            forceHashRules(joditTargetObj);
+            alignHashWithQr();
+            const instFixed = bootstrap.Modal.getInstance(document.getElementById('joditModal'));
+            if (instFixed) instFixed.hide();
+            joditTargetObj = null;
+            return;
+        }
+
         pushHistory();
         const htmlContent = joditInstance.value;
 
@@ -1811,6 +2303,11 @@
     function setStyle(prop, val) {
         const selected = getActiveObjects();
         if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
+        if (selected[0].data?.id === 'hash') {
+            forceHashRules(selected[0]);
+            alignHashWithQr();
+            return;
+        }
         pushHistory();
 
         const obj = selected[0];
@@ -1841,6 +2338,11 @@
     function toggleStyle(style) {
         const selected = getActiveObjects();
         if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
+        if (selected[0].data?.id === 'hash') {
+            forceHashRules(selected[0]);
+            alignHashWithQr();
+            return;
+        }
         pushHistory();
         const obj = selected[0];
 
@@ -1871,9 +2373,9 @@
         const selected = getActiveObjects();
         if (!selected.length) return;
 
-        const blocked = selected.find((o) => ['qrcode', 'hash'].includes(o.data?.id));
+        const blocked = selected.find((o) => FIXED_ELEMENT_IDS.includes(o.data?.id));
         if (blocked) {
-            Toast.fire({ icon: 'warning', title: 'Hash e QR são obrigatórios para validação' });
+            Toast.fire({ icon: 'warning', title: 'Data, hash e QR são obrigatórios para validação' });
             return;
         }
 
@@ -1891,10 +2393,13 @@
         pushHistory();
 
         selected.forEach((obj) => {
-            if (['qrcode', 'hash'].includes(obj.data?.id)) return;
+            if (FIXED_ELEMENT_IDS.includes(obj.data?.id)) return;
             obj.clone((cloned) => {
                 cloned.set({ left: obj.left + 20, top: obj.top + 20 });
-                cloned.data = { ...obj.data, id: generateId(obj.data?.type || 'el') };
+                cloned.data = {
+                    ...JSON.parse(JSON.stringify(obj.data || {})),
+                    id: generateId(obj.data?.type || 'el')
+                };
                 designer.add(cloned);
             });
         });
@@ -2037,13 +2542,13 @@
     function resetarLayout() {
         Swal.fire({
             title: 'Limpar Design?',
-            text: 'Isso removerá os elementos customizados e manterá hash e QR.',
+            text: 'Isso removerá os elementos customizados e manterá data, hash e QR.',
             icon: 'warning',
             showCancelButton: true
         }).then((r) => {
             if (!r.isConfirmed) return;
             pushHistory();
-            const keep = exportTemplate().elements.filter((el) => ['hash', 'qrcode'].includes(el.id));
+            const keep = exportTemplate().elements.filter((el) => FIXED_ELEMENT_IDS.includes(el.id));
             applyTemplateOnCanvas({
                 version: 2,
                 document: template.document,
@@ -2087,6 +2592,9 @@
     }
 
     function setupDesignerEvents() {
+        designer.on('before:transform', () => {
+            pushHistory();
+        });
         designer.on('selection:created', syncToolbarWithSelection);
         designer.on('selection:updated', syncToolbarWithSelection);
         designer.on('selection:cleared', () => {
@@ -2130,10 +2638,12 @@
                     fitTextToBlock(obj);
                 }
             }
+            if (obj && (obj.data?.id === 'qrcode' || obj.data?.id === 'hash')) {
+                alignHashWithQr(false);
+            }
             hideGuides();
             updateElementsList();
             syncBlockSizeControls();
-            pushHistory();
         });
         designer.on('object:moving', (e) => {
             const obj = e.target;
