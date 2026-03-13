@@ -23,11 +23,29 @@ class User(UserMixin, db.Model):
     nome = db.Column(db.String(100))
     cpf = db.Column(db.String(14), unique=True)
     ra = db.Column(db.String(20), unique=True, nullable=True) # Added for academic tracking
-    curso = db.Column(db.String(100), nullable=True) # Added for filtering
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=True)
     can_create_events = db.Column(db.Boolean, default=False)
 
     course_obj = db.relationship('Course', backref='students')
+    institutional_certificates = db.relationship('InstitutionalCertificate', backref='creator')
+
+    @property
+    def curso(self):
+        return self.course_obj.nome if self.course_obj else None
+
+    @curso.setter
+    def curso(self, value):
+        if value is None:
+            self.course_id = None
+            return
+        normalized = str(value).strip()
+        if not normalized:
+            self.course_id = None
+            return
+
+        course = Course.query.filter(Course.nome.ilike(normalized)).first()
+        if course:
+            self.course_id = course.id
 
     def set_password(self, password):
         """Sets the user's password hash.
@@ -109,13 +127,13 @@ class Event(db.Model):
     nome = db.Column(db.String(100))
     descricao = db.Column(db.Text)
     tipo = db.Column(db.String(20))  # 'PADRAO' or 'RAPIDO'
-    data_inicio = db.Column(db.String(10))
-    hora_inicio = db.Column(db.String(5))
-    data_fim = db.Column(db.String(10))
-    hora_fim = db.Column(db.String(5))
+    data_inicio = db.Column(db.Date)
+    hora_inicio = db.Column(db.Time)
+    data_fim = db.Column(db.Date)
+    hora_fim = db.Column(db.Time)
     token_publico = db.Column(db.String(50))
     status = db.Column(db.String(20), default='ABERTO')
-    curso = db.Column(db.String(100), nullable=True) # Added for filtering
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=True)
     
     # Geofencing Defaults
     latitude = db.Column(db.Float, nullable=True)
@@ -125,7 +143,26 @@ class Event(db.Model):
     cert_bg_path = db.Column(db.String(200), nullable=True)
     cert_template_json = db.Column(db.Text, nullable=True) # JSON with positions of variables
 
+    course_obj = db.relationship('Course', backref='events')
     activities = db.relationship('Activity', backref='event', cascade="all, delete-orphan")
+
+    @property
+    def curso(self):
+        return self.course_obj.nome if self.course_obj else None
+
+    @curso.setter
+    def curso(self, value):
+        if value is None:
+            self.course_id = None
+            return
+        normalized = str(value).strip()
+        if not normalized:
+            self.course_id = None
+            return
+
+        course = Course.query.filter(Course.nome.ilike(normalized)).first()
+        if course:
+            self.course_id = course.id
 
 
 class Activity(db.Model):
@@ -151,8 +188,8 @@ class Activity(db.Model):
     palestrante = db.Column(db.String(100))
     local = db.Column(db.String(100))
     descricao = db.Column(db.Text)
-    data_atv = db.Column(db.String(10))
-    hora_atv = db.Column(db.String(5))
+    data_atv = db.Column(db.Date)
+    hora_atv = db.Column(db.Time)
     carga_horaria = db.Column(db.Integer)
     vagas = db.Column(db.Integer, default=-1)
     
@@ -169,7 +206,6 @@ class Enrollment(db.Model):
     Attributes:
         id (int): Primary key.
         activity_id (int): Foreign key to activity.
-        event_id (int): Foreign key to event (legacy/redundant).
         user_cpf (str): Foreign key to user CPF.
         nome (str): Snapshot of user name at enrollment time.
         presente (bool): Attendance status.
@@ -178,7 +214,6 @@ class Enrollment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'))
-    event_id = db.Column(db.Integer, db.ForeignKey('events.id'))  # Redundant but kept for legacy compat if needed
     user_cpf = db.Column(db.String(14), db.ForeignKey('users.cpf'))
     nome = db.Column(db.String(100))  # Snapshot of name
     presente = db.Column(db.Boolean, default=False)
@@ -192,4 +227,72 @@ class Enrollment(db.Model):
     # Location Capture for Audit
     lat_checkin = db.Column(db.Float, nullable=True)
     lon_checkin = db.Column(db.Float, nullable=True)
+
+
+class InstitutionalCertificate(db.Model):
+    """Certificate batch for institutional (non-event) use cases."""
+    __tablename__ = 'institutional_certificates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_by_username = db.Column(db.String(50), db.ForeignKey('users.username'), nullable=False)
+    titulo = db.Column(db.String(140), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('institutional_certificate_categories.id'), nullable=False)
+    descricao = db.Column(db.Text, nullable=True)
+    data_emissao = db.Column(db.String(10), nullable=False)
+    signer_name = db.Column(db.String(120), nullable=True)
+    cert_bg_path = db.Column(db.String(200), nullable=True)
+    cert_template_json = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='RASCUNHO')
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now(), nullable=False)
+
+    recipients = db.relationship(
+        'InstitutionalCertificateRecipient',
+        backref='certificate',
+        cascade='all, delete-orphan'
+    )
+    category = db.relationship('InstitutionalCertificateCategory', backref='certificates')
+
+    @property
+    def categoria(self):
+        return self.category.nome if self.category else None
+
+    __table_args__ = (
+        db.CheckConstraint("status in ('RASCUNHO', 'ENVIADO', 'ARQUIVADO')", name='ck_institutional_certificate_status'),
+        db.Index('ix_institutional_cert_created_by', 'created_by_username'),
+        db.Index('ix_institutional_cert_status', 'status'),
+        db.Index('ix_institutional_cert_category_id', 'category_id'),
+    )
+
+
+class InstitutionalCertificateCategory(db.Model):
+    """Normalized lookup table for institutional certificate categories."""
+    __tablename__ = 'institutional_certificate_categories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(80), unique=True, nullable=False)
+
+
+class InstitutionalCertificateRecipient(db.Model):
+    """Recipient row for institutional certificate delivery and tracking."""
+    __tablename__ = 'institutional_certificate_recipients'
+
+    id = db.Column(db.Integer, primary_key=True)
+    certificate_id = db.Column(db.Integer, db.ForeignKey('institutional_certificates.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=True)
+    cpf = db.Column(db.String(14), nullable=True)
+    metadata_json = db.Column(db.Text, nullable=True)
+    cert_hash = db.Column(db.String(16), unique=True, nullable=True)
+    cert_entregue = db.Column(db.Boolean, default=False)
+    cert_data_envio = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('certificate_id', 'email', name='uq_institutional_recipient_email_per_cert'),
+        db.UniqueConstraint('certificate_id', 'cpf', name='uq_institutional_recipient_cpf_per_cert'),
+        db.Index('ix_institutional_recipient_certificate_id', 'certificate_id'),
+        db.Index('ix_institutional_recipient_entregue', 'cert_entregue'),
+        db.Index('ix_institutional_recipient_data_envio', 'cert_data_envio'),
+    )
 

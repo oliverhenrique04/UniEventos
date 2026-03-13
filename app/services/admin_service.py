@@ -24,7 +24,8 @@ class AdminService:
             if filters.get('ra'):
                 query = query.filter(User.ra.ilike(f"%{filters['ra']}%"))
             if filters.get('curso'):
-                query = query.filter(User.curso.ilike(f"%{filters['curso']}%"))
+                query = query.join(Course, User.course_id == Course.id, isouter=True)
+                query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
             if filters.get('cpf'):
                 query = query.filter(User.cpf.ilike(f"%{filters['cpf']}%"))
             if filters.get('email'):
@@ -36,7 +37,8 @@ class AdminService:
             if filters.get('event_id') or filters.get('activity_id'):
                 query = query.join(Enrollment, User.cpf == Enrollment.user_cpf)
                 if filters.get('event_id'):
-                    query = query.filter(Enrollment.event_id == filters['event_id'])
+                    query = query.join(Activity, Enrollment.activity_id == Activity.id)
+                    query = query.filter(Activity.event_id == filters['event_id'])
                 if filters.get('activity_id'):
                     query = query.filter(Enrollment.activity_id == filters['activity_id'])
 
@@ -124,7 +126,6 @@ class AdminService:
             
         enrollment = Enrollment(
             activity_id=activity_id,
-            event_id=activity.event_id,
             user_cpf=user.cpf,
             nome=user.nome,
             presente=True # Admin manual enroll often implies immediate presence or force entry
@@ -169,7 +170,7 @@ class AdminService:
                     nome=row.get('nome'),
                     cpf=cpf,
                     role=row.get('role', 'participante'),
-                    curso=curso_nome, # Keep string for legacy
+                    curso=curso_nome,
                     course_id=course_obj.id if course_obj else None,
                     can_create_events=(row.get('can_create_events', '0') == '1')
                 )

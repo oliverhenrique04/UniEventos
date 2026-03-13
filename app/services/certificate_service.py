@@ -252,7 +252,7 @@ class CertificateService:
             '{{NOME}}': user.nome.upper(),
             '{{EVENTO}}': event.nome,
             '{{HORAS}}': str(total_hours),
-            '{{DATA}}': f"{event.data_inicio.split('-')[::-1][0]}/{event.data_inicio.split('-')[::-1][1]}/{event.data_inicio.split('-')[::-1][2]}" if event.data_inicio else "",
+            '{{DATA}}': event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else "",
             '{{CPF}}': user.cpf,
             '{{HASH}}': cert_hash
         }

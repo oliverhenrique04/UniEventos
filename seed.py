@@ -85,6 +85,7 @@ def upsert_fixed_users():
         ("admin", "Administrador Geral", "000.000.000-00", "ADMIN-001", "TI", "admin", "admin"),
         ("prof.ana", "Dra. Ana Silva", "111.222.333-44", "PROF-001", "Ciência da Computação", "professor", "1234"),
         ("coord.marcos", "Msc. Marcos Oliveira", "555.666.777-88", "COORD-001", "Engenharia", "coordenador", "1234"),
+        ("extensao", "Equipe Extensão", "222.333.444-55", "EXT-001", "Extensão", "extensao", "1234"),
     ]
 
     for username, nome, cpf, ra, curso_nome, role, pwd in fixed:

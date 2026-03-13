@@ -219,7 +219,7 @@
 {% block content %}
 <div class="container fade-in-up">
 
-    {% if user.role != 'participante' %}
+    {% if user.role in ['admin', 'professor', 'coordenador'] %}
     <div class="row g-4">
 
         <div class="col-lg-8">
@@ -311,6 +311,22 @@
             </div>
         </div>
 
+    </div>
+    {% endif %}
+
+    {% if user.role == 'extensao' %}
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="glass-panel bg-white p-4 p-md-5 shadow-sm border-top border-4 border-primary">
+                <h4 class="fw-bold mb-2">
+                    <i class="fa-solid fa-certificate text-primary me-2"></i>Certificados Institucionais
+                </h4>
+                <p class="text-muted mb-4">Gerencie certificados de monitoria, representacao, iniciacao cientifica e outras acoes de extensao.</p>
+                <a href="/certificados_institucionais" class="btn btn-primary btn-lg">
+                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar gestao institucional
+                </a>
+            </div>
+        </div>
     </div>
     {% endif %}
 

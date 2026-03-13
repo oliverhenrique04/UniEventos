@@ -2,8 +2,9 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.enrollment_repository import EnrollmentRepository
 from app.services.notification_service import NotificationService
-from app.models import Event, Activity, Enrollment, db
+from app.models import Event, Activity, Enrollment, Course, db
 import secrets
+from datetime import datetime
 
 class EventService:
     """
@@ -15,6 +16,30 @@ class EventService:
         self.activity_repo = ActivityRepository()
         self.enrollment_repo = EnrollmentRepository()
         self.notification_service = NotificationService()
+
+    @staticmethod
+    def _parse_date(value):
+        if value in (None, ''):
+            return None
+        if hasattr(value, 'year') and hasattr(value, 'month') and hasattr(value, 'day') and not hasattr(value, 'hour'):
+            return value
+        try:
+            return datetime.strptime(str(value), '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _parse_time(value):
+        if value in (None, ''):
+            return None
+        if hasattr(value, 'hour') and hasattr(value, 'minute') and hasattr(value, 'second'):
+            return value
+        for fmt in ('%H:%M', '%H:%M:%S'):
+            try:
+                return datetime.strptime(str(value), fmt).time()
+            except (ValueError, TypeError):
+                continue
+        return None
 
     def create_event(self, owner_username, data):
         """Creates a new event and its associated activities."""
@@ -36,10 +61,10 @@ class EventService:
             latitude=lat,
             longitude=lon,
             tipo='RAPIDO' if is_rapido else 'PADRAO',
-            data_inicio=data.get('data_inicio'),
-            hora_inicio=data.get('hora_inicio'),
-            data_fim=data.get('data_fim'),
-            hora_fim=data.get('hora_fim'),
+            data_inicio=self._parse_date(data.get('data_inicio')),
+            hora_inicio=self._parse_time(data.get('hora_inicio')),
+            data_fim=self._parse_date(data.get('data_fim')),
+            hora_fim=self._parse_time(data.get('hora_fim')),
             token_publico=token,
             status='ABERTO'
         )
@@ -85,10 +110,10 @@ class EventService:
         event.curso = data.get('curso', event.curso)
         event.latitude = lat
         event.longitude = lon
-        event.data_inicio = data.get('data_inicio', event.data_inicio)
-        event.hora_inicio = data.get('hora_inicio', event.hora_inicio)
-        event.data_fim = data.get('data_fim', event.data_fim)
-        event.hora_fim = data.get('hora_fim', event.hora_fim)
+        event.data_inicio = self._parse_date(data.get('data_inicio', event.data_inicio))
+        event.hora_inicio = self._parse_time(data.get('hora_inicio', event.hora_inicio))
+        event.data_fim = self._parse_date(data.get('data_fim', event.data_fim))
+        event.hora_fim = self._parse_time(data.get('hora_fim', event.hora_fim))
         
         # Non-destructive activity synchronization
         if 'atividades' in data or data.get('is_rapido'):
@@ -139,8 +164,8 @@ class EventService:
                 activity.palestrante = atv_data['palestrante']
                 activity.local = atv_data['local']
                 activity.descricao = atv_data.get('descricao', '')
-                activity.data_atv = atv_data.get('data_atv')
-                activity.hora_atv = atv_data.get('hora_atv')
+                activity.data_atv = self._parse_date(atv_data.get('data_atv'))
+                activity.hora_atv = self._parse_time(atv_data.get('hora_atv'))
                 activity.carga_horaria = horas
                 activity.vagas = vagas
                 activity.latitude = event.latitude
@@ -155,8 +180,8 @@ class EventService:
                     palestrante=atv_data['palestrante'],
                     local=atv_data['local'],
                     descricao=atv_data.get('descricao', ''),
-                    data_atv=atv_data.get('data_atv'),
-                    hora_atv=atv_data.get('hora_atv'),
+                    data_atv=self._parse_date(atv_data.get('data_atv')),
+                    hora_atv=self._parse_time(atv_data.get('hora_atv')),
                     carga_horaria=horas,
                     vagas=vagas,
                     latitude=event.latitude,
@@ -181,9 +206,12 @@ class EventService:
             if filters.get('nome'):
                 query = query.filter(Event.nome.ilike(f"%{filters['nome']}%"))
             if filters.get('data'):
-                query = query.filter(Event.data_inicio == filters['data'])
+                parsed_date = self._parse_date(filters['data'])
+                if parsed_date:
+                    query = query.filter(Event.data_inicio == parsed_date)
             if filters.get('curso'):
-                query = query.filter(Event.curso.ilike(f"%{filters['curso']}%"))
+                query = query.join(Course, Event.course_id == Course.id, isouter=True)
+                query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
 
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
@@ -200,15 +228,18 @@ class EventService:
             if filters.get('owner'):
                 query = query.filter(Event.owner_username.ilike(f"%{filters['owner']}%"))
             if filters.get('curso'):
-                query = query.filter(Event.curso.ilike(f"%{filters['curso']}%"))
+                query = query.join(Course, Event.course_id == Course.id, isouter=True)
+                query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
             if filters.get('data'):
-                query = query.filter(Event.data_inicio == filters['data'])
+                parsed_date = self._parse_date(filters['data'])
+                if parsed_date:
+                    query = query.filter(Event.data_inicio == parsed_date)
 
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
     def get_event_participants_paginated(self, event_id, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of participants enrolled in an event."""
-        query = Enrollment.query.filter_by(event_id=event_id)
+        query = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(Activity.event_id == event_id)
         if filters:
             if filters.get('nome'):
                 query = query.filter(Enrollment.nome.ilike(f"%{filters['nome']}%"))
@@ -234,7 +265,7 @@ class EventService:
         """
         from app.models import User
         # Get unique user CPFs enrolled in any activity of this event
-        enrollments = Enrollment.query.filter_by(event_id=event_id).all()
+        enrollments = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(Activity.event_id == event_id).all()
         cpfs = set([e.user_cpf for e in enrollments])
         
         count = 0
@@ -276,7 +307,7 @@ class EventService:
             if activity.vagas != -1 and current_count >= activity.vagas:
                 return None, "Lotado!"
             
-            enrollment = Enrollment(activity_id=activity_id, event_id=activity.event_id, user_cpf=user.cpf, nome=user.nome, presente=False)
+            enrollment = Enrollment(activity_id=activity_id, user_cpf=user.cpf, nome=user.nome, presente=False)
             saved = self.enrollment_repo.save(enrollment)
             if user.email:
                 self.notification_service.send_email_task(user.email, f"Inscrição Confirmada: {activity.nome}", f"Olá {user.nome}, sua inscrição na atividade {activity.nome} do evento {activity.event.nome} foi confirmada!")
@@ -293,7 +324,7 @@ class EventService:
 
         if not enrollment:
             if activity.nome == "Check-in Presença":
-                enrollment = Enrollment(activity_id=activity_id, event_id=event_id, user_cpf=user.cpf, nome=user.nome, presente=True, lat_checkin=lat, lon_checkin=lon)
+                enrollment = Enrollment(activity_id=activity_id, user_cpf=user.cpf, nome=user.nome, presente=True, lat_checkin=lat, lon_checkin=lon)
                 self.enrollment_repo.save(enrollment)
             else:
                 return False, "Você não se inscreveu nesta atividade.", None
@@ -308,7 +339,7 @@ class EventService:
         return True, "Presença confirmada!", enrollment
 
     def get_user_events_paginated(self, user_cpf, page=1, per_page=10, filters=None):
-        query = Event.query.join(Enrollment, Event.id == Enrollment.event_id).filter(Enrollment.user_cpf == user_cpf).distinct()
+        query = Event.query.join(Activity, Event.id == Activity.event_id).join(Enrollment, Enrollment.activity_id == Activity.id).filter(Enrollment.user_cpf == user_cpf).distinct()
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
     def get_user_activities_paginated(self, user_cpf, page=1, per_page=10):
@@ -336,5 +367,5 @@ class EventService:
             except (ValueError, TypeError):
                 vagas = -1
 
-            activity = Activity(event_id=event.id, nome=atv['nome'], palestrante=atv['palestrante'], local=atv['local'], descricao=atv.get('descricao', ''), data_atv=atv.get('data_atv'), hora_atv=atv.get('hora_atv'), carga_horaria=horas, vagas=vagas, latitude=event.latitude, longitude=event.longitude)
+            activity = Activity(event_id=event.id, nome=atv['nome'], palestrante=atv['palestrante'], local=atv['local'], descricao=atv.get('descricao', ''), data_atv=self._parse_date(atv.get('data_atv')), hora_atv=self._parse_time(atv.get('hora_atv')), carga_horaria=horas, vagas=vagas, latitude=event.latitude, longitude=event.longitude)
             self.activity_repo.save(activity)

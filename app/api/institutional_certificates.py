@@ -1,0 +1,976 @@
+import json
+from datetime import datetime
+import re
+import csv
+import io
+import os
+
+from flask import Blueprint, jsonify, request, make_response, send_file, current_app
+from flask_login import current_user, login_required
+from sqlalchemy import or_
+from werkzeug.utils import secure_filename
+
+from app.extensions import db
+from app.models import (
+    InstitutionalCertificate,
+    InstitutionalCertificateRecipient,
+    InstitutionalCertificateCategory,
+    User,
+    Course,
+)
+from app.services.institutional_certificate_service import InstitutionalCertificateService
+
+bp = Blueprint('institutional_certificates', __name__, url_prefix='/api/institutional_certificates')
+institutional_service = InstitutionalCertificateService()
+
+ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
+MAX_DESIGN_IMAGE_SIZE = 8 * 1024 * 1024
+
+
+def _can_manage_institutional_certificates():
+    return current_user.role in ['admin', 'extensao']
+
+
+def _parse_date_iso(date_str):
+    try:
+        datetime.strptime(date_str, '%Y-%m-%d')
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_valid_email(email):
+    if not email:
+        return False
+    return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email) is not None
+
+
+def _is_allowed_image(filename):
+    _, ext = os.path.splitext((filename or '').lower())
+    return ext in ALLOWED_IMAGE_EXTENSIONS
+
+
+def _validate_image_file(file_storage):
+    if not file_storage or not file_storage.filename:
+        return False, 'Arquivo nao enviado'
+
+    if not _is_allowed_image(file_storage.filename):
+        return False, 'Formato invalido. Use PNG, JPG, JPEG ou WEBP'
+
+    file_storage.stream.seek(0, os.SEEK_END)
+    size = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+
+    if size <= 0:
+        return False, 'Arquivo vazio'
+    if size > MAX_DESIGN_IMAGE_SIZE:
+        return False, 'Arquivo excede o limite de 8MB'
+
+    return True, None
+
+
+def _sanitize_html_content(html_content):
+    if not html_content or not isinstance(html_content, str):
+        return html_content
+
+    html_content = re.sub(
+        r'<(script|iframe|object|embed|frame|frameset|applet|meta|link|style)[^>]*>.*?</\1>',
+        '', html_content, flags=re.DOTALL | re.IGNORECASE
+    )
+    html_content = re.sub(
+        r'<(script|iframe|meta|link|style|base)[^>]*/?>',
+        '', html_content, flags=re.IGNORECASE
+    )
+    html_content = re.sub(
+        r'\s+on\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)',
+        '', html_content, flags=re.IGNORECASE
+    )
+    html_content = re.sub(
+        r'(href|src)\s*=\s*["\']?\s*(javascript|data):[^"\'>\s]*["\']?',
+        '', html_content, flags=re.IGNORECASE
+    )
+    return html_content
+
+
+def _normalize_template(template_json):
+    if template_json is None:
+        return None, None
+
+    try:
+        parsed = json.loads(template_json)
+    except (ValueError, TypeError):
+        return None, 'Template invalido: JSON malformado'
+
+    if not isinstance(parsed, dict):
+        return None, 'Template invalido: estrutura esperada e um objeto'
+
+    for element in parsed.get('elements', []):
+        if element.get('is_html') and element.get('html_content'):
+            element['html_content'] = _sanitize_html_content(element['html_content'])
+
+    return json.dumps(parsed, ensure_ascii=False), None
+
+
+def _normalize_workload_hours(value):
+    raw = str(value or '').strip().replace(',', '.')
+    if not raw:
+        return None
+    try:
+        numeric = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if numeric < 0:
+        return None
+    if numeric.is_integer():
+        return str(int(numeric))
+    return f"{numeric:.2f}".rstrip('0').rstrip('.')
+
+
+def _extract_recipient_metadata(recipient):
+    try:
+        metadata = json.loads(recipient.metadata_json or '{}')
+        if not isinstance(metadata, dict):
+            return {}
+        return metadata
+    except Exception:
+        return {}
+
+
+def _to_float_or_none(value):
+    raw = str(value or '').strip().replace(',', '.')
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _get_managed_certificate_or_error(certificate_id):
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        return None, (jsonify({'erro': 'Nao encontrado'}), 404)
+    if not _can_manage_institutional_certificates():
+        return None, (jsonify({'erro': 'Permissao negada'}), 403)
+    if current_user.role != 'admin' and cert.created_by_username != current_user.username:
+        return None, (jsonify({'erro': 'Acesso negado'}), 403)
+    return cert, None
+
+
+def _get_or_create_category(nome):
+    normalized = (nome or '').strip()
+    if not normalized:
+        return None
+    existing = InstitutionalCertificateCategory.query.filter(
+        InstitutionalCertificateCategory.nome.ilike(normalized)
+    ).first()
+    if existing:
+        return existing
+    category = InstitutionalCertificateCategory(nome=normalized)
+    db.session.add(category)
+    db.session.flush()
+    return category
+
+
+@bp.route('/<int:certificate_id>/users/search', methods=['GET'])
+@login_required
+def search_users_for_recipients(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    query_text = (request.args.get('q') or '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = min(max(request.args.get('per_page', 10, type=int), 1), 50)
+
+    query = User.query.outerjoin(Course, User.course_id == Course.id)
+    if query_text:
+        like_term = f'%{query_text}%'
+        query = query.filter(or_(
+            User.username.ilike(like_term),
+            User.nome.ilike(like_term),
+            User.email.ilike(like_term),
+            User.cpf.ilike(like_term),
+            User.ra.ilike(like_term),
+            Course.nome.ilike(like_term),
+        ))
+
+    pagination = query.order_by(User.nome.asc(), User.username.asc()).paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False,
+    )
+
+    return jsonify({
+        'items': [
+            {
+                'username': user.username,
+                'nome': user.nome,
+                'email': user.email,
+                'cpf': user.cpf,
+                'ra': user.ra,
+                'curso': user.curso,
+            }
+            for user in pagination.items
+        ],
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': pagination.page,
+        'query': query_text,
+    })
+
+
+@bp.route('', methods=['GET'])
+@login_required
+def list_institutional_certificates():
+    if not _can_manage_institutional_certificates():
+        return jsonify({'erro': 'Permissao negada'}), 403
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    categoria = request.args.get('categoria')
+    status = request.args.get('status')
+    titulo = (request.args.get('titulo') or '').strip()
+
+    query = InstitutionalCertificate.query
+    query = query.join(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
+    if current_user.role != 'admin':
+        query = query.filter(InstitutionalCertificate.created_by_username == current_user.username)
+    if categoria:
+        query = query.filter(InstitutionalCertificateCategory.nome.ilike(f'%{categoria}%'))
+    if status:
+        query = query.filter(InstitutionalCertificate.status == status)
+    if titulo:
+        query = query.filter(InstitutionalCertificate.titulo.ilike(f'%{titulo}%'))
+
+    pagination = query.order_by(InstitutionalCertificate.created_at.desc()).paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+
+    return jsonify({
+        'items': [
+            {
+                'id': item.id,
+                'titulo': item.titulo,
+                'categoria': item.categoria,
+                'category_id': item.category_id,
+                'data_emissao': item.data_emissao,
+                'status': item.status,
+                'recipients_count': len(item.recipients),
+                'created_by_username': item.created_by_username,
+                'created_at': item.created_at.isoformat() if item.created_at else None,
+            }
+            for item in pagination.items
+        ],
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': pagination.page,
+        'filters': {
+            'categoria': categoria,
+            'status': status,
+            'titulo': titulo,
+        }
+    })
+
+
+@bp.route('', methods=['POST'])
+@login_required
+def create_institutional_certificate():
+    if not _can_manage_institutional_certificates():
+        return jsonify({'erro': 'Permissao negada'}), 403
+
+    data = request.get_json(silent=True) or {}
+    titulo = (data.get('titulo') or '').strip()
+    categoria = (data.get('categoria') or '').strip()
+    data_emissao = (data.get('data_emissao') or '').strip()
+
+    if not titulo:
+        return jsonify({'erro': 'Titulo e obrigatorio'}), 400
+    category = _get_or_create_category(categoria)
+    if not category:
+        return jsonify({'erro': 'Categoria e obrigatoria'}), 400
+    if not _parse_date_iso(data_emissao):
+        return jsonify({'erro': 'data_emissao deve estar no formato YYYY-MM-DD'}), 400
+
+    cert = InstitutionalCertificate(
+        created_by_username=current_user.username,
+        titulo=titulo,
+        category_id=category.id,
+        descricao=(data.get('descricao') or '').strip() or None,
+        data_emissao=data_emissao,
+        signer_name=(data.get('signer_name') or '').strip() or None,
+        cert_bg_path=(data.get('cert_bg_path') or '').strip() or None,
+        cert_template_json=json.dumps(data.get('template') or {}, ensure_ascii=False),
+        status='RASCUNHO',
+    )
+
+    db.session.add(cert)
+    db.session.commit()
+
+    return jsonify({'mensagem': 'Certificado institucional criado', 'id': cert.id}), 201
+
+
+@bp.route('/<int:certificate_id>', methods=['GET'])
+@login_required
+def get_institutional_certificate(certificate_id):
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        return jsonify({'erro': 'Nao encontrado'}), 404
+    if not _can_manage_institutional_certificates():
+        return jsonify({'erro': 'Permissao negada'}), 403
+    if current_user.role != 'admin' and cert.created_by_username != current_user.username:
+        return jsonify({'erro': 'Acesso negado'}), 403
+
+    return jsonify({
+        'id': cert.id,
+        'titulo': cert.titulo,
+        'categoria': cert.categoria,
+        'category_id': cert.category_id,
+        'descricao': cert.descricao,
+        'data_emissao': cert.data_emissao,
+        'signer_name': cert.signer_name,
+        'cert_bg_path': cert.cert_bg_path,
+        'template': json.loads(cert.cert_template_json or '{}'),
+        'status': cert.status,
+        'created_by_username': cert.created_by_username,
+    })
+
+
+@bp.route('/<int:certificate_id>', methods=['PUT'])
+@login_required
+def update_institutional_certificate(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    data = request.get_json(silent=True) or {}
+
+    titulo = (data.get('titulo') or cert.titulo).strip()
+    categoria = (data.get('categoria') or cert.categoria).strip()
+    data_emissao = (data.get('data_emissao') or cert.data_emissao).strip()
+    status = (data.get('status') or cert.status or 'RASCUNHO').strip().upper()
+
+    if not titulo:
+        return jsonify({'erro': 'Titulo e obrigatorio'}), 400
+    category = _get_or_create_category(categoria)
+    if not category:
+        return jsonify({'erro': 'Categoria e obrigatoria'}), 400
+    if not _parse_date_iso(data_emissao):
+        return jsonify({'erro': 'data_emissao deve estar no formato YYYY-MM-DD'}), 400
+    if status not in ['RASCUNHO', 'ENVIADO', 'ARQUIVADO']:
+        return jsonify({'erro': 'Status invalido'}), 400
+
+    cert.titulo = titulo
+    cert.category_id = category.id
+    cert.data_emissao = data_emissao
+    cert.descricao = (data.get('descricao') or cert.descricao or '').strip() or None
+    cert.signer_name = (data.get('signer_name') or cert.signer_name or '').strip() or None
+    cert.status = status
+
+    db.session.commit()
+    return jsonify({'mensagem': 'Certificado institucional atualizado'})
+
+
+@bp.route('/<int:certificate_id>/setup', methods=['POST'])
+@login_required
+def setup_institutional_certificate(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    bg_file = request.files.get('background')
+    template_json = request.form.get('template')
+    remove_bg = request.form.get('remove_bg') == 'true'
+
+    normalized_template, template_error = _normalize_template(template_json)
+    if template_error:
+        return jsonify({'erro': template_error}), 400
+
+    bg_path = None
+    if remove_bg:
+        cert.cert_bg_path = None
+    elif bg_file:
+        valid_file, file_error = _validate_image_file(bg_file)
+        if not valid_file:
+            return jsonify({'erro': file_error}), 400
+
+        filename = secure_filename(f'bg_institutional_{certificate_id}_{bg_file.filename}')
+        upload_dir = os.path.join(current_app.root_path, 'static', 'certificates', 'backgrounds')
+        os.makedirs(upload_dir, exist_ok=True)
+        save_path = os.path.join(upload_dir, filename)
+        bg_file.save(save_path)
+        bg_path = f'certificates/backgrounds/{filename}'
+        cert.cert_bg_path = bg_path
+
+    if normalized_template is not None:
+        cert.cert_template_json = normalized_template
+
+    db.session.commit()
+    return jsonify({
+        'mensagem': 'Configuracao de certificado institucional atualizada com sucesso!',
+        'bg_url': f'/static/{bg_path}' if bg_path else (f"/static/{cert.cert_bg_path}" if cert.cert_bg_path else None),
+    })
+
+
+@bp.route('/<int:certificate_id>/upload_asset', methods=['POST'])
+@login_required
+def upload_institutional_asset(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    image_file = request.files.get('asset')
+    valid_file, file_error = _validate_image_file(image_file)
+    if not valid_file:
+        return jsonify({'erro': file_error}), 400
+
+    filename = secure_filename(f'asset_institutional_{certificate_id}_{image_file.filename}')
+    upload_dir = os.path.join(current_app.root_path, 'static', 'certificates', 'assets')
+    os.makedirs(upload_dir, exist_ok=True)
+    save_path = os.path.join(upload_dir, filename)
+    image_file.save(save_path)
+
+    return jsonify({
+        'mensagem': 'Asset enviado com sucesso',
+        'asset_url': f'/static/certificates/assets/{filename}',
+        'asset_path': f'certificates/assets/{filename}',
+    })
+
+
+@bp.route('/<int:certificate_id>/duplicate', methods=['POST'])
+@login_required
+def duplicate_institutional_certificate(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    duplicated = InstitutionalCertificate(
+        created_by_username=current_user.username,
+        titulo=f"{cert.titulo} (Copia)",
+        category_id=cert.category_id,
+        descricao=cert.descricao,
+        data_emissao=cert.data_emissao,
+        signer_name=cert.signer_name,
+        cert_bg_path=cert.cert_bg_path,
+        cert_template_json=cert.cert_template_json,
+        status='RASCUNHO',
+    )
+
+    db.session.add(duplicated)
+    db.session.flush()
+
+    for r in cert.recipients:
+        copied_recipient = InstitutionalCertificateRecipient(
+            certificate_id=duplicated.id,
+            nome=r.nome,
+            email=r.email,
+            cpf=r.cpf,
+            metadata_json=r.metadata_json,
+            cert_hash=institutional_service.build_hash(duplicated.id, r.nome, r.email),
+            cert_entregue=False,
+            cert_data_envio=None,
+        )
+        db.session.add(copied_recipient)
+
+    db.session.commit()
+    return jsonify({'mensagem': 'Certificado duplicado com sucesso', 'id': duplicated.id}), 201
+
+
+@bp.route('/<int:certificate_id>', methods=['DELETE'])
+@login_required
+def delete_institutional_certificate(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    delivered_count = InstitutionalCertificateRecipient.query.filter_by(
+        certificate_id=certificate_id,
+        cert_entregue=True,
+    ).count()
+    if delivered_count > 0:
+        return jsonify({
+            'erro': 'Nao e permitido excluir certificado com destinatarios ja enviados',
+            'delivered_count': delivered_count,
+        }), 400
+
+    db.session.delete(cert)
+    db.session.commit()
+    return jsonify({'mensagem': 'Certificado removido com sucesso'})
+
+
+@bp.route('/<int:certificate_id>/recipients', methods=['GET'])
+@login_required
+def list_recipients(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    page = request.args.get('page', 1, type=int)
+    per_page = min(max(request.args.get('per_page', 10, type=int), 1), 100)
+    query_text = (request.args.get('q') or '').strip()
+    sort_by = (request.args.get('sort_by') or 'id').strip().lower()
+    sort_dir = (request.args.get('sort_dir') or 'desc').strip().lower()
+    descending = sort_dir != 'asc'
+
+    query = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
+    if query_text:
+        like_term = f'%{query_text}%'
+        query = query.filter(or_(
+            InstitutionalCertificateRecipient.nome.ilike(like_term),
+            InstitutionalCertificateRecipient.email.ilike(like_term),
+            InstitutionalCertificateRecipient.cpf.ilike(like_term),
+            InstitutionalCertificateRecipient.metadata_json.ilike(like_term),
+        ))
+
+    sortable_columns = {
+        'id': InstitutionalCertificateRecipient.id,
+        'nome': InstitutionalCertificateRecipient.nome,
+        'email': InstitutionalCertificateRecipient.email,
+        'cpf': InstitutionalCertificateRecipient.cpf,
+        'cert_data_envio': InstitutionalCertificateRecipient.cert_data_envio,
+        'cert_entregue': InstitutionalCertificateRecipient.cert_entregue,
+    }
+
+    if sort_by in ('carga_horaria', 'curso_usuario'):
+        recipients = query.all()
+
+        def sort_key(recipient):
+            metadata = _extract_recipient_metadata(recipient)
+            if sort_by == 'carga_horaria':
+                numeric = _to_float_or_none(metadata.get('carga_horaria'))
+                return (numeric is None, numeric if numeric is not None else 0)
+            course = str(metadata.get('curso_usuario') or '').lower()
+            return (course == '', course)
+
+        recipients.sort(key=sort_key, reverse=descending)
+        total = len(recipients)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paged_items = recipients[start:end]
+        pages = max((total + per_page - 1) // per_page, 1)
+        current_page = min(max(page, 1), pages)
+    else:
+        order_column = sortable_columns.get(sort_by, InstitutionalCertificateRecipient.id)
+        order_clause = order_column.desc() if descending else order_column.asc()
+        pagination = query.order_by(order_clause, InstitutionalCertificateRecipient.id.desc()).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False,
+        )
+        paged_items = pagination.items
+        total = pagination.total
+        pages = pagination.pages
+        current_page = pagination.page
+
+    return jsonify({
+        'items': [
+            {
+                'id': r.id,
+                'nome': r.nome,
+                'email': r.email,
+                'cpf': r.cpf,
+                'carga_horaria': _extract_recipient_metadata(r).get('carga_horaria'),
+                'curso_usuario': _extract_recipient_metadata(r).get('curso_usuario'),
+                'cert_hash': r.cert_hash,
+                'cert_entregue': r.cert_entregue,
+                'cert_data_envio': r.cert_data_envio.isoformat() if r.cert_data_envio else None,
+            }
+            for r in paged_items
+        ],
+        'total': total,
+        'pages': pages,
+        'current_page': current_page,
+        'query': query_text,
+        'sort_by': sort_by,
+        'sort_dir': 'desc' if descending else 'asc',
+    })
+
+
+@bp.route('/<int:certificate_id>/recipients', methods=['POST'])
+@login_required
+def add_recipients(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    rows = payload.get('recipients') or []
+    if not isinstance(rows, list) or not rows:
+        return jsonify({'erro': 'Envie recipients como lista nao vazia'}), 400
+
+    inserted = 0
+    skipped = 0
+    for row in rows:
+        nome = (row.get('nome') or '').strip()
+        email = (row.get('email') or '').strip().lower() or None
+        cpf = (row.get('cpf') or '').strip() or None
+        metadata = row.get('metadata') or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        carga_horaria_raw = row.get('carga_horaria', metadata.get('carga_horaria'))
+        curso_usuario_raw = row.get('curso_usuario', metadata.get('curso_usuario'))
+        carga_horaria = _normalize_workload_hours(carga_horaria_raw)
+        curso_usuario = (str(curso_usuario_raw or '').strip() or None)
+
+        if not nome:
+            skipped += 1
+            continue
+        if email and not _is_valid_email(email):
+            skipped += 1
+            continue
+
+        exists = None
+        if email:
+            exists = InstitutionalCertificateRecipient.query.filter_by(
+                certificate_id=certificate_id,
+                email=email
+            ).first()
+        if not exists and cpf:
+            exists = InstitutionalCertificateRecipient.query.filter_by(
+                certificate_id=certificate_id,
+                cpf=cpf,
+            ).first()
+        if exists:
+            skipped += 1
+            continue
+
+        recipient = InstitutionalCertificateRecipient(
+            certificate_id=certificate_id,
+            nome=nome,
+            email=email,
+            cpf=cpf,
+            metadata_json=json.dumps({
+                **metadata,
+                'carga_horaria': carga_horaria,
+                'curso_usuario': curso_usuario,
+            }, ensure_ascii=False),
+            cert_hash=institutional_service.build_hash(certificate_id, nome, email),
+            cert_entregue=False,
+        )
+        db.session.add(recipient)
+        inserted += 1
+
+    db.session.commit()
+    return jsonify({'mensagem': 'Destinatarios processados', 'inserted': inserted, 'skipped': skipped})
+
+
+@bp.route('/<int:certificate_id>/recipients/import_csv', methods=['POST'])
+@login_required
+def import_recipients_csv(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    file = request.files.get('file')
+    if not file or not file.filename:
+        return jsonify({'erro': 'Arquivo CSV nao enviado'}), 400
+
+    try:
+        content = file.read().decode('utf-8-sig')
+    except Exception:
+        return jsonify({'erro': 'Falha ao ler arquivo CSV'}), 400
+
+    reader = csv.DictReader(io.StringIO(content))
+    required_headers = {'nome', 'email', 'cpf'}
+    if not reader.fieldnames or not required_headers.issubset(set(h.strip().lower() for h in reader.fieldnames if h)):
+        return jsonify({'erro': 'CSV deve conter cabecalhos: nome,email,cpf'}), 400
+
+    inserted = 0
+    skipped = 0
+    for row in reader:
+        normalized = {str(k).strip().lower(): (v or '').strip() for k, v in row.items()}
+        nome = normalized.get('nome', '')
+        email = normalized.get('email', '').lower() or None
+        cpf = normalized.get('cpf', '') or None
+        carga_horaria = _normalize_workload_hours(normalized.get('carga_horaria'))
+        curso_usuario = normalized.get('curso_usuario') or None
+
+        if not nome:
+            skipped += 1
+            continue
+        if email and not _is_valid_email(email):
+            skipped += 1
+            continue
+
+        exists = None
+        if email:
+            exists = InstitutionalCertificateRecipient.query.filter_by(
+                certificate_id=cert.id,
+                email=email,
+            ).first()
+        if not exists and cpf:
+            exists = InstitutionalCertificateRecipient.query.filter_by(
+                certificate_id=cert.id,
+                cpf=cpf,
+            ).first()
+        if exists:
+            skipped += 1
+            continue
+
+        recipient = InstitutionalCertificateRecipient(
+            certificate_id=cert.id,
+            nome=nome,
+            email=email,
+            cpf=cpf,
+            metadata_json=json.dumps({
+                'carga_horaria': carga_horaria,
+                'curso_usuario': curso_usuario,
+            }, ensure_ascii=False),
+            cert_hash=institutional_service.build_hash(cert.id, nome, email),
+            cert_entregue=False,
+        )
+        db.session.add(recipient)
+        inserted += 1
+
+    db.session.commit()
+    return jsonify({'mensagem': 'Importacao CSV concluida', 'inserted': inserted, 'skipped': skipped})
+
+
+@bp.route('/<int:certificate_id>/recipients/<int:recipient_id>', methods=['DELETE'])
+@login_required
+def remove_recipient(certificate_id, recipient_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipient = InstitutionalCertificateRecipient.query.filter_by(
+        id=recipient_id,
+        certificate_id=certificate_id,
+    ).first()
+    if not recipient:
+        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
+
+    db.session.delete(recipient)
+    db.session.commit()
+    return jsonify({'mensagem': 'Destinatario removido'})
+
+
+@bp.route('/<int:certificate_id>/recipients/<int:recipient_id>', methods=['PUT'])
+@login_required
+def update_recipient_metadata(certificate_id, recipient_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipient = InstitutionalCertificateRecipient.query.filter_by(
+        id=recipient_id,
+        certificate_id=certificate_id,
+    ).first()
+    if not recipient:
+        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
+
+    payload = request.get_json(silent=True) or {}
+    carga_horaria = _normalize_workload_hours(payload.get('carga_horaria'))
+    curso_usuario = (str(payload.get('curso_usuario') or '').strip() or None)
+
+    metadata = _extract_recipient_metadata(recipient)
+    metadata['carga_horaria'] = carga_horaria
+    metadata['curso_usuario'] = curso_usuario
+    recipient.metadata_json = json.dumps(metadata, ensure_ascii=False)
+
+    db.session.commit()
+    return jsonify({
+        'mensagem': 'Dados do destinatario atualizados',
+        'recipient': {
+            'id': recipient.id,
+            'carga_horaria': carga_horaria,
+            'curso_usuario': curso_usuario,
+        }
+    })
+
+
+@bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/resend', methods=['POST'])
+@login_required
+def resend_recipient(certificate_id, recipient_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipient = InstitutionalCertificateRecipient.query.filter_by(
+        id=recipient_id,
+        certificate_id=certificate_id,
+    ).first()
+    if not recipient:
+        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
+
+    if not recipient.email:
+        return jsonify({'erro': 'Destinatario sem email cadastrado'}), 400
+
+    if not recipient.cert_hash:
+        recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+
+    pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+    queued = institutional_service.queue_email(cert, recipient, pdf_path)
+    if not queued:
+        return jsonify({'erro': 'Problema no envio: falha ao enfileirar email'}), 500
+
+    recipient.cert_entregue = True
+    recipient.cert_data_envio = datetime.utcnow()
+    cert.status = 'ENVIADO'
+    db.session.commit()
+
+    return jsonify({'mensagem': 'Reenvio enfileirado com sucesso', 'resultado': 'sucesso'})
+
+
+@bp.route('/<int:certificate_id>/recipients/export_csv', methods=['GET'])
+@login_required
+def export_recipients_csv(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipients = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['nome', 'email', 'cpf', 'carga_horaria', 'curso_usuario', 'cert_hash', 'cert_entregue', 'cert_data_envio'])
+
+    for r in recipients:
+        metadata = _extract_recipient_metadata(r)
+        writer.writerow([
+            r.nome or '',
+            r.email or '',
+            r.cpf or '',
+            metadata.get('carga_horaria') or '',
+            metadata.get('curso_usuario') or '',
+            r.cert_hash or '',
+            'sim' if r.cert_entregue else 'nao',
+            r.cert_data_envio.isoformat() if r.cert_data_envio else '',
+        ])
+
+    csv_content = output.getvalue()
+    response = make_response(csv_content)
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=institutional_cert_{cert.id}_recipients.csv'
+    return response
+
+
+@bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/download', methods=['GET'])
+@login_required
+def download_recipient_pdf(certificate_id, recipient_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipient = InstitutionalCertificateRecipient.query.filter_by(
+        id=recipient_id,
+        certificate_id=certificate_id,
+    ).first()
+    if not recipient:
+        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
+
+    if not recipient.cert_hash:
+        recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+        db.session.commit()
+
+    pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+    if not pdf_path:
+        return jsonify({'erro': 'Falha ao gerar PDF'}), 500
+
+    filename = f'institutional_{cert.id}_{recipient.id}.pdf'
+    return send_file(pdf_path, as_attachment=True, download_name=filename)
+
+
+@bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/preview', methods=['GET'])
+@login_required
+def preview_recipient_pdf(certificate_id, recipient_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipient = InstitutionalCertificateRecipient.query.filter_by(
+        id=recipient_id,
+        certificate_id=certificate_id,
+    ).first()
+    if not recipient:
+        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
+
+    if not recipient.cert_hash:
+        recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+        db.session.commit()
+
+    pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+    if not pdf_path:
+        return jsonify({'erro': 'Falha ao gerar PDF'}), 500
+
+    # Return inline PDF and disable cache to avoid stale previews after edits.
+    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@bp.route('/<int:certificate_id>/send', methods=['POST'])
+@login_required
+def send_institutional_certificates(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    recipients = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id).all()
+    if not recipients:
+        return jsonify({'erro': 'Nenhum destinatario cadastrado'}), 400
+
+    sent_count = 0
+    skipped_without_email = 0
+    failed_queue = 0
+    now = datetime.utcnow()
+    for recipient in recipients:
+        if not recipient.cert_hash:
+            recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+
+        if not recipient.email:
+            skipped_without_email += 1
+            continue
+
+        pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+        queued = institutional_service.queue_email(cert, recipient, pdf_path)
+        if not queued:
+            failed_queue += 1
+            continue
+
+        recipient.cert_entregue = True
+        recipient.cert_data_envio = now
+        sent_count += 1
+
+    cert.status = 'ENVIADO' if sent_count > 0 else cert.status
+    db.session.commit()
+
+    if sent_count == 0 and failed_queue > 0:
+        return jsonify({
+            'mensagem': 'Problema no envio',
+            'resultado': 'erro',
+            'total_enviado': sent_count,
+            'sem_email': skipped_without_email,
+            'falha_fila': failed_queue,
+        }), 500
+
+    if failed_queue > 0:
+        return jsonify({
+            'mensagem': 'Envio parcialmente concluido com falhas',
+            'resultado': 'parcial',
+            'total_enviado': sent_count,
+            'sem_email': skipped_without_email,
+            'falha_fila': failed_queue,
+        })
+
+    if sent_count == 0:
+        return jsonify({
+            'mensagem': 'Problema no envio: nenhum destinatario com email valido',
+            'resultado': 'erro',
+            'total_enviado': sent_count,
+            'sem_email': skipped_without_email,
+            'falha_fila': failed_queue,
+        }), 400
+
+    return jsonify({
+        'mensagem': 'Envio concluido',
+        'resultado': 'sucesso',
+        'total_enviado': sent_count,
+        'sem_email': skipped_without_email,
+        'falha_fila': failed_queue,
+    })

@@ -13,7 +13,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     login_manager.init_app(app)
 
-    from app.api import activities, admin, auth, certificates, courses, events, reports
+    from app.api import activities, admin, auth, certificates, courses, events, institutional_certificates, reports
     from app.main import errors, routes
     from app.models import User
 
@@ -24,6 +24,7 @@ def create_app(config_class=Config):
     app.register_blueprint(reports.bp)
     app.register_blueprint(certificates.bp)
     app.register_blueprint(courses.bp)
+    app.register_blueprint(institutional_certificates.bp)
     app.register_blueprint(routes.bp)
     app.register_blueprint(errors.bp)
 

@@ -1,0 +1,1259 @@
+{% extends 'base.html' %}
+
+{% block head_styles %}
+<style>
+.skeleton-line {
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.2s infinite;
+}
+
+.skeleton-line.sm { height: 9px; }
+.skeleton-line.w-30 { width: 30%; }
+.skeleton-line.w-50 { width: 50%; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-80 { width: 80%; }
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.clean-modal-header {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.clean-modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.clean-section {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.clean-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 10px;
+}
+
+.clean-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#modalDestinatarios .table thead th {
+    background: #f8fafc;
+    font-size: 0.78rem;
+    color: #334155;
+    border-bottom-width: 1px;
+}
+
+#modalDestinatarios .table tbody td {
+    vertical-align: middle;
+}
+
+.mini-help {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.recipient-preview-frame-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 10px;
+}
+
+#recipientPreviewFrame {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    min-height: 68vh;
+    background: #fff;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-certificate me-2"></i>Certificados Institucionais</h2>
+        </div>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado">
+            <i class="fa-solid fa-plus me-1"></i>Novo Certificado
+        </button>
+    </div>
+
+    <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+        <h6 class="fw-bold mb-3 text-uppercase small text-muted"><i class="fa-solid fa-filter me-2"></i>Filtros</h6>
+        <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="small fw-bold">Buscar por titulo</label>
+                    <input type="text" id="filtroTitulo" class="form-control form-control-sm" placeholder="Ex.: Monitoria 2026">
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold">Categoria</label>
+                    <input type="text" id="filtroCategoria" class="form-control form-control-sm" placeholder="Ex.: Iniciacao cientifica">
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold">Status</label>
+                    <select id="filtroStatus" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="RASCUNHO">Rascunho</option>
+                        <option value="ENVIADO">Enviado</option>
+                        <option value="ARQUIVADO">Arquivado</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary btn-sm fw-bold" id="btnFiltrar">
+                        <i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar
+                    </button>
+                </div>
+            </div>
+    </div>
+
+    <div class="glass-panel p-0 overflow-hidden mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="tabelaInstitucionais">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Titulo</th>
+                            <th>Categoria</th>
+                            <th>Emissao</th>
+                            <th>Status</th>
+                            <th>Atualizar</th>
+                            <th>Destinatarios</th>
+                            <th>Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <small class="text-muted" id="resumoPaginacao"></small>
+        <div class="btn-group">
+            <button class="btn btn-sm btn-outline-secondary" id="btnPaginaAnterior">Anterior</button>
+            <button class="btn btn-sm btn-outline-secondary" id="btnPaginaProxima">Proxima</button>
+        </div>
+    </div>
+
+    <nav>
+        <ul class="pagination justify-content-center mt-3" id="paginacaoInstitucional"></ul>
+    </nav>
+</div>
+
+<div class="modal fade" id="modalNovoCertificado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header clean-modal-header">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-file-circle-plus me-2 text-primary"></i>Novo Certificado Institucional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNovoCertificado">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="small fw-bold">Titulo</label>
+                            <input type="text" class="form-control" name="titulo" required>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="small fw-bold">Categoria</label>
+                            <input type="text" class="form-control" name="categoria" placeholder="Ex.: Monitoria" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="small fw-bold">Data de emissao</label>
+                            <input type="date" class="form-control" name="data_emissao" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold">Descricao</label>
+                            <textarea class="form-control" name="descricao" rows="3"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold">Assinante</label>
+                            <input type="text" class="form-control" name="signer_name" placeholder="Nome do responsavel">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer clean-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary px-4" id="btnSalvarNovo">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDestinatarios" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header clean-modal-header">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-users me-2 text-primary"></i>Destinatarios</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="clean-toolbar mb-3">
+                    <div class="mini-help">
+                        Gestao de vinculacao por busca, lote manual e importacao CSV.
+                    </div>
+                    <button class="btn btn-sm btn-outline-dark" id="btnExportarCsv"><i class="fa-solid fa-file-export me-1"></i>Exportar CSV</button>
+                </div>
+
+                <div class="clean-section">
+                    <div class="clean-section-title"><i class="fa-solid fa-magnifying-glass me-1"></i>Buscar e selecionar usuarios</div>
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-9">
+                            <label class="small fw-bold">Buscar usuarios por qualquer campo</label>
+                            <input type="text" class="form-control" id="inputBuscaUsuario" placeholder="Nome, username, e-mail, CPF, RA ou curso">
+                        </div>
+                        <div class="col-md-3 d-grid">
+                            <button class="btn btn-outline-dark" id="btnBuscarUsuarios">
+                                <i class="fa-solid fa-magnifying-glass me-1"></i>Buscar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive mb-2">
+                        <table class="table table-sm align-middle" id="tabelaBuscaUsuarios">
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px;"><input type="checkbox" id="checkTodosUsuarios"></th>
+                                    <th>Nome</th>
+                                    <th>Email</th>
+                                    <th>CPF</th>
+                                    <th>RA</th>
+                                    <th>Curso</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" class="text-muted text-center py-3">Use a busca para listar usuarios.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <small class="text-muted" id="resumoBuscaUsuarios">Nenhuma busca executada.</small>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" id="btnBuscaUsuariosAnterior">Anterior</button>
+                            <button class="btn btn-outline-secondary" id="btnBuscaUsuariosProxima">Proxima</button>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button class="btn btn-outline-success" id="btnAdicionarUsuariosSelecionados">
+                            <i class="fa-solid fa-user-check me-1"></i>Adicionar selecionados
+                        </button>
+                    </div>
+                </div>
+
+                <div class="clean-section">
+                    <div class="clean-section-title"><i class="fa-solid fa-upload me-1"></i>Inclusao por lote</div>
+                    <div class="alert alert-light border small mb-3">
+                        Informe uma linha por destinatario no formato: <strong>nome;email;cpf;carga_horaria;curso_usuario</strong>
+                    </div>
+                    <div class="row g-3 align-items-end mb-2">
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Carga horaria padrao para selecionados</label>
+                            <input type="text" id="inputCargaHorariaPadrao" class="form-control" placeholder="Ex.: 20">
+                        </div>
+                    </div>
+                    <textarea class="form-control mb-3" id="inputDestinatarios" rows="4" placeholder="Maria da Silva;maria@email.com;000.000.000-00;20;Ciencia da Computacao"></textarea>
+                    <div class="d-flex justify-content-end mb-3">
+                        <button class="btn btn-outline-primary" id="btnAdicionarDestinatarios"><i class="fa-solid fa-user-plus me-1"></i>Adicionar em lote</button>
+                    </div>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-8">
+                            <input type="file" id="fileDestinatariosCsv" class="form-control" accept=".csv">
+                            <div class="form-text">CSV com cabecalho: nome,email,cpf,carga_horaria,curso_usuario</div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <button class="btn btn-outline-secondary" id="btnImportarCsv"><i class="fa-solid fa-file-import me-1"></i>Importar CSV</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="clean-section mb-0">
+                    <div class="clean-section-title"><i class="fa-solid fa-address-book me-1"></i>Destinatarios vinculados</div>
+                    <div class="d-flex justify-content-between align-items-center mt-1 mb-2 flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 280px;">
+                            <input type="text" id="filtroDestinatarios" class="form-control form-control-sm" placeholder="Buscar destinatarios por nome, e-mail, CPF, carga horaria ou curso">
+                            <button class="btn btn-sm btn-outline-secondary" id="btnFiltrarDestinatarios">
+                                <i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-muted" id="resumoPaginacaoDestinatarios">Total: 0 | Pagina 1 de 1</small>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" id="btnDestinatariosAnterior">Anterior</button>
+                                <button class="btn btn-outline-secondary" id="btnDestinatariosProxima">Proxima</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle" id="tabelaDestinatarios">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="nome">Nome</button>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="email">Email</button>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="cpf">CPF</button>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="carga_horaria">Carga Horaria</button>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="curso_usuario">Curso</button>
+                                    </th>
+                                    <th>Salvar</th>
+                                    <th>Hash</th>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="cert_entregue">Entregue</button>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-link btn-sm text-decoration-none p-0 sort-destinatarios" data-sort-by="cert_data_envio">Data Envio</button>
+                                    </th>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer clean-modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPreviewDestinatario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header clean-modal-header">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-solid fa-file-pdf me-2 text-danger"></i>
+                    Preview do Certificado
+                    <small class="text-muted d-block fw-normal mt-1" id="previewDestinatarioTitulo"></small>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="recipient-preview-frame-wrap">
+                    <iframe id="recipientPreviewFrame" title="Preview do certificado do destinatario"></iframe>
+                </div>
+            </div>
+            <div class="modal-footer clean-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tabelaBody = document.querySelector('#tabelaInstitucionais tbody');
+const formNovo = document.getElementById('formNovoCertificado');
+const tabelaDestinatariosBody = document.querySelector('#tabelaDestinatarios tbody');
+let certificateIdAtivo = null;
+let paginaAtual = 1;
+let totalPaginas = 1;
+let searchUsersResults = [];
+let searchUsersPage = 1;
+let searchUsersTotalPages = 1;
+let searchUsersTotal = 0;
+let searchUsersDebounceTimer = null;
+const selectedUsersMap = new Map();
+let recipientsPage = 1;
+let recipientsTotalPages = 1;
+let recipientsTotal = 0;
+let recipientsDebounceTimer = null;
+let recipientsSortBy = 'id';
+let recipientsSortDir = 'desc';
+let previewDestinatarioModalInstance = null;
+
+function userSelectionKey(user) {
+    if (!user) return '';
+    return `${user.username || ''}|${user.cpf || ''}|${user.email || ''}`;
+}
+
+function resetUserSearchState() {
+    searchUsersResults = [];
+    searchUsersPage = 1;
+    searchUsersTotalPages = 1;
+    searchUsersTotal = 0;
+    selectedUsersMap.clear();
+    const checkAll = document.getElementById('checkTodosUsuarios');
+    if (checkAll) checkAll.checked = false;
+    const resumo = document.getElementById('resumoBuscaUsuarios');
+    if (resumo) resumo.textContent = 'Nenhuma busca executada.';
+    document.getElementById('btnBuscaUsuariosAnterior').disabled = true;
+    document.getElementById('btnBuscaUsuariosProxima').disabled = true;
+}
+
+function updateUserSearchPaginationInfo() {
+    const resumo = document.getElementById('resumoBuscaUsuarios');
+    if (resumo) {
+        resumo.textContent = `Resultados: ${searchUsersTotal} | Pagina ${searchUsersPage} de ${searchUsersTotalPages} | Selecionados: ${selectedUsersMap.size}`;
+    }
+    document.getElementById('btnBuscaUsuariosAnterior').disabled = searchUsersPage <= 1;
+    document.getElementById('btnBuscaUsuariosProxima').disabled = searchUsersPage >= searchUsersTotalPages;
+}
+
+function setButtonLoading(button, isLoading, loadingText = 'Processando...') {
+    if (!button) return;
+    if (isLoading) {
+        if (!button.dataset.originalHtml) {
+            button.dataset.originalHtml = button.innerHTML;
+        }
+        button.disabled = true;
+        button.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>${loadingText}`;
+        return;
+    }
+
+    button.disabled = false;
+    if (button.dataset.originalHtml) {
+        button.innerHTML = button.dataset.originalHtml;
+    }
+}
+
+function renderCertificatesLoading() {
+    tabelaBody.innerHTML = Array.from({ length: 5 }).map(() => `
+        <tr>
+            <td><div class="skeleton-line w-50"></div></td>
+            <td>
+                <div class="skeleton-line w-80 mb-2"></div>
+                <div class="skeleton-line sm w-50"></div>
+            </td>
+            <td><div class="skeleton-line w-60"></div></td>
+            <td><div class="skeleton-line w-50"></div></td>
+            <td><div class="skeleton-line w-60"></div></td>
+            <td><div class="skeleton-line w-80"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+            <td><div class="skeleton-line w-80"></div></td>
+        </tr>
+    `).join('');
+}
+
+function renderCertificatesEmpty() {
+    tabelaBody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-5">
+                <div class="d-flex flex-column align-items-center gap-2">
+                    <i class="fa-regular fa-folder-open fs-2 text-muted"></i>
+                    <div class="fw-semibold text-slate-700">Nenhum certificado institucional cadastrado</div>
+                    <small class="text-muted">Crie o primeiro certificado para iniciar os envios institucionais.</small>
+                    <button class="btn btn-sm btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado">
+                        <i class="fa-solid fa-plus me-1"></i>Criar certificado
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+function renderRecipientsLoading() {
+    tabelaDestinatariosBody.innerHTML = Array.from({ length: 4 }).map(() => `
+        <tr>
+            <td><div class="skeleton-line w-80"></div></td>
+            <td><div class="skeleton-line w-60"></div></td>
+            <td><div class="skeleton-line w-50"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+            <td><div class="skeleton-line w-50"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+            <td><div class="skeleton-line w-80"></div></td>
+            <td><div class="skeleton-line w-50"></div></td>
+            <td><div class="skeleton-line w-60"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+            <td><div class="skeleton-line w-30"></div></td>
+        </tr>
+    `).join('');
+}
+
+function updateRecipientsPaginationInfo() {
+    const resumo = document.getElementById('resumoPaginacaoDestinatarios');
+    if (resumo) {
+        resumo.textContent = `Total: ${recipientsTotal} | Pagina ${recipientsPage} de ${recipientsTotalPages}`;
+    }
+    document.getElementById('btnDestinatariosAnterior').disabled = recipientsPage <= 1;
+    document.getElementById('btnDestinatariosProxima').disabled = recipientsPage >= recipientsTotalPages;
+}
+
+function updateRecipientsSortIndicators() {
+    document.querySelectorAll('.sort-destinatarios').forEach((button) => {
+        const baseLabel = button.dataset.label || button.textContent.replace(/\s*[▲▼]$/, '');
+        button.dataset.label = baseLabel;
+        if (button.dataset.sortBy === recipientsSortBy) {
+            button.textContent = `${baseLabel} ${recipientsSortDir === 'asc' ? '▲' : '▼'}`;
+        } else {
+            button.textContent = baseLabel;
+        }
+    });
+}
+
+function statusBadge(status) {
+    if (status === 'ENVIADO') {
+        return '<span class="badge bg-success-subtle text-success border border-success-subtle">ENVIADO</span>';
+    }
+    if (status === 'ARQUIVADO') {
+        return '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">ARQUIVADO</span>';
+    }
+    return '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">RASCUNHO</span>';
+}
+
+function uiError(message) {
+    Swal.fire('Erro', message || 'Operacao nao concluida.', 'error');
+}
+
+function uiSuccess(message) {
+    Toast.fire({ icon: 'success', title: message || 'Operacao concluida com sucesso.' });
+}
+
+function formatDateDisplay(value) {
+    if (!value) return '-';
+    const parts = String(value).split('-');
+    if (parts.length !== 3) return value;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+async function carregarCertificadosInstitucionais(page = 1) {
+    paginaAtual = page;
+    renderCertificatesLoading();
+    const params = new URLSearchParams({
+        page: String(page),
+        per_page: '10',
+        titulo: document.getElementById('filtroTitulo').value || '',
+        categoria: document.getElementById('filtroCategoria').value || '',
+        status: document.getElementById('filtroStatus').value || ''
+    });
+    const resp = await fetch(`/api/institutional_certificates?${params.toString()}`);
+    const data = await resp.json();
+
+    if (!resp.ok) {
+        tabelaBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-4">${data.erro || 'Erro ao carregar dados'}</td></tr>`;
+        return;
+    }
+
+    if (!data.items || !data.items.length) {
+        renderCertificatesEmpty();
+        totalPaginas = 1;
+        atualizarControlesPaginacao(0, 1, 1);
+        renderPaginacao(1, 1);
+        return;
+    }
+
+    totalPaginas = data.pages || 1;
+    atualizarControlesPaginacao(data.total || 0, data.current_page || 1, totalPaginas);
+    renderPaginacao(data.current_page || 1, totalPaginas);
+
+    tabelaBody.innerHTML = data.items.map(item => `
+        <tr class="animate__animated animate__fadeIn">
+            <td class="fw-bold">#${item.id}</td>
+            <td>
+                <div class="fw-semibold text-dark">${item.titulo}</div>
+                <div class="x-small text-muted">Criado por: ${item.created_by_username || '-'}</div>
+            </td>
+            <td><span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${item.categoria || '-'}</span></td>
+            <td><small class="fw-bold text-slate-600">${formatDateDisplay(item.data_emissao)}</small></td>
+            <td>${statusBadge(item.status || 'RASCUNHO')}</td>
+            <td>
+                <div class="input-group input-group-sm">
+                    <select class="form-select" id="status_${item.id}">
+                        <option value="RASCUNHO" ${(item.status || 'RASCUNHO') === 'RASCUNHO' ? 'selected' : ''}>Rascunho</option>
+                        <option value="ENVIADO" ${(item.status || '') === 'ENVIADO' ? 'selected' : ''}>Enviado</option>
+                        <option value="ARQUIVADO" ${(item.status || '') === 'ARQUIVADO' ? 'selected' : ''}>Arquivado</option>
+                    </select>
+                    <button class="btn btn-outline-secondary" onclick="atualizarStatusCertificado(${item.id})">OK</button>
+                </div>
+            </td>
+            <td><span class="badge bg-light text-dark border">${item.recipients_count}</span></td>
+            <td class="text-end">
+                <div class="btn-group shadow-sm">
+                    <button class="btn btn-sm btn-light border" onclick="abrirDestinatarios(${item.id})" title="Destinatarios"><i class="fa-solid fa-users text-primary"></i></button>
+                    <button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Designer"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i></button>
+                    <button class="btn btn-sm btn-light border" onclick="enviarCertificado(${item.id}, this)" title="Enviar"><i class="fa-solid fa-paper-plane text-success"></i></button>
+                    <button class="btn btn-sm btn-light border" onclick="duplicarCertificado(${item.id})" title="Duplicar"><i class="fa-regular fa-copy text-indigo-600"></i></button>
+                    <button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir"><i class="fa-solid fa-trash-can text-danger"></i></button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function abrirDesignerCertificado(id) {
+    window.location.href = `/designer_certificado_institucional/${id}`;
+}
+
+function atualizarControlesPaginacao(total, current, pages) {
+    const resumo = document.getElementById('resumoPaginacao');
+    resumo.textContent = `Total: ${total} | Pagina ${current} de ${pages}`;
+    document.getElementById('btnPaginaAnterior').disabled = current <= 1;
+    document.getElementById('btnPaginaProxima').disabled = current >= pages;
+}
+
+function renderPaginacao(current, total) {
+    const container = document.getElementById('paginacaoInstitucional');
+    container.innerHTML = '';
+    if (total <= 1) return;
+
+    const createItem = (page, active = false, disabled = false, text = null) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.innerText = text || page;
+        if (!disabled) {
+            a.onclick = (event) => {
+                event.preventDefault();
+                carregarCertificadosInstitucionais(page);
+            };
+        }
+        li.appendChild(a);
+        return li;
+    };
+
+    container.appendChild(createItem(current - 1, false, current === 1, '«'));
+
+    const range = 1;
+    const pages = [];
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || (i >= current - range && i <= current + range)) {
+            pages.push(i);
+        } else if (pages[pages.length - 1] !== '...') {
+            pages.push('...');
+        }
+    }
+
+    pages.forEach((page) => {
+        if (page === '...') {
+            container.appendChild(createItem(null, false, true, '...'));
+            return;
+        }
+        container.appendChild(createItem(page, page === current));
+    });
+
+    container.appendChild(createItem(current + 1, false, current === total, '»'));
+}
+
+async function criarCertificadoInstitucional() {
+    const saveButton = document.getElementById('btnSalvarNovo');
+    setButtonLoading(saveButton, true, 'Salvando...');
+    const payload = Object.fromEntries(new FormData(formNovo).entries());
+    try {
+        const resp = await fetch('/api/institutional_certificates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            uiError(data.erro || 'Erro ao criar certificado');
+            return;
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('modalNovoCertificado')).hide();
+        formNovo.reset();
+        uiSuccess('Certificado institucional criado.');
+        await carregarCertificadosInstitucionais(1);
+    } finally {
+        setButtonLoading(saveButton, false);
+    }
+}
+
+async function enviarCertificado(id, buttonEl = null) {
+    setButtonLoading(buttonEl, true, 'Enviando...');
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${id}/send`, { method: 'POST' });
+        const data = await resp.json();
+        if (!resp.ok || data.resultado === 'erro') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Problema no envio',
+                text: `${data.erro || data.mensagem || 'Falha ao enviar'}. Enviados: ${data.total_enviado || 0}. Sem e-mail: ${data.sem_email || 0}. Falhas de fila: ${data.falha_fila || 0}`,
+            });
+            await carregarCertificadosInstitucionais(paginaAtual);
+            return;
+        }
+
+        if (data.resultado === 'parcial') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Problema no envio',
+                text: `${data.mensagem}. Enviados: ${data.total_enviado}. Sem e-mail: ${data.sem_email}. Falhas de fila: ${data.falha_fila}`,
+            });
+            await carregarCertificadosInstitucionais(paginaAtual);
+            return;
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Envio concluido',
+            text: `${data.mensagem}. Enviados: ${data.total_enviado}. Sem e-mail: ${data.sem_email}. Falhas de fila: ${data.falha_fila}`,
+        });
+        await carregarCertificadosInstitucionais(paginaAtual);
+    } finally {
+        setButtonLoading(buttonEl, false);
+    }
+}
+
+async function duplicarCertificado(id) {
+    const resp = await fetch(`/api/institutional_certificates/${id}/duplicate`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) {
+        uiError(data.erro || 'Falha ao duplicar certificado');
+        return;
+    }
+    uiSuccess(data.mensagem || 'Certificado duplicado.');
+    await carregarCertificadosInstitucionais(paginaAtual);
+}
+
+async function excluirCertificado(id) {
+    const confirmacao = await Swal.fire({
+        title: 'Excluir certificado?',
+        text: 'Essa acao nao pode ser desfeita.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar',
+    });
+    if (!confirmacao.isConfirmed) return;
+
+    const resp = await fetch(`/api/institutional_certificates/${id}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!resp.ok) {
+        uiError(data.erro || 'Falha ao excluir certificado');
+        return;
+    }
+    uiSuccess(data.mensagem || 'Certificado excluido.');
+    await carregarCertificadosInstitucionais(paginaAtual);
+}
+
+async function atualizarStatusCertificado(id) {
+    const status = document.getElementById(`status_${id}`).value;
+    const resp = await fetch(`/api/institutional_certificates/${id}` , {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+        uiError(data.erro || 'Falha ao atualizar status');
+        return;
+    }
+    uiSuccess(data.mensagem || 'Status atualizado.');
+    await carregarCertificadosInstitucionais(paginaAtual);
+}
+
+function abrirDestinatarios(id) {
+    certificateIdAtivo = id;
+    resetUserSearchState();
+    document.getElementById('inputBuscaUsuario').value = '';
+    document.getElementById('inputCargaHorariaPadrao').value = '';
+    document.getElementById('inputDestinatarios').value = '';
+    document.getElementById('filtroDestinatarios').value = '';
+    recipientsPage = 1;
+    recipientsTotal = 0;
+    recipientsTotalPages = 1;
+    recipientsSortBy = 'id';
+    recipientsSortDir = 'desc';
+    updateRecipientsPaginationInfo();
+    updateRecipientsSortIndicators();
+    document.querySelector('#tabelaBuscaUsuarios tbody').innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">Use a busca para listar usuarios.</td></tr>';
+    renderRecipientsLoading();
+    carregarDestinatarios(id, 1);
+    const modal = new bootstrap.Modal(document.getElementById('modalDestinatarios'));
+    modal.show();
+}
+
+async function carregarDestinatarios(id, page = 1) {
+    recipientsPage = page;
+    const queryText = (document.getElementById('filtroDestinatarios').value || '').trim();
+    const params = new URLSearchParams({
+        page: String(page),
+        per_page: '12',
+        q: queryText,
+        sort_by: recipientsSortBy,
+        sort_dir: recipientsSortDir,
+    });
+    const resp = await fetch(`/api/institutional_certificates/${id}/recipients?${params.toString()}`);
+    const data = await resp.json();
+    if (!resp.ok) {
+        tabelaDestinatariosBody.innerHTML = `<tr><td colspan="13" class="text-danger text-center py-3">${data.erro || 'Erro ao carregar destinatarios'}</td></tr>`;
+        recipientsTotal = 0;
+        recipientsTotalPages = 1;
+        recipientsPage = 1;
+        updateRecipientsPaginationInfo();
+        return;
+    }
+    const items = data.items || [];
+    recipientsTotal = data.total || 0;
+    recipientsTotalPages = data.pages || 1;
+    recipientsPage = data.current_page || page;
+    recipientsSortBy = data.sort_by || recipientsSortBy;
+    recipientsSortDir = data.sort_dir || recipientsSortDir;
+    updateRecipientsPaginationInfo();
+    updateRecipientsSortIndicators();
+
+    if (!items.length) {
+        tabelaDestinatariosBody.innerHTML = '<tr><td colspan="13" class="text-muted text-center py-4"><i class="fa-regular fa-address-book me-2"></i>Nenhum destinatario cadastrado.</td></tr>';
+        return;
+    }
+    tabelaDestinatariosBody.innerHTML = items.map(item => `
+        <tr>
+            <td>${item.nome || ''}</td>
+            <td>${item.email || '-'}</td>
+            <td>${item.cpf || '-'}</td>
+            <td><input type="text" class="form-control form-control-sm" id="carga_${item.id}" value="${item.carga_horaria || ''}" placeholder="Ex.: 20"></td>
+            <td><input type="text" class="form-control form-control-sm" id="curso_${item.id}" value="${item.curso_usuario || ''}" placeholder="Curso"></td>
+            <td class="text-end pe-1">
+                <button class="btn btn-sm btn-outline-secondary" onclick="salvarDadosDestinatario(${item.id}, this)" title="Salvar dados">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                </button>
+            </td>
+            <td><small class="font-monospace">${item.cert_hash || '-'}</small></td>
+            <td>${item.cert_entregue ? '<span class="badge text-bg-success">Sim</span>' : '<span class="badge text-bg-secondary">Nao</span>'}</td>
+            <td>${item.cert_data_envio ? new Date(item.cert_data_envio).toLocaleString('pt-BR') : '-'}</td>
+            <td class="text-end pe-1">
+                <button class="btn btn-sm btn-outline-info" onclick='abrirPreviewDestinatario(${item.id}, ${JSON.stringify(item.nome || '')})' title="Preview">
+                    <i class="fa-regular fa-eye"></i>
+                </button>
+            </td>
+            <td class="text-end pe-1">
+                <button class="btn btn-sm btn-outline-primary" onclick="baixarPdfDestinatario(${item.id})" title="Baixar PDF">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+            </td>
+            <td class="text-end pe-1">
+                <button class="btn btn-sm btn-outline-success" onclick="reenviarDestinatario(${item.id}, this)" ${item.email ? '' : 'disabled'}>
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </td>
+            <td class="text-end pe-1">
+                <button class="btn btn-sm btn-outline-danger" onclick="removerDestinatario(${item.id})">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function salvarDadosDestinatario(recipientId, buttonEl = null) {
+    if (!certificateIdAtivo) return;
+    const cargaInput = document.getElementById(`carga_${recipientId}`);
+    const cursoInput = document.getElementById(`curso_${recipientId}`);
+    const payload = {
+        carga_horaria: (cargaInput?.value || '').trim(),
+        curso_usuario: (cursoInput?.value || '').trim(),
+    };
+
+    setButtonLoading(buttonEl, true, 'Salvando...');
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            uiError(data.erro || 'Falha ao atualizar dados do destinatario');
+            return;
+        }
+
+        uiSuccess(data.mensagem || 'Dados do destinatario atualizados.');
+        if (cargaInput) cargaInput.value = data.recipient?.carga_horaria || '';
+        if (cursoInput) cursoInput.value = data.recipient?.curso_usuario || '';
+    } finally {
+        setButtonLoading(buttonEl, false);
+    }
+}
+
+function parseDestinatarios(rawText) {
+    return (rawText || '')
+        .split('\n')
+        .map(l => l.trim())
+        .filter(Boolean)
+        .map(l => {
+            const [nome, email, cpf, carga_horaria, curso_usuario] = l.split(';').map(v => (v || '').trim());
+            return { nome, email, cpf, carga_horaria, curso_usuario };
+        });
+}
+
+async function adicionarDestinatarios() {
+    if (!certificateIdAtivo) return;
+    const addButton = document.getElementById('btnAdicionarDestinatarios');
+    setButtonLoading(addButton, true, 'Adicionando...');
+    const texto = document.getElementById('inputDestinatarios').value;
+    const recipients = parseDestinatarios(texto);
+    if (!recipients.length) {
+        setButtonLoading(addButton, false);
+        uiError('Informe ao menos uma linha valida.');
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipients })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            uiError(data.erro || 'Falha ao adicionar destinatarios');
+            return;
+        }
+
+        Toast.fire({ icon: 'success', title: `${data.mensagem}. Inseridos: ${data.inserted}. Ignorados: ${data.skipped}` });
+        document.getElementById('inputDestinatarios').value = '';
+        await carregarDestinatarios(certificateIdAtivo, recipientsPage);
+        await carregarCertificadosInstitucionais(paginaAtual);
+    } finally {
+        setButtonLoading(addButton, false);
+    }
+}
+
+async function removerDestinatario(recipientId) {
+    if (!certificateIdAtivo) return;
+    const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`, {
+        method: 'DELETE'
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+        uiError(data.erro || 'Falha ao remover destinatario');
+        return;
+    }
+    uiSuccess(data.mensagem || 'Destinatario removido.');
+    await carregarDestinatarios(certificateIdAtivo, recipientsPage);
+    await carregarCertificadosInstitucionais(paginaAtual);
+}
+
+async function reenviarDestinatario(recipientId, buttonEl = null) {
+    if (!certificateIdAtivo) return;
+    setButtonLoading(buttonEl, true, 'Reenviando...');
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/resend`, {
+            method: 'POST'
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            uiError(data.erro || 'Problema no envio');
+            return;
+        }
+        uiSuccess(data.mensagem || 'Reenvio solicitado.');
+        await carregarDestinatarios(certificateIdAtivo, recipientsPage);
+        await carregarCertificadosInstitucionais(paginaAtual);
+    } finally {
+        setButtonLoading(buttonEl, false);
+    }
+}
+
+async function importarDestinatariosCsv() {
+    if (!certificateIdAtivo) return;
+    const importButton = document.getElementById('btnImportarCsv');
+    setButtonLoading(importButton, true, 'Importando...');
+    const input = document.getElementById('fileDestinatariosCsv');
+    if (!input.files || !input.files[0]) {
+        setButtonLoading(importButton, false);
+        uiError('Selecione um arquivo CSV.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/import_csv`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            uiError(data.erro || 'Falha na importacao CSV');
+            return;
+        }
+
+        Toast.fire({ icon: 'success', title: `${data.mensagem}. Inseridos: ${data.inserted}. Ignorados: ${data.skipped}` });
+        input.value = '';
+        await carregarDestinatarios(certificateIdAtivo, recipientsPage);
+        await carregarCertificadosInstitucionais(paginaAtual);
+    } finally {
+        setButtonLoading(importButton, false);
+    }
+}
+
+function selectedUsersFromSearch() {
+    const cargaHorariaPadrao = (document.getElementById('inputCargaHorariaPadrao').value || '').trim();
+    return Array.from(selectedUsersMap.values()).map((user) => ({
+            nome: user.nome || user.username || '',
+            email: user.email || '',
+            cpf: user.cpf || '',
+            carga_horaria: cargaHorariaPadrao,
+            curso_usuario: user.curso || '',
+            metadata: {
+                username: user.username || null,
+                ra: user.ra || null,
+                curso: user.curso || null,
+                curso_usuario: user.curso || null,
+                carga_horaria: cargaHorariaPadrao || null,
+            }
+        }));
+}
+
+function renderSearchUsersRows() {
+    const tbody = document.querySelector('#tabelaBuscaUsuarios tbody');
+    if (!searchUsersResults.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">Nenhum usuario encontrado para o termo informado.</td></tr>';
+        const checkAll = document.getElementById('checkTodosUsuarios');
+        if (checkAll) checkAll.checked = false;
+        updateUserSearchPaginationInfo();
+        return;
+    }
+    tbody.innerHTML = searchUsersResults.map((user, index) => `
+        <tr>
+            <td><input type="checkbox" class="form-check-input check-usuario-selecao" value="${index}" ${selectedUsersMap.has(userSelectionKey(user)) ? 'checked' : ''}></td>
+            <td>${user.nome || user.username || '-'}</td>
+            <td>${user.email || '-'}</td>
+            <td>${user.cpf || '-'}</td>
+            <td>${user.ra || '-'}</td>
+            <td>${user.curso || '-'}</td>
+        </tr>
+    `).join('');
+
+    document.querySelectorAll('.check-usuario-selecao').forEach((checkbox) => {
+        checkbox.addEventListener('change', (event) => {
+            const index = Number(event.target.value);
+            const user = searchUsersResults[index];
+            if (!user) return;
+            const key = userSelectionKey(user);
+            if (event.target.checked) {
+                selectedUsersMap.set(key, user);
+            } else {
+                selectedUsersMap.delete(key);
+            }
+            updateUserSearchPaginationInfo();
+        });
+    });
+
+    const checkAll = document.getElementById('checkTodosUsuarios');
+    if (checkAll) {
+        checkAll.checked = searchUsersResults.length > 0 && searchUsersResults.every((user) => selectedUsersMap.has(userSelectionKey(user)));
+    }
+    updateUserSearchPaginationInfo();
+}
+
+async function buscarUsuariosDestinatarios(page = 1) {
+    if (!certificateIdAtivo) return;
+    const searchButton = document.getElementById('btnBuscarUsuarios');
+    const tbody = document.querySelector('#tabelaBuscaUsuarios tbody');
+    setButtonLoading(searchButton, true, 'Buscando...');
+    try {
+        const query = (document.getElementById('inputBuscaUsuario').value || '').trim();
+        const params = new URLSearchParams({ q: query, page: String(page), per_page: '15' });
+        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/users/search?${params.toString()}`);
+        const data = await resp.json();
+        if (!resp.ok) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-danger text-center py-3">${data.erro || 'Falha na busca de usuarios'}</td></tr>`;
+            searchUsersResults = [];
+            searchUsersPage = 1;
+            searchUsersTotalPages = 1;
+            searchUsersTotal = 0;
+            updateUserSearchPaginationInfo();
+            return;
+        }
+        searchUsersResults = data.items || [];
+        searchUsersPage = data.current_page || page;
+        searchUsersTotalPages = data.pages || 1;
+        searchUsersTotal = data.total || 0;
+        renderSearchUsersRows();
+    } finally {
+        setButtonLoading(searchButton, false);
+    }
+}
+
+async function adicionarUsuariosSelecionados() {
+    if (!certificateIdAtivo) return;
+    const actionButton = document.getElementById('btnAdicionarUsuariosSelecionados');
+    const recipients = selectedUsersFromSearch();
+    if (!recipients.length) {
+        uiError('Selecione ao menos um usuario da busca.');
+        return;
+    }
+
+    setButtonLoading(actionButton, true, 'Adicionando...');
+    try {
+        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipients })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            uiError(data.erro || 'Falha ao adicionar usuarios selecionados');
+            return;
+        }
+        Toast.fire({ icon: 'success', title: `${data.mensagem}. Inseridos: ${data.inserted}. Ignorados: ${data.skipped}` });
+        selectedUsersMap.clear();
+        renderSearchUsersRows();
+        await carregarDestinatarios(certificateIdAtivo, recipientsPage);
+        await carregarCertificadosInstitucionais(paginaAtual);
+    } finally {
+        setButtonLoading(actionButton, false);
+    }
+}
+
+function exportarDestinatariosCsv() {
+    if (!certificateIdAtivo) return;
+    window.open(`/api/institutional_certificates/${certificateIdAtivo}/recipients/export_csv`, '_blank');
+}
+
+function baixarPdfDestinatario(recipientId) {
+    if (!certificateIdAtivo) return;
+    window.open(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/download`, '_blank');
+}
+
+function abrirPreviewDestinatario(recipientId, recipientNome = '') {
+    if (!certificateIdAtivo) return;
+    const iframe = document.getElementById('recipientPreviewFrame');
+    const subtitle = document.getElementById('previewDestinatarioTitulo');
+    const safeNome = (recipientNome || '').trim();
+    if (subtitle) {
+        subtitle.textContent = safeNome ? `Destinatario: ${safeNome}` : '';
+    }
+    if (iframe) {
+        iframe.src = `/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/preview?t=${Date.now()}`;
+    }
+    if (!previewDestinatarioModalInstance) {
+        previewDestinatarioModalInstance = new bootstrap.Modal(document.getElementById('modalPreviewDestinatario'));
+    }
+    previewDestinatarioModalInstance.show();
+}
+
+document.getElementById('modalPreviewDestinatario').addEventListener('hidden.bs.modal', () => {
+    const iframe = document.getElementById('recipientPreviewFrame');
+    if (iframe) {
+        iframe.src = '';
+    }
+});
+
+document.getElementById('btnSalvarNovo').addEventListener('click', criarCertificadoInstitucional);
+document.getElementById('btnAdicionarDestinatarios').addEventListener('click', adicionarDestinatarios);
+document.getElementById('btnImportarCsv').addEventListener('click', importarDestinatariosCsv);
+document.getElementById('btnExportarCsv').addEventListener('click', exportarDestinatariosCsv);
+document.getElementById('btnBuscarUsuarios').addEventListener('click', buscarUsuariosDestinatarios);
+document.getElementById('btnAdicionarUsuariosSelecionados').addEventListener('click', adicionarUsuariosSelecionados);
+document.getElementById('btnBuscaUsuariosAnterior').addEventListener('click', () => {
+    if (searchUsersPage > 1) buscarUsuariosDestinatarios(searchUsersPage - 1);
+});
+document.getElementById('btnBuscaUsuariosProxima').addEventListener('click', () => {
+    if (searchUsersPage < searchUsersTotalPages) buscarUsuariosDestinatarios(searchUsersPage + 1);
+});
+document.getElementById('checkTodosUsuarios').addEventListener('change', (event) => {
+    const checked = event.target.checked;
+    document.querySelectorAll('.check-usuario-selecao').forEach((checkbox) => {
+        checkbox.checked = checked;
+        const index = Number(checkbox.value);
+        const user = searchUsersResults[index];
+        if (!user) return;
+        const key = userSelectionKey(user);
+        if (checked) {
+            selectedUsersMap.set(key, user);
+        } else {
+            selectedUsersMap.delete(key);
+        }
+    });
+    updateUserSearchPaginationInfo();
+});
+document.getElementById('inputBuscaUsuario').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        buscarUsuariosDestinatarios(1);
+    }
+});
+document.getElementById('inputBuscaUsuario').addEventListener('input', () => {
+    if (searchUsersDebounceTimer) {
+        clearTimeout(searchUsersDebounceTimer);
+    }
+    searchUsersDebounceTimer = setTimeout(() => {
+        if (!certificateIdAtivo) return;
+        buscarUsuariosDestinatarios(1);
+    }, 350);
+});
+document.getElementById('btnFiltrar').addEventListener('click', () => carregarCertificadosInstitucionais(1));
+document.getElementById('btnFiltrarDestinatarios').addEventListener('click', () => {
+    if (!certificateIdAtivo) return;
+    carregarDestinatarios(certificateIdAtivo, 1);
+});
+document.getElementById('btnDestinatariosAnterior').addEventListener('click', () => {
+    if (!certificateIdAtivo) return;
+    if (recipientsPage > 1) carregarDestinatarios(certificateIdAtivo, recipientsPage - 1);
+});
+document.getElementById('btnDestinatariosProxima').addEventListener('click', () => {
+    if (!certificateIdAtivo) return;
+    if (recipientsPage < recipientsTotalPages) carregarDestinatarios(certificateIdAtivo, recipientsPage + 1);
+});
+document.getElementById('filtroDestinatarios').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        if (!certificateIdAtivo) return;
+        carregarDestinatarios(certificateIdAtivo, 1);
+    }
+});
+document.getElementById('filtroDestinatarios').addEventListener('input', () => {
+    if (recipientsDebounceTimer) {
+        clearTimeout(recipientsDebounceTimer);
+    }
+    recipientsDebounceTimer = setTimeout(() => {
+        if (!certificateIdAtivo) return;
+        carregarDestinatarios(certificateIdAtivo, 1);
+    }, 350);
+});
+document.getElementById('btnPaginaAnterior').addEventListener('click', () => {
+    if (paginaAtual > 1) carregarCertificadosInstitucionais(paginaAtual - 1);
+});
+document.getElementById('btnPaginaProxima').addEventListener('click', () => {
+    if (paginaAtual < totalPaginas) carregarCertificadosInstitucionais(paginaAtual + 1);
+});
+document.querySelectorAll('.sort-destinatarios').forEach((button) => {
+    button.addEventListener('click', () => {
+        const sortBy = button.dataset.sortBy;
+        if (!certificateIdAtivo || !sortBy) return;
+        if (recipientsSortBy === sortBy) {
+            recipientsSortDir = recipientsSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            recipientsSortBy = sortBy;
+            recipientsSortDir = 'asc';
+        }
+        carregarDestinatarios(certificateIdAtivo, 1);
+    });
+});
+resetUserSearchState();
+updateRecipientsSortIndicators();
+carregarCertificadosInstitucionais(1);
+</script>
+{% endblock %}

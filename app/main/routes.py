@@ -56,6 +56,33 @@ def gerenciar_entregas(event_id):
         abort(404)
     return render_template('certificate_delivery.html', user=current_user, event=event)
 
+
+@bp.route('/certificados_institucionais')
+@login_required
+def certificados_institucionais_page():
+    """Page for extension profile to manage institutional certificates."""
+    if current_user.role not in ['admin', 'extensao']:
+        return "Acesso negado", 403
+    return render_template('institutional_certificates.html', user=current_user)
+
+
+@bp.route('/designer_certificado_institucional/<int:certificate_id>')
+@login_required
+def designer_certificado_institucional(certificate_id):
+    """Page for visually designing institutional certificates."""
+    if current_user.role not in ['admin', 'extensao']:
+        return "Acesso negado", 403
+
+    from app.models import InstitutionalCertificate
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        abort(404)
+
+    if current_user.role != 'admin' and cert.created_by_username != current_user.username:
+        return "Acesso negado", 403
+
+    return render_template('certificate_designer.html', user=current_user, event=cert, designer_mode='institutional')
+
 @bp.route('/usuarios')
 @login_required
 def gerenciar_usuarios():
@@ -136,29 +163,55 @@ def validar_busca():
 @bp.route('/validar/<cert_hash>')
 def validar_hash(cert_hash):
     """Public page to show validation results for a specific hash."""
-    from app.models import Enrollment, Activity, Event, User
+    from app.models import Enrollment, Activity, Event, User, InstitutionalCertificateRecipient
     enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
     if not enrollment:
-        return render_template('validation.html', erro="Certificado não encontrado ou inválido.")
+        institutional_recipient = InstitutionalCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
+        if not institutional_recipient:
+            return render_template('validation.html', erro="Certificado não encontrado ou inválido.")
+
+        cert = institutional_recipient.certificate
+        data_br = cert.data_emissao
+        try:
+            data_br = datetime.strptime(cert.data_emissao, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            pass
+
+        return render_template(
+            'validation.html',
+            success=True,
+            nome=institutional_recipient.nome,
+            evento=cert.titulo,
+            data=data_br,
+            horas='-',
+            curso=cert.categoria,
+            hash=cert_hash,
+        )
     
     # Calculate total hours for this user in this event
     # (Since hash is linked to one enrollment, but certificates are usually event-wide)
     # Actually, in our logic, one hash represents the participation in the event.
-    activities = Activity.query.filter_by(event_id=enrollment.event_id).all()
+    activity_ref = db.session.get(Activity, enrollment.activity_id)
+    if not activity_ref:
+        return render_template('validation.html', erro="Atividade relacionada não encontrada.")
+    activities = Activity.query.filter_by(event_id=activity_ref.event_id).all()
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
-    event = db.session.get(Event, enrollment.event_id)
+    event = db.session.get(Event, activity_ref.event_id)
     curso = event.curso if event and event.curso else "N/A"
     
     # Sum hours of activities where this user was present in this event
     total_hours = 0
     from app.models import Enrollment as E2
-    all_user_enrollments = E2.query.filter_by(event_id=enrollment.event_id, user_cpf=enrollment.user_cpf, presente=True).all()
+    all_user_enrollments = E2.query.join(Activity, E2.activity_id == Activity.id).filter(
+        Activity.event_id == activity_ref.event_id,
+        E2.user_cpf == enrollment.user_cpf,
+        E2.presente == True,
+    ).all()
     for e in all_user_enrollments:
         atv = db.session.get(Activity, e.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
 
-    data_iso = event.data_inicio
-    data_br = datetime.strptime(data_iso, "%Y-%m-%d").strftime("%d/%m/%Y")
+    data_br = event.data_inicio.strftime("%d/%m/%Y") if event and event.data_inicio else ""
 
     return render_template('validation.html', 
                            success=True, 

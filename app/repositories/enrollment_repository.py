@@ -1,4 +1,4 @@
-from app.models import Enrollment
+from app.models import Enrollment, Activity
 from .base_repository import BaseRepository
 from typing import Optional, List
 
@@ -33,4 +33,8 @@ class EnrollmentRepository(BaseRepository[Enrollment]):
         Returns:
             List[Enrollment]: List of confirmed enrollments.
         """
-        return self.model.query.filter_by(user_cpf=user_cpf, event_id=event_id, presente=True).all()
+        return self.model.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+            Enrollment.user_cpf == user_cpf,
+            Enrollment.presente == True,
+            Activity.event_id == event_id,
+        ).all()

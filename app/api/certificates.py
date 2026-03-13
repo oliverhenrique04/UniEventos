@@ -107,6 +107,15 @@ def _is_valid_email(email):
         return False
     return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email) is not None
 
+
+def _event_from_enrollment(enrollment):
+    if not enrollment:
+        return None
+    activity = db.session.get(Activity, enrollment.activity_id)
+    if not activity:
+        return None
+    return db.session.get(Event, activity.event_id)
+
 @bp.route('/setup/<int:event_id>', methods=['POST'])
 @login_required
 def setup_certificate(event_id):
@@ -208,7 +217,10 @@ def list_delivery(event_id):
     page = request.args.get('page', 1, type=int)
     per_page = 10
     
-    pagination = Enrollment.query.filter_by(event_id=event_id, presente=True).paginate(page=page, per_page=per_page, error_out=False)
+    pagination = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event_id,
+        Enrollment.presente == True,
+    ).paginate(page=page, per_page=per_page, error_out=False)
     
     res = []
     for e in pagination.items:
@@ -241,7 +253,7 @@ def update_email(enrollment_id):
         return jsonify({"erro": "E-mail inválido"}), 400
 
     enrollment = _get_or_404(Enrollment, enrollment_id)
-    event = db.session.get(Event, enrollment.event_id)
+    event = _event_from_enrollment(enrollment)
     if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
@@ -254,7 +266,7 @@ def update_email(enrollment_id):
 def resend_single(enrollment_id):
     """Triggers a resend for a single certificate."""
     enrollment = _get_or_404(Enrollment, enrollment_id)
-    event = db.session.get(Event, enrollment.event_id)
+    event = _event_from_enrollment(enrollment)
     if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
@@ -264,7 +276,11 @@ def resend_single(enrollment_id):
     
     # Calculate total hours
     total_hours = 0
-    presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
+    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event.id,
+        Enrollment.user_cpf == user.cpf,
+        Enrollment.presente == True,
+    ).all()
     for p in presences:
         atv = db.session.get(Activity, p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
@@ -294,14 +310,18 @@ def resend_single(enrollment_id):
 def download_single(enrollment_id):
     # ... (Keep existing download_single code)
     enrollment = _get_or_404(Enrollment, enrollment_id)
-    event = db.session.get(Event, enrollment.event_id)
+    event = _event_from_enrollment(enrollment)
     if not _can_manage_certificates(event):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
     if not user: return "Usuário não encontrado", 404
     total_hours = 0
-    presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
+    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event.id,
+        Enrollment.user_cpf == user.cpf,
+        Enrollment.presente == True,
+    ).all()
     for p in presences:
         atv = db.session.get(Activity, p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)
@@ -314,7 +334,7 @@ def download_single(enrollment_id):
 def preview_single(enrollment_id):
     """Generates and serves a certificate PDF for inline viewing (preview)."""
     enrollment = _get_or_404(Enrollment, enrollment_id)
-    event = db.session.get(Event, enrollment.event_id)
+    event = _event_from_enrollment(enrollment)
     if not _can_manage_certificates(event):
         return "Acesso negado", 403
 
@@ -323,7 +343,11 @@ def preview_single(enrollment_id):
     if not user: return "Usuário não encontrado", 404
     
     total_hours = 0
-    presences = Enrollment.query.filter_by(event_id=event.id, user_cpf=user.cpf, presente=True).all()
+    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event.id,
+        Enrollment.user_cpf == user.cpf,
+        Enrollment.presente == True,
+    ).all()
     for p in presences:
         atv = db.session.get(Activity, p.activity_id)
         if atv: total_hours += (atv.carga_horaria or 0)

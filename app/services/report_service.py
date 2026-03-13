@@ -19,7 +19,9 @@ class ReportService:
         from app.models import Enrollment, Activity
         from sqlalchemy.orm import joinedload
         
-        query = Enrollment.query.filter(Enrollment.event_id == event_id).options(joinedload(Enrollment.activity))
+        query = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+            Activity.event_id == event_id
+        ).options(joinedload(Enrollment.activity))
         
         if filter_nome:
             query = query.filter(Enrollment.nome.ilike(f"%{filter_nome}%"))

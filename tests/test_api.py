@@ -1,4 +1,5 @@
 import json
+from datetime import date, time
 from app.models import Event
 from app.extensions import db
 
@@ -14,8 +15,8 @@ def _create_event_for_certs(app, owner_username='admin_test'):
             nome='Evento Certificado',
             descricao='Teste',
             tipo='RAPIDO',
-            data_inicio='2030-01-01',
-            hora_inicio='10:00'
+            data_inicio=date(2030, 1, 1),
+            hora_inicio=time(10, 0)
         )
         from app.extensions import db
         db.session.add(event)

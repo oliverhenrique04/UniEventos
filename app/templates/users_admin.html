@@ -131,6 +131,7 @@
                                 <option value="participante">Participante</option>
                                 <option value="professor">Professor</option>
                                 <option value="coordenador">Coordenador</option>
+                                <option value="extensao">Extensão</option>
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
@@ -294,6 +295,8 @@
             switch(u.role) {
                 case 'admin': roleBadge = '<span class="badge bg-danger">Admin</span>'; break;
                 case 'professor': roleBadge = '<span class="badge bg-warning text-dark">Professor</span>'; break;
+                case 'coordenador': roleBadge = '<span class="badge bg-primary">Coordenador</span>'; break;
+                case 'extensao': roleBadge = '<span class="badge bg-info text-dark">Extensão</span>'; break;
                 default: roleBadge = '<span class="badge bg-success bg-slate-200 text-slate-700">Participante</span>';
             }
 

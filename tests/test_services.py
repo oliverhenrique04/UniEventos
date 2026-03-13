@@ -1,6 +1,7 @@
 import pytest
 import json
 import os
+from datetime import date, time
 from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.services.certificate_service import CertificateService
@@ -49,8 +50,8 @@ def test_certificate_service_generates_pdf_with_bounded_overflow_text(app, admin
             nome='Evento Overflow',
             descricao='Teste bloco de texto',
             tipo='RAPIDO',
-            data_inicio='2030-05-01',
-            hora_inicio='09:00',
+            data_inicio=date(2030, 5, 1),
+            hora_inicio=time(9, 0),
             cert_template_json=json.dumps({
                 'version': 2,
                 'document': {'gridSize': 2, 'snap': True, 'guides': True},
@@ -106,8 +107,8 @@ def test_certificate_service_generates_pdf_with_partial_rich_text_styles(app, ad
             nome='Evento Rich Text',
             descricao='Teste estilo parcial',
             tipo='RAPIDO',
-            data_inicio='2030-06-02',
-            hora_inicio='11:00',
+            data_inicio=date(2030, 6, 2),
+            hora_inicio=time(11, 0),
             cert_template_json=json.dumps({
                 'version': 2,
                 'document': {'gridSize': 2, 'snap': True, 'guides': True},

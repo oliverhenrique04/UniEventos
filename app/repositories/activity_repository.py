@@ -16,5 +16,5 @@ class ActivityRepository(BaseRepository[Activity]):
         return self.model.query.join(Enrollment).filter(
             Enrollment.user_cpf == user_cpf,
             Enrollment.presente == True,
-            Enrollment.event_id == event_id
+            Activity.event_id == event_id
         ).all()

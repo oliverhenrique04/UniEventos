@@ -196,13 +196,15 @@ def meu_historico():
             activity = db.session.get(Activity, presence.activity_id)
             if activity:
                 total_hours += activity.carga_horaria or 0
-        event_count = db.session.query(Enrollment.event_id).filter_by(user_cpf=current_user.cpf).distinct().count()
+        event_count = db.session.query(Activity.event_id).join(Enrollment, Enrollment.activity_id == Activity.id).filter(
+            Enrollment.user_cpf == current_user.cpf
+        ).distinct().count()
         return jsonify({"total_hours": total_hours, "total_events": event_count})
 
     if type == 'participated':
         from app.models import Event, Enrollment, Activity
         # Join Events with Enrollments where presente=True
-        query = db.session.query(Event).join(Enrollment, Event.id == Enrollment.event_id)\
+        query = db.session.query(Event).join(Activity, Event.id == Activity.event_id).join(Enrollment, Enrollment.activity_id == Activity.id)\
             .filter(Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).distinct()
         
         pagination = query.order_by(Event.data_inicio.desc()).paginate(page=page, per_page=10, error_out=False)
@@ -212,12 +214,12 @@ def meu_historico():
             # Sum hours for this user in this event
             ev_hours = db.session.query(db.func.sum(Activity.carga_horaria))\
                 .join(Enrollment, Activity.id == Enrollment.activity_id)\
-                .filter(Enrollment.event_id == ev.id, Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).scalar() or 0
+                .filter(Activity.event_id == ev.id, Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).scalar() or 0
             
             items.append({
                 "id": ev.id,
                 "nome": ev.nome,
-                "data": ev.data_inicio,
+                "data": ev.data_inicio.isoformat() if ev.data_inicio else None,
                 "horas": int(ev_hours),
                 "tipo": ev.tipo,
                 "token": ev.token_publico
@@ -239,7 +241,7 @@ def meu_historico():
             "id": e.id,
             "atv_nome": e.activity.nome,
             "event_nome": e.activity.event.nome,
-            "data": e.activity.data_atv,
+            "data": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
             "horas": e.activity.carga_horaria,
             "presente": e.presente
         } for e in pagination.items]
@@ -248,9 +250,9 @@ def meu_historico():
         items = [{
             "enrollment_id": e.id,
             "atv_nome": e.activity.nome,
-            "event_id": e.event_id,
+            "event_id": e.activity.event_id,
             "event_nome": e.activity.event.nome,
-            "data": e.activity.data_atv,
+            "data": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
             "horas": e.activity.carga_horaria,
             "hash": e.cert_hash
         } for e in pagination.items]

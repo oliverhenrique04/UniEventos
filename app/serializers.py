@@ -1,3 +1,17 @@
+def _fmt_date(value):
+    if not value:
+        return None
+    return value.isoformat() if hasattr(value, 'isoformat') else str(value)
+
+
+def _fmt_time(value):
+    if not value:
+        return None
+    if hasattr(value, 'strftime'):
+        return value.strftime('%H:%M')
+    return str(value)
+
+
 def serialize_user(user):
     """Serializes a User object to a dictionary."""
     if not user:
@@ -30,8 +44,8 @@ def serialize_activity(activity, current_user=None):
         'palestrante': activity.palestrante,
         'local': activity.local,
         'descricao': activity.descricao,
-        'data_atv': activity.data_atv,
-        'hora_atv': activity.hora_atv,
+        'data_atv': _fmt_date(activity.data_atv),
+        'hora_atv': _fmt_time(activity.hora_atv),
         'carga_horaria': activity.carga_horaria,
         'vagas': activity.vagas,
         'total_inscritos': total_inscritos,
@@ -57,12 +71,13 @@ def serialize_event(event, current_user=None):
         'owner': event.owner_username,
         'nome': event.nome,
         'descricao': event.descricao,
-        'curso': event.curso, # Include curso in serialization
+        'curso': event.curso, # Derived from normalized course relation
+        'course_id': event.course_id,
         'tipo': event.tipo,
-        'data_inicio': event.data_inicio,
-        'hora_inicio': event.hora_inicio,
-        'data_fim': event.data_fim,
-        'hora_fim': event.hora_fim,
+        'data_inicio': _fmt_date(event.data_inicio),
+        'hora_inicio': _fmt_time(event.hora_inicio),
+        'data_fim': _fmt_date(event.data_fim),
+        'hora_fim': _fmt_time(event.hora_fim),
         'token_publico': event.token_publico,
         'status': event.status,
         'total_inscritos': total_inscritos,
