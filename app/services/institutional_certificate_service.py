@@ -35,6 +35,33 @@ class InstitutionalCertificateService:
         except Exception:
             return {}
 
+    @staticmethod
+    def _recipient_effective_profile(recipient):
+        linked_user = getattr(recipient, 'linked_user', None)
+
+        nome = (
+            (linked_user.nome if linked_user else None)
+            or (linked_user.username if linked_user else None)
+            or recipient.nome
+            or ''
+        )
+        email = (
+            (linked_user.email.lower() if linked_user and linked_user.email else None)
+            or recipient.email
+            or None
+        )
+        cpf = (
+            (linked_user.cpf if linked_user else None)
+            or recipient.cpf
+            or None
+        )
+
+        return {
+            'nome': nome,
+            'email': email,
+            'cpf': cpf,
+        }
+
     def _render_institutional_template_json(self, certificate, recipient):
         if not certificate.cert_template_json:
             return None
@@ -45,11 +72,12 @@ class InstitutionalCertificateService:
             return certificate.cert_template_json
 
         metadata = self._recipient_metadata(recipient)
+        profile = self._recipient_effective_profile(recipient)
         carga_horaria = str(metadata.get('carga_horaria') or '-')
         curso_usuario = str(metadata.get('curso_usuario') or '-')
 
         placeholders = {
-            '{{RECIPIENT_NAME}}': recipient.nome or '',
+            '{{RECIPIENT_NAME}}': profile['nome'] or '',
             '{{CERTIFICATE_TITLE}}': certificate.titulo or '',
             '{{CATEGORY}}': certificate.categoria or '',
             '{{EMISSION_DATE}}': certificate.data_emissao or '',
@@ -58,12 +86,12 @@ class InstitutionalCertificateService:
             '{{CURSO_USUARIO}}': curso_usuario,
             '{{HASH}}': recipient.cert_hash or '',
             # Backward-compatible aliases
-            '{{NOME}}': recipient.nome or '',
+            '{{NOME}}': profile['nome'] or '',
             '{{EVENTO}}': certificate.titulo or '',
             '{{HORAS}}': carga_horaria,
             '{{CURSO}}': curso_usuario,
             '{{DATA}}': certificate.data_emissao or '',
-            '{{CPF}}': recipient.cpf or '',
+            '{{CPF}}': profile['cpf'] or '',
         }
 
         for element in template.get('elements', []):
@@ -81,8 +109,10 @@ class InstitutionalCertificateService:
         return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16].upper()
 
     def generate_recipient_pdf(self, certificate, recipient):
+        profile = self._recipient_effective_profile(recipient)
+
         if not recipient.cert_hash:
-            recipient.cert_hash = self.build_hash(certificate.id, recipient.nome, recipient.email)
+            recipient.cert_hash = self.build_hash(certificate.id, profile['nome'], profile['email'])
 
         data_inicio = None
         try:
@@ -99,9 +129,9 @@ class InstitutionalCertificateService:
             cert_template_json=rendered_template_json,
         )
         fake_user = SimpleNamespace(
-            nome=recipient.nome,
-            cpf=recipient.cpf or f'INST-{recipient.id}',
-            email=recipient.email,
+            nome=profile['nome'],
+            cpf=profile['cpf'] or f'INST-{recipient.id}',
+            email=profile['email'],
         )
         fake_enrollment = SimpleNamespace(cert_hash=recipient.cert_hash)
 
@@ -114,22 +144,23 @@ class InstitutionalCertificateService:
         )
 
     def queue_email(self, certificate, recipient, attachment_path):
-        if not recipient.email:
+        profile = self._recipient_effective_profile(recipient)
+        if not profile['email']:
             return False
 
         subject = f"Certificado Institucional - {certificate.titulo}"
         return self.notifier.send_email_task(
-            to_email=recipient.email,
+            to_email=profile['email'],
             subject=subject,
             template_name='institutional_certificate_ready.html',
             template_data={
-                'recipient_name': recipient.nome,
+                'recipient_name': profile['nome'],
                 'certificate_title': certificate.titulo,
                 'category_name': certificate.categoria,
                 'issue_date': certificate.data_emissao,
                 'certificate_number': recipient.cert_hash,
                 'signer_name': certificate.signer_name,
-                'recipient_cpf': recipient.cpf,
+                'recipient_cpf': profile['cpf'],
                 'download_url': build_absolute_app_url(f"/api/institutional_certificates/download_public/{recipient.cert_hash}"),
                 'preview_url': build_absolute_app_url(f"/api/institutional_certificates/preview_public/{recipient.cert_hash}"),
                 'validation_url': build_absolute_app_url(f"/validar/{recipient.cert_hash}"),

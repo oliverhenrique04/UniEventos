@@ -341,6 +341,7 @@ class InstitutionalCertificateRecipient(db.Model):
     __table_args__ = (
         db.UniqueConstraint('certificate_id', 'email', name='uq_institutional_recipient_email_per_cert'),
         db.UniqueConstraint('certificate_id', 'cpf', name='uq_institutional_recipient_cpf_per_cert'),
+        db.UniqueConstraint('certificate_id', 'user_username', name='uq_institutional_recipient_user_per_cert'),
         db.Index('ix_institutional_recipient_certificate_id', 'certificate_id'),
         db.Index('ix_institutional_recipient_user_username', 'user_username'),
         db.Index('ix_institutional_recipient_entregue', 'cert_entregue'),

@@ -137,6 +137,34 @@ def _extract_recipient_metadata(recipient):
         return {}
 
 
+def _recipient_effective_profile(recipient):
+    linked_user = getattr(recipient, 'linked_user', None)
+    nome = (
+        (linked_user.nome if linked_user else None)
+        or (linked_user.username if linked_user else None)
+        or recipient.nome
+        or ''
+    )
+    email = (
+        (linked_user.email.lower() if linked_user and linked_user.email else None)
+        or recipient.email
+        or None
+    )
+    cpf = (
+        (linked_user.cpf if linked_user else None)
+        or recipient.cpf
+        or None
+    )
+    username = (linked_user.username if linked_user else None) or recipient.user_username
+
+    return {
+        'nome': nome,
+        'email': email,
+        'cpf': cpf,
+        'user_username': username,
+    }
+
+
 def _to_float_or_none(value):
     raw = str(value or '').strip().replace(',', '.')
     if not raw:
@@ -498,6 +526,7 @@ def duplicate_institutional_certificate(certificate_id):
     for r in cert.recipients:
         copied_recipient = InstitutionalCertificateRecipient(
             certificate_id=duplicated.id,
+            user_username=r.user_username,
             nome=r.nome,
             email=r.email,
             cpf=r.cpf,
@@ -602,10 +631,10 @@ def list_recipients(certificate_id):
         'items': [
             {
                 'id': r.id,
-                'nome': r.nome,
-                'email': r.email,
-                'cpf': r.cpf,
-                'user_username': r.user_username,
+                'nome': _recipient_effective_profile(r)['nome'],
+                'email': _recipient_effective_profile(r)['email'],
+                'cpf': _recipient_effective_profile(r)['cpf'],
+                'user_username': _recipient_effective_profile(r)['user_username'],
                 'linked_user_nome': r.linked_user.nome if r.linked_user else None,
                 'carga_horaria': _extract_recipient_metadata(r).get('carga_horaria'),
                 'curso_usuario': _extract_recipient_metadata(r).get('curso_usuario'),
@@ -865,11 +894,13 @@ def resend_recipient(certificate_id, recipient_id):
     if not recipient:
         return jsonify({'erro': 'Destinatario nao encontrado'}), 404
 
-    if not recipient.email:
+    profile = _recipient_effective_profile(recipient)
+
+    if not profile['email']:
         return jsonify({'erro': 'Destinatario sem email cadastrado'}), 400
 
     if not recipient.cert_hash:
-        recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+        recipient.cert_hash = institutional_service.build_hash(certificate_id, profile['nome'], profile['email'])
 
     pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
     queued = institutional_service.queue_email(cert, recipient, pdf_path)
@@ -898,11 +929,12 @@ def export_recipients_csv(certificate_id):
     writer.writerow(['nome', 'email', 'cpf', 'carga_horaria', 'curso_usuario', 'cert_hash', 'cert_entregue', 'cert_data_envio'])
 
     for r in recipients:
+        profile = _recipient_effective_profile(r)
         metadata = _extract_recipient_metadata(r)
         writer.writerow([
-            r.nome or '',
-            r.email or '',
-            r.cpf or '',
+            profile['nome'] or '',
+            profile['email'] or '',
+            profile['cpf'] or '',
             metadata.get('carga_horaria') or '',
             metadata.get('curso_usuario') or '',
             r.cert_hash or '',
@@ -931,8 +963,9 @@ def download_recipient_pdf(certificate_id, recipient_id):
     if not recipient:
         return jsonify({'erro': 'Destinatario nao encontrado'}), 404
 
+    profile = _recipient_effective_profile(recipient)
     if not recipient.cert_hash:
-        recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+        recipient.cert_hash = institutional_service.build_hash(certificate_id, profile['nome'], profile['email'])
         db.session.commit()
 
     try:
@@ -962,6 +995,11 @@ def download_public_by_hash(cert_hash):
     if not cert:
         return jsonify({'erro': 'Certificado nao encontrado'}), 404
 
+    profile = _recipient_effective_profile(recipient)
+    if not recipient.cert_hash:
+        recipient.cert_hash = institutional_service.build_hash(recipient.certificate_id, profile['nome'], profile['email'])
+        db.session.commit()
+
     pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
     if not pdf_path:
         return jsonify({'erro': 'Falha ao gerar PDF'}), 500
@@ -980,6 +1018,11 @@ def preview_public_by_hash(cert_hash):
     cert = db.session.get(InstitutionalCertificate, recipient.certificate_id)
     if not cert:
         return jsonify({'erro': 'Certificado nao encontrado'}), 404
+
+    profile = _recipient_effective_profile(recipient)
+    if not recipient.cert_hash:
+        recipient.cert_hash = institutional_service.build_hash(recipient.certificate_id, profile['nome'], profile['email'])
+        db.session.commit()
 
     pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
     if not pdf_path:
@@ -1006,8 +1049,9 @@ def preview_recipient_pdf(certificate_id, recipient_id):
     if not recipient:
         return jsonify({'erro': 'Destinatario nao encontrado'}), 404
 
+    profile = _recipient_effective_profile(recipient)
     if not recipient.cert_hash:
-        recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+        recipient.cert_hash = institutional_service.build_hash(certificate_id, profile['nome'], profile['email'])
         db.session.commit()
 
     pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
@@ -1038,10 +1082,11 @@ def send_institutional_certificates(certificate_id):
     failed_queue = 0
     now = datetime.utcnow()
     for recipient in recipients:
+        profile = _recipient_effective_profile(recipient)
         if not recipient.cert_hash:
-            recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
+            recipient.cert_hash = institutional_service.build_hash(certificate_id, profile['nome'], profile['email'])
 
-        if not recipient.email:
+        if not profile['email']:
             skipped_without_email += 1
             continue
 
