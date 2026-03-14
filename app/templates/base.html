@@ -65,6 +65,9 @@
                     <a href="{{ url_for('main.meus_eventos') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-award me-1"></i> Participações
                     </a>
+                    <a href="{{ url_for('main.perfil_usuario', tab='certificados') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                        <i class="fa-solid fa-certificate me-1"></i> Certificados
+                    </a>
                     {% endif %}
                     {% if user.role %}
                     <div class="text-center text-lg-end">
