@@ -10,3 +10,4 @@ logs/
 dist/
 build/
 app/static/certificates/
+gunicorn.pid
