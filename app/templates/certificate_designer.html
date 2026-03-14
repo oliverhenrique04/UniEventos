@@ -789,6 +789,49 @@
     let previewData = null;
     let previewPdfUrl = null;
 
+    function staticUrl(path) {
+        if (!path) return '';
+        const raw = String(path).trim();
+        if (!raw) return '';
+
+        if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) {
+            return raw;
+        }
+
+        if (raw.startsWith('/')) {
+            return pathUrl(raw);
+        }
+
+        const normalized = raw.replace(/^static\//, '');
+        return pathUrl(`/static/${normalized}`);
+    }
+
+    function toStaticRelativePath(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+
+        if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('/')) {
+            try {
+                const parsed = new URL(raw, window.location.origin);
+                const marker = '/static/';
+                const idx = parsed.pathname.indexOf(marker);
+                if (idx >= 0) {
+                    return parsed.pathname.slice(idx + marker.length);
+                }
+                return parsed.pathname.replace(/^\/+/, '');
+            } catch (e) {
+                const marker = '/static/';
+                const idx = raw.indexOf(marker);
+                if (idx >= 0) {
+                    return raw.slice(idx + marker.length);
+                }
+                return raw.replace(/^\/+/, '');
+            }
+        }
+
+        return raw.replace(/^static\//, '');
+    }
+
     function setActionButtonLoading(buttonId, loading, loadingText = 'Processando...') {
         const button = document.getElementById(buttonId);
         if (!button) return;
@@ -1086,7 +1129,7 @@
                 });
             });
         } else if (snapshot.bg) {
-            const bgUrl = snapshot.bg.startsWith('/') ? snapshot.bg : `/static/${snapshot.bg}`;
+            const bgUrl = staticUrl(snapshot.bg);
             await new Promise((resolve) => {
                 fabric.Image.fromURL(bgUrl, (img) => {
                     if (!img) return resolve();
@@ -1138,7 +1181,7 @@
 
             if (obj.type === 'image') {
                 return new Promise((resolve) => {
-                    const src = obj.getSrc ? obj.getSrc() : (obj.data?.src ? (obj.data.src.startsWith('/') ? obj.data.src : `/static/${obj.data.src}`) : null);
+                    const src = obj.getSrc ? obj.getSrc() : (obj.data?.src ? staticUrl(obj.data.src) : null);
                     if (!src) return resolve();
                     fabric.Image.fromURL(src, (img) => {
                         if (!img) return resolve();
@@ -1952,7 +1995,7 @@
             }
 
             if (el.type === 'image' && el.src) {
-                const src = el.src.startsWith('/') ? el.src : `/static/${el.src}`;
+                const src = staticUrl(el.src);
                 fabric.Image.fromURL(src, (img) => {
                     img.set({
                         left: pctToPxX(el.x),
@@ -2685,7 +2728,7 @@
                 return;
             }
 
-            bgPath = (json.bg_url || '').replace('/static/', '');
+            bgPath = toStaticRelativePath(json.bg_url || '');
             await loadBackground(bgPath);
             Toast.fire({ icon: 'success', title: 'Background pronto' });
         } catch (e) {
@@ -2701,7 +2744,7 @@
             return;
         }
 
-        const url = path.startsWith('/') ? path : `/static/${path}`;
+        const url = staticUrl(path);
         document.getElementById('noBgMsg').classList.add('d-none');
         await new Promise((resolve) => {
             fabric.Image.fromURL(url, (img) => {
