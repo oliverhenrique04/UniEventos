@@ -320,8 +320,29 @@
 <script>
     let CURRENT_TAB = 'events';
 
+    function ativarAbaInicialDoPerfil() {
+        const tabParam = new URLSearchParams(window.location.search).get('tab');
+        const tabsMap = {
+            eventos: { target: '#tab-eventos', type: 'events' },
+            atividades: { target: '#tab-atividades', type: 'activities' },
+            certificados: { target: '#tab-certificados', type: 'certificates' },
+        };
+
+        const selected = tabsMap[tabParam];
+        if (!selected) {
+            carregarHistorico('events', 1);
+            return;
+        }
+
+        const trigger = document.querySelector(`button[data-bs-target="${selected.target}"]`);
+        if (trigger && window.bootstrap?.Tab) {
+            new bootstrap.Tab(trigger).show();
+        }
+        carregarHistorico(selected.type, 1);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
-        carregarHistorico('events', 1);
+        ativarAbaInicialDoPerfil();
         carregarEstatisticas();
     });
 
