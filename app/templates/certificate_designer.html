@@ -724,10 +724,13 @@
 <script>
     const designerMode = {{ (designer_mode or 'event')|tojson }};
     const entityId = {{ event.id }};
-    const apiBaseUrl = designerMode === 'institutional' ? '/api/institutional_certificates' : '/api/certificates';
+    const apiBaseUrl = designerMode === 'institutional'
+        ? apiUrl('/api/institutional_certificates')
+        : apiUrl('/api/certificates');
     const setupUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/setup` : `${apiBaseUrl}/setup/${entityId}`;
     const uploadAssetUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/upload_asset` : `${apiBaseUrl}/upload_asset/${entityId}`;
     const sendBatchUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/send` : `${apiBaseUrl}/send_batch/${entityId}`;
+    const validationBaseUrl = new URL(pathUrl('/validar/'), window.location.origin).href;
     const toolbar = document.getElementById('floatingToolbar');
     const guideV = document.getElementById('guideV');
     const guideH = document.getElementById('guideH');
@@ -1193,7 +1196,7 @@
             if (obj.data?.id === 'qrcode' || obj.data?.type === 'qr') {
                 return new Promise((resolve) => {
                     const qrious = new QRious({
-                        value: `{{ request.host_url if request else '' }}validar/${tags[HASH_TAG]}`,
+                        value: `${validationBaseUrl}${tags[HASH_TAG]}`,
                         size: 180,
                         level: 'H'
                     });
@@ -2009,7 +2012,7 @@
 
             if (el.type === 'qr') {
                 const qrious = new QRious({
-                    value: `{{ request.host_url if request else '' }}validar/${HASH_TAG}`,
+                    value: `${validationBaseUrl}${HASH_TAG}`,
                     size: 180,
                     level: 'H'
                 });
