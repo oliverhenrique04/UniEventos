@@ -10,7 +10,7 @@ Este guia cobre a autenticacao integrada no Moodle LMS 2024100708.03 usando CPF 
 4. Login/provisionamento de usuario por CPF:
    - Busca usuario existente por CPF.
    - Se nao existir, cria automaticamente como `participante`.
-5. Restricao para comunidade UniEuro por dominio de e-mail (`MOODLE_ALLOWED_EMAIL_DOMAIN`).
+5. Restricao para comunidade Unieuro por dominio de e-mail (`MOODLE_ALLOWED_EMAIL_DOMAIN`).
 6. Validacao de credencial LTI por `oauth_consumer_key` (`MOODLE_TOOL_CONSUMER_KEY`).
 7. Validacao opcional de segredo compartilhado legado (`MOODLE_TOOL_SHARED_SECRET`).
 
@@ -42,7 +42,7 @@ Observacoes:
 
 1. Garanta que o campo `username` de cada usuario no Moodle esteja preenchido com CPF (11 digitos).
 2. Se houver usuarios legados, normalize para conter apenas digitos.
-3. Mantenha esse padrao para toda a comunidade academica UniEuro.
+3. Mantenha esse padrao para toda a comunidade academica Unieuro.
 
 ## 3.2. Habilitar Ferramenta Externa
 
@@ -96,7 +96,7 @@ Importante:
 1. `MOODLE_LOGIN_ENABLED=true` no ambiente de destino.
 2. `MOODLE_LOGIN_URL` aponta para a atividade correta.
 3. CPF chega no payload (`username` e/ou `custom_cpf`).
-4. Dominio do e-mail do usuario e UniEuro (`@unieuro.edu.br`), se restricao ativa.
+4. Dominio do e-mail do usuario e Unieuro (`@unieuro.edu.br`), se restricao ativa.
 5. `oauth_consumer_key` confere com `MOODLE_TOOL_CONSUMER_KEY`.
 6. Quando usar modo legado, `custom_ava_secret` confere com `MOODLE_TOOL_SHARED_SECRET`.
 7. Usuario entra sem digitar senha no UniEventos via botao AVA.

@@ -94,10 +94,6 @@ def ava_launch_login():
     email = (payload.get('lis_person_contact_email_primary') or payload.get('email') or '').strip().lower()
     allowed_domain = (current_app.config.get('MOODLE_ALLOWED_EMAIL_DOMAIN') or '').strip().lower()
 
-    if allowed_domain:
-        if not email or not email.endswith(f'@{allowed_domain}'):
-            return jsonify({'status': 'error', 'message': 'Acesso restrito à comunidade acadêmica UniEuro.'}), 403
-
     expected_consumer_key = (current_app.config.get('MOODLE_TOOL_CONSUMER_KEY') or '').strip()
     received_consumer_key = (
         payload.get('oauth_consumer_key')
@@ -130,6 +126,50 @@ def ava_launch_login():
             }), 403
         if received_secret != shared_secret:
             return jsonify({'status': 'error', 'message': 'Assinatura da ferramenta externa inválida.'}), 403
+
+    nome = (
+        payload.get('lis_person_name_full')
+        or payload.get('name')
+        or f"{payload.get('lis_person_name_given', '').strip()} {payload.get('lis_person_name_family', '').strip()}".strip()
+    )
+
+    user = auth_service.authenticate_or_provision_from_moodle(cpf=cpf, nome=nome, email=email)
+    if not user:
+        return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
+
+    login_user(user)
+    return redirect(url_for('main.index'))
+
+
+@bp.route('/ava/direct', methods=['POST'])
+def ava_direct_login():
+    """Direct login for community members when LTI activity is hidden/unavailable."""
+    if not current_app.config.get('MOODLE_LOGIN_ENABLED'):
+        return jsonify({'status': 'error', 'message': 'Login AVA desativado.'}), 404
+
+    payload = request.form or request.json or {}
+    cpf_field = (current_app.config.get('MOODLE_CPF_FIELD') or 'custom_cpf').strip()
+
+    cpf_raw = (
+        payload.get(cpf_field)
+        or payload.get('username')
+        or payload.get('ext_user_username')
+        or payload.get('custom_cpf')
+        or payload.get('cpf')
+        or payload.get('lis_person_sourcedid')
+        or payload.get('user_id')
+    )
+    cpf = normalize_cpf(cpf_raw)
+
+    if not cpf:
+        return jsonify({'status': 'error', 'message': 'CPF não recebido.'}), 400
+
+    email = (payload.get('lis_person_contact_email_primary') or payload.get('email') or '').strip().lower()
+    allowed_domain = (current_app.config.get('MOODLE_ALLOWED_EMAIL_DOMAIN') or '').strip().lower()
+
+    if allowed_domain:
+        if not email or not email.endswith(f'@{allowed_domain}'):
+            return jsonify({'status': 'error', 'message': 'Acesso restrito à comunidade acadêmica Unieuro.'}), 403
 
     nome = (
         payload.get('lis_person_name_full')

@@ -45,7 +45,7 @@ class AuthService:
 
         user = self.user_repo.get_by_cpf(normalized_cpf)
         normalized_email = (email or '').strip().lower() or None
-        normalized_nome = (nome or '').strip() or 'Comunidade Academica UniEuro'
+        normalized_nome = (nome or '').strip() or 'Comunidade Academica Unieuro'
 
         if user:
             updated = False

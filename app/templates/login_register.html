@@ -89,6 +89,27 @@
         .password-toggle:hover {
             color: #1e293b;
         }
+
+        .auth-support {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .forgot-link {
+            border: 0;
+            background: transparent;
+            color: #044d84;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 0;
+        }
+
+        .forgot-link:hover {
+            color: #03365f;
+            text-decoration: underline;
+        }
     </style>
 {% endblock %}
 
@@ -137,11 +158,13 @@
                         Entrar com o AVA
                     </button>
                     <div class="text-center mb-3">
-                        <small class="text-muted">Disponivel apenas para a comunidade academica UniEuro</small>
+                        <small class="text-muted">O acesso por AVA está disponível exclusivamente para a comunidade acadêmica do Unieuro.</small>
                     </div>
                     {% endif %}
-                    <div class="text-center">
-                        <a href="#" class="text-decoration-none small text-muted" onclick="abrirRecuperacaoSenha(event)">Esqueceu a senha?</a>
+                    <div class="auth-support text-center mt-2">
+                        <button type="button" class="forgot-link" onclick="abrirRecuperacaoSenha(event)">
+                            <i class="fa-solid fa-key me-1"></i> Esqueceu sua senha?
+                        </button>
                     </div>
                 </form>
             </div>
