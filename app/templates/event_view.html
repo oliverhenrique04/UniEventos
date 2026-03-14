@@ -2,6 +2,34 @@
 
 {% block content %}
 <div class="container py-4 fade-in-up">
+    {% if event.data_inicio and event.data_inicio.strftime %}
+        {% set data_inicio_fmt = event.data_inicio.strftime('%d/%m/%Y') %}
+    {% elif event.data_inicio %}
+        {% set data_inicio_fmt = event.data_inicio.split('-')|reverse|join('/') %}
+    {% else %}
+        {% set data_inicio_fmt = '-' %}
+    {% endif %}
+
+    {% if event.data_fim and event.data_fim.strftime %}
+        {% set data_fim_fmt = event.data_fim.strftime('%d/%m/%Y') %}
+    {% elif event.data_fim %}
+        {% set data_fim_fmt = event.data_fim.split('-')|reverse|join('/') %}
+    {% else %}
+        {% set data_fim_fmt = '-' %}
+    {% endif %}
+
+    {% if event.hora_inicio and event.hora_inicio.strftime %}
+        {% set hora_inicio_fmt = event.hora_inicio.strftime('%H:%M') %}
+    {% else %}
+        {% set hora_inicio_fmt = event.hora_inicio or '-' %}
+    {% endif %}
+
+    {% if event.hora_fim and event.hora_fim.strftime %}
+        {% set hora_fim_fmt = event.hora_fim.strftime('%H:%M') %}
+    {% else %}
+        {% set hora_fim_fmt = event.hora_fim or '-' %}
+    {% endif %}
+
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Dashboard</a></li>
@@ -21,7 +49,7 @@
                         </span>
                         <div class="small fw-bold opacity-75">
                             <i class="fa-regular fa-calendar-days me-1"></i>
-                            {{ event.data_inicio.split('-')|reverse|join('/') }}
+                            {{ data_inicio_fmt }}
                         </div>
                     </div>
 
@@ -46,7 +74,7 @@
                                 <small class="text-muted d-block mb-1 fw-bold text-uppercase">Início</small>
                                 <div class="fw-bold text-dark">
                                     <i class="fa-regular fa-clock me-2 text-primary"></i>
-                                    {{ event.data_inicio.split('-')|reverse|join('/') }} às {{ event.hora_inicio }}
+                                    {{ data_inicio_fmt }} às {{ hora_inicio_fmt }}
                                 </div>
                             </div>
                         </div>
@@ -55,7 +83,7 @@
                                 <small class="text-muted d-block mb-1 fw-bold text-uppercase">Término</small>
                                 <div class="fw-bold text-dark">
                                     <i class="fa-regular fa-calendar-check me-2 text-primary"></i>
-                                    {{ event.data_fim.split('-')|reverse|join('/') }} às {{ event.hora_fim }}
+                                    {{ data_fim_fmt }} às {{ hora_fim_fmt }}
                                 </div>
                             </div>
                         </div>

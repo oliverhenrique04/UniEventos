@@ -1,10 +1,128 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.services.admin_service import AdminService
 from app.serializers import serialize_user
+from threading import Thread, Lock
+from math import ceil
+from uuid import uuid4
+from io import BytesIO
 
 bp = Blueprint('admin', __name__, url_prefix='/api')
 admin_service = AdminService()
+_IMPORT_JOBS = {}
+_IMPORT_JOBS_LOCK = Lock()
+
+
+def _update_job(job_id, **kwargs):
+    with _IMPORT_JOBS_LOCK:
+        job = _IMPORT_JOBS.get(job_id)
+        if not job:
+            return
+        job.update(kwargs)
+
+
+def _append_job_row(job_id, row_result):
+    with _IMPORT_JOBS_LOCK:
+        job = _IMPORT_JOBS.get(job_id)
+        if not job:
+            return
+
+        job['processed_rows'] += 1
+        status = row_result.get('status')
+        if status == 'created':
+            job['created'] += 1
+        elif status == 'updated':
+            job['updated'] += 1
+        elif status == 'unchanged':
+            job['unchanged'] += 1
+        else:
+            job['errors_count'] += 1
+
+        job['rows'].append(row_result)
+
+
+def _run_xlsx_import_job(job_id, file_content, app_obj):
+    with app_obj.app_context():
+        try:
+            parsed = admin_service.parse_students_xlsx(BytesIO(file_content))
+            if not parsed.get('ok'):
+                _update_job(
+                    job_id,
+                    status='failed',
+                    completed=True,
+                    message=parsed.get('message', 'Falha ao ler arquivo.'),
+                    ignored_columns=parsed.get('ignored_columns', []),
+                    rows=[
+                        {
+                            'row_number': 0,
+                            'status': 'error',
+                            'message': err,
+                            'nome': '',
+                            'cpf': '',
+                            'curso': '',
+                            'ra': '',
+                        }
+                        for err in parsed.get('errors', [])
+                    ],
+                    processed_rows=0,
+                    total_rows=0,
+                    errors_count=len(parsed.get('errors', [])),
+                )
+                return
+
+            rows = parsed.get('rows', [])
+            _update_job(
+                job_id,
+                status='running',
+                message='Importação em andamento...',
+                total_rows=len(rows),
+                ignored_columns=parsed.get('ignored_columns', []),
+            )
+
+            for row_data in rows:
+                row_result = admin_service.process_student_record(row_data)
+                _append_job_row(job_id, row_result)
+
+            _update_job(
+                job_id,
+                status='completed',
+                completed=True,
+                message='Importação concluída com sucesso.',
+            )
+        except Exception as exc:
+            _update_job(
+                job_id,
+                status='failed',
+                completed=True,
+                message=f'Falha ao processar importação: {str(exc)}',
+            )
+
+
+def _apply_import_rows_filter(rows, field, query):
+    q = (query or '').strip().lower()
+    if not q:
+        return rows
+
+    allowed_fields = {'row_number', 'nome', 'cpf', 'curso', 'ra', 'status', 'message'}
+    normalized_field = (field or 'all').strip().lower()
+
+    def match_row(row):
+        if normalized_field in allowed_fields:
+            value = row.get(normalized_field, '')
+            return q in str(value).lower()
+
+        searchable = [
+            row.get('row_number', ''),
+            row.get('nome', ''),
+            row.get('cpf', ''),
+            row.get('curso', ''),
+            row.get('ra', ''),
+            row.get('status', ''),
+            row.get('message', ''),
+        ]
+        return any(q in str(value).lower() for value in searchable)
+
+    return [row for row in rows if match_row(row)]
 
 @bp.route('/listar_usuarios', methods=['GET'])
 @login_required
@@ -69,7 +187,12 @@ def inscricao_manual():
         return jsonify({"erro": "Negado"}), 403
     
     data = request.json
-    success, msg = admin_service.manual_enroll(data.get('cpf'), data.get('activity_id'))
+    try:
+        activity_id = int(data.get('activity_id'))
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Atividade inválida."}), 400
+
+    success, msg = admin_service.manual_enroll(data.get('cpf'), activity_id)
     
     if success: return jsonify({"mensagem": msg})
     return jsonify({"erro": msg}), 400
@@ -109,6 +232,122 @@ def importar_usuarios_csv():
         "mensagem": f"{success_count} usuários importados.",
         "erros": errors
     })
+
+@bp.route('/importar_alunos_xlsx', methods=['POST'])
+@login_required
+def importar_alunos_xlsx():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+
+    try:
+        result = admin_service.import_students_xlsx(file)
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"erro": f"Falha ao processar XLSX: {str(exc)}"}), 400
+
+
+@bp.route('/importar_alunos_xlsx/start', methods=['POST'])
+@login_required
+def importar_alunos_xlsx_start():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+
+    job_id = uuid4().hex
+    file_content = file.read()
+
+    with _IMPORT_JOBS_LOCK:
+        _IMPORT_JOBS[job_id] = {
+            'job_id': job_id,
+            'status': 'queued',
+            'completed': False,
+            'message': 'Importação iniciada.',
+            'total_rows': 0,
+            'processed_rows': 0,
+            'created': 0,
+            'updated': 0,
+            'unchanged': 0,
+            'errors_count': 0,
+            'ignored_columns': [],
+            'rows': [],
+        }
+
+    app_obj = current_app._get_current_object()
+    worker = Thread(target=_run_xlsx_import_job, args=(job_id, file_content, app_obj), daemon=True)
+    worker.start()
+
+    return jsonify({'job_id': job_id, 'message': 'Importação em processamento.'})
+
+
+@bp.route('/importar_alunos_xlsx/status/<job_id>', methods=['GET'])
+@login_required
+def importar_alunos_xlsx_status(job_id):
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    filter_field = request.args.get('field', 'all', type=str)
+    filter_query = request.args.get('q', '', type=str)
+    page = max(page, 1)
+    per_page = max(min(per_page, 100), 5)
+
+    with _IMPORT_JOBS_LOCK:
+        job = _IMPORT_JOBS.get(job_id)
+        if not job:
+            return jsonify({'erro': 'Job não encontrado.'}), 404
+
+        rows = list(job.get('rows', []))
+        filtered_rows = _apply_import_rows_filter(rows, filter_field, filter_query)
+        total_items = len(filtered_rows)
+        pages = max(1, ceil(total_items / per_page))
+        if page > pages:
+            page = pages
+
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_items = filtered_rows[start:end]
+
+        payload = {
+            'job_id': job['job_id'],
+            'status': job['status'],
+            'completed': job['completed'],
+            'message': job['message'],
+            'total_rows': job['total_rows'],
+            'processed_rows': job['processed_rows'],
+            'created': job['created'],
+            'updated': job['updated'],
+            'unchanged': job['unchanged'],
+            'errors_count': job['errors_count'],
+            'ignored_columns': job['ignored_columns'],
+            'rows': page_items,
+            'filters': {
+                'field': filter_field,
+                'q': filter_query,
+                'filtered_total_items': total_items,
+            },
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'pages': pages,
+                'total_items': total_items,
+            },
+        }
+
+    return jsonify(payload)
 
 @bp.route('/atualizar_permissoes', methods=['POST'])
 @login_required

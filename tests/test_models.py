@@ -7,8 +7,8 @@ def test_user_password_hashing():
     assert not u.check_password('dog')
 
 def test_user_to_dict():
-    u = User(username='user', role='admin', nome='Test', cpf='123')
+    u = User(username='user', role='admin', nome='Test', cpf='12345678901')
     d = u.to_dict()
     assert d['username'] == 'user'
     assert d['role'] == 'admin'
-    assert d['cpf'] == '123'
+    assert d['cpf'] == '12345678901'

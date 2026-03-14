@@ -127,10 +127,18 @@
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label fw-bold text-slate-700 d-flex justify-content-between">
-                                Localização do Check-in
-                                <small class="text-primary fw-normal">Clique no mapa para marcar o local</small>
+                            <label class="form-label fw-bold text-slate-700 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                <span>Localização do Check-in</span>
+                                <small class="text-primary fw-normal">Clique no mapa para marcar ou use GPS</small>
                             </label>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="btnUseMyLocation" onclick="usarMinhaLocalizacao()">
+                                    <i class="fa-solid fa-location-crosshairs me-1"></i> Usar minha localização
+                                </button>
+                                <button type="button" class="btn btn-sm btn-light border" onclick="limparLocalizacao()">
+                                    <i class="fa-solid fa-eraser me-1"></i> Limpar localização
+                                </button>
+                            </div>
                             <div id="map" class="mb-2 shadow-sm"></div>
                             <input type="hidden" id="evLat">
                             <input type="hidden" id="evLon">
@@ -193,7 +201,14 @@
                         <div id="containerRapido" class="d-none">
                             <div class="alert alert-info border-0 rounded-4">
                                 <i class="fa-solid fa-circle-info me-2"></i>
-                                Para <strong>Eventos Rápidos</strong>, o sistema gera automaticamente uma atividade de check-in vinculada ao horário principal do evento.
+                                Para <strong>Eventos Rápidos</strong>, o sistema gera automaticamente uma atividade de check-in vinculada ao horário principal do evento. A carga horária informada abaixo será a utilizada para certificação dos participantes presentes.
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-slate-700">Carga Horária (obrigatória)</label>
+                                    <input type="number" class="form-control" id="evRapidoHoras" min="1" step="1" placeholder="Ex: 2">
+                                    <small class="text-muted">Valor utilizado na emissão do certificado deste evento rápido.</small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -213,7 +228,7 @@
 
                 <div class="glass-panel p-3 bg-indigo-50 border-0 shadow-sm mb-5">
                     <h6 class="fw-bold mb-1 text-indigo-700" style="font-size: 0.85rem;">Certificação Automática</h6>
-                    <p style="font-size: 0.7rem;" class="text-indigo-600 mb-0">A carga horária total é calculada automaticamente pela soma das atividades com presença confirmada.</p>
+                    <p style="font-size: 0.7rem;" class="text-indigo-600 mb-0">A carga horária total é calculada automaticamente pela soma das atividades com presença confirmada. Em Evento Rápido, vale a carga horária única informada no formulário.</p>
                 </div>
             </div>
         </div>
@@ -228,6 +243,59 @@
     let currentType = 'PADRAO';
     let map, marker;
 
+    function setSelectedLocation(lat, lng, sourceLabel = 'Localização marcada') {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+        map.setView([lat, lng], 17);
+
+        document.getElementById('evLat').value = lat;
+        document.getElementById('evLon').value = lng;
+        document.getElementById('locationStatus').innerHTML = `<i class="fa-solid fa-circle-check text-success me-1"></i> ${sourceLabel}: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+
+    function limparLocalizacao() {
+        if (marker) {
+            map.removeLayer(marker);
+            marker = null;
+        }
+        document.getElementById('evLat').value = '';
+        document.getElementById('evLon').value = '';
+        document.getElementById('locationStatus').innerHTML = '<i class="fa-solid fa-location-dot me-1"></i> Nenhuma localização marcada (opcional).';
+    }
+
+    async function usarMinhaLocalizacao() {
+        const btn = document.getElementById('btnUseMyLocation');
+        if (!navigator.geolocation) {
+            Swal.fire('Indisponível', 'Seu navegador não suporta geolocalização.', 'warning');
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Obtendo GPS...';
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                setSelectedLocation(lat, lng, 'Localização detectada');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            },
+            (error) => {
+                let msg = 'Não foi possível obter sua localização.';
+                if (error.code === error.PERMISSION_DENIED) msg = 'Permissão de localização negada. Ative no navegador/celular.';
+                if (error.code === error.TIMEOUT) msg = 'Tempo excedido ao tentar obter GPS.';
+                if (error.code === error.POSITION_UNAVAILABLE) msg = 'Localização indisponível no momento.';
+
+                Swal.fire('Falha de localização', msg, 'warning');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         carregarCursosSelect();
         
@@ -240,13 +308,8 @@
         map.on('click', function(e) {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
-            
-            if (marker) map.removeLayer(marker);
-            marker = L.marker([lat, lng]).addTo(map);
-            
-            document.getElementById('evLat').value = lat;
-            document.getElementById('evLon').value = lng;
-            document.getElementById('locationStatus').innerHTML = `<i class="fa-solid fa-circle-check text-success me-1"></i> Localização marcada: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+            setSelectedLocation(lat, lng, 'Localização marcada no mapa');
         });
 
         // Set min dates
@@ -256,6 +319,7 @@
         
         // Add initial activity
         addAtvRow();
+        setEventType(currentType);
     });
 
     async function carregarCursosSelect() {
@@ -271,11 +335,28 @@
 
     function setEventType(type) {
         currentType = type;
-        document.getElementById('optStandard').classList.toggle('active', type === 'PADRAO');
-        document.getElementById('optFast').classList.toggle('active', type === 'RAPIDO');
-        
-        document.getElementById('containerPadrao').classList.toggle('d-none', type === 'RAPIDO');
-        document.getElementById('containerRapido').classList.toggle('d-none', type === 'PADRAO');
+        const isPadrao = type === 'PADRAO';
+        document.getElementById('optStandard').classList.toggle('active', isPadrao);
+        document.getElementById('optFast').classList.toggle('active', !isPadrao);
+
+        const containerPadrao = document.getElementById('containerPadrao');
+        const containerRapido = document.getElementById('containerRapido');
+        containerPadrao.classList.toggle('d-none', !isPadrao);
+        containerRapido.classList.toggle('d-none', isPadrao);
+
+        // Prevent native browser validation from targeting hidden controls.
+        containerPadrao.querySelectorAll('input, select, textarea, button').forEach((el) => {
+            if (el.classList.contains('atv-nome') || el.classList.contains('atv-horas')) {
+                el.required = isPadrao;
+            }
+            el.disabled = !isPadrao;
+        });
+
+        const evRapidoHoras = document.getElementById('evRapidoHoras');
+        if (evRapidoHoras) {
+            evRapidoHoras.required = !isPadrao;
+            evRapidoHoras.disabled = isPadrao;
+        }
     }
 
     function addAtvRow() {
@@ -328,6 +409,14 @@
 
     document.getElementById('mainEventForm').onsubmit = async (e) => {
         e.preventDefault();
+
+        if (currentType === 'RAPIDO') {
+            const horasRapido = document.getElementById('evRapidoHoras').value;
+            if (!horasRapido || Number(horasRapido) <= 0) {
+                Swal.fire('Validação', 'Informe a carga horária do Evento Rápido.', 'warning');
+                return;
+            }
+        }
         
         const btn = e.target.querySelector('button[type="submit"]');
         const originalText = btn.innerHTML;
@@ -361,6 +450,7 @@
             data_fim: document.getElementById('evDataFim').value,
             hora_fim: document.getElementById('evHoraFim').value,
             is_rapido: currentType === 'RAPIDO',
+            carga_horaria_rapida: currentType === 'RAPIDO' ? document.getElementById('evRapidoHoras').value : null,
             atividades: activities
         };
 

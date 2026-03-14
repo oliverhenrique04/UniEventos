@@ -7,6 +7,14 @@ from flask import current_app
 import unicodedata
 import re
 
+
+def normalize_cpf(value):
+    """Returns CPF as digits only (11 chars expected by domain rules)."""
+    if value is None:
+        return None
+    digits = re.sub(r'\D', '', str(value))
+    return digits
+
 def haversine_distance(lat1, lon1, lat2, lon2):
     """Calculates the great-circle distance between two points in meters."""
     if None in [lat1, lon1, lat2, lon2]: return 0

@@ -59,6 +59,9 @@
                     </a>
                     {% endif %}
                     {% if user.role == 'participante' %}
+                    <a href="/?open_checkin=1#checkin-digital" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                        <i class="fa-solid fa-qrcode me-1"></i> Check-in Digital
+                    </a>
                     <a href="/meus_eventos" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-award me-1"></i> Participações
                     </a>
@@ -73,7 +76,7 @@
                         </span>
                     </div>
                     
-                    <a href="/logout" class="btn btn-outline-danger btn-sm w-100 w-lg-auto">
+                    <a href="/logout" class="btn btn-outline-danger btn-sm w-15 w-lg-auto">
                         <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sair
                     </a>
                     {% endif %}

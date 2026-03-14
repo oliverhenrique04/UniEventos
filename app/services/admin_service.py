@@ -3,6 +3,8 @@ from app.repositories.user_repository import UserRepository
 from sqlalchemy import or_
 import csv
 import io
+from openpyxl import load_workbook
+from app.utils import normalize_cpf
 
 class AdminService:
     """Service layer for administrative user management tasks.
@@ -27,7 +29,9 @@ class AdminService:
                 query = query.join(Course, User.course_id == Course.id, isouter=True)
                 query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
             if filters.get('cpf'):
-                query = query.filter(User.cpf.ilike(f"%{filters['cpf']}%"))
+                cpf_digits = normalize_cpf(filters['cpf'])
+                if cpf_digits:
+                    query = query.filter(User.cpf.ilike(f"%{cpf_digits}%"))
             if filters.get('email'):
                 query = query.filter(User.email.ilike(f"%{filters['email']}%"))
             if filters.get('nome'):
@@ -80,7 +84,8 @@ class AdminService:
             curso=data.get('curso'),
             role=data.get('role', 'participante')
         )
-        user.set_password(data.get('password', '123456'))
+        cpf_default = normalize_cpf(data.get('cpf'))
+        user.set_password(data.get('password') or cpf_default)
         db.session.add(user)
         db.session.commit()
         return user, "Usuário criado com sucesso."
@@ -114,13 +119,19 @@ class AdminService:
 
     def manual_enroll(self, user_cpf, activity_id):
         """Manually enrolls a user into an activity."""
-        user = User.query.filter_by(cpf=user_cpf).first()
+        try:
+            activity_id = int(activity_id)
+        except (TypeError, ValueError):
+            return False, "Atividade inválida."
+
+        user = self.user_repo.get_by_cpf(user_cpf)
         activity = db.session.get(Activity, activity_id)
         
         if not user or not activity:
             return False, "Usuário ou Atividade não encontrados."
             
-        existing = Enrollment.query.filter_by(user_cpf=user_cpf, activity_id=activity_id).first()
+        # Always use normalized persisted CPF from user record.
+        existing = Enrollment.query.filter_by(user_cpf=user.cpf, activity_id=activity_id).first()
         if existing:
             return False, "Usuário já está inscrito nesta atividade."
             
@@ -174,7 +185,8 @@ class AdminService:
                     course_id=course_obj.id if course_obj else None,
                     can_create_events=(row.get('can_create_events', '0') == '1')
                 )
-                user.set_password(row.get('password', '123456')) # Default password
+                cpf_default = normalize_cpf(cpf)
+                user.set_password(row.get('password') or cpf_default)
                 
                 db.session.add(user)
                 success_count += 1
@@ -183,6 +195,306 @@ class AdminService:
         
         db.session.commit()
         return success_count, errors
+
+    @staticmethod
+    def _normalize_cpf_digits(cpf):
+        if not cpf:
+            return ''
+        return ''.join(ch for ch in str(cpf) if ch.isdigit())
+
+    @staticmethod
+    def _format_cpf_mask(cpf_digits):
+        if len(cpf_digits) != 11:
+            return None
+        return f"{cpf_digits[0:3]}.{cpf_digits[3:6]}.{cpf_digits[6:9]}-{cpf_digits[9:11]}"
+
+    def _find_user_by_cpf_flexible(self, cpf_raw):
+        cpf_digits = self._normalize_cpf_digits(cpf_raw)
+        if len(cpf_digits) != 11:
+            return None
+
+        cpf_masked = self._format_cpf_mask(cpf_digits)
+        candidates = [cpf_raw, cpf_digits, cpf_masked]
+        seen = set()
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+            normalized = str(candidate).strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            user = self.user_repo.get_by_cpf(normalized)
+            if user:
+                return user
+
+        return None
+
+    def parse_students_xlsx(self, file_stream):
+        """Parses XLSX rows for student import and returns normalized row records."""
+        workbook = load_workbook(filename=file_stream, read_only=True, data_only=True)
+        sheet = workbook.active
+
+        expected_headers = [
+            'ALUNO_NOME', 'IES', 'CURSO', 'TURMA', 'CPF', 'DATANASCIMENTO',
+            'SEXO', 'ESTADOCIVIL', 'MAE', 'NIVEL ESCOLAR', 'RA', 'TURNO',
+            'PERIODO', 'RUA_NUMERO', 'BAIRRO', 'CEP', 'MUNICIPIO', 'ESTADO',
+            'Total Geral'
+        ]
+        required_headers = {'ALUNO_NOME', 'CURSO', 'CPF'}
+
+        rows = list(sheet.iter_rows(values_only=True))
+        workbook.close()
+
+        if not rows:
+            return {
+                'ok': False,
+                'message': 'Arquivo XLSX vazio.',
+                'rows': [],
+                'errors': ['Arquivo sem linhas para processamento.'],
+                'ignored_columns': expected_headers[1:]
+            }
+
+        headers = [str(h).strip() if h is not None else '' for h in rows[0]]
+        header_map = {h.upper(): idx for idx, h in enumerate(headers) if h}
+
+        missing_required = sorted([h for h in required_headers if h not in header_map])
+        if missing_required:
+            return {
+                'ok': False,
+                'message': 'Cabeçalho inválido.',
+                'rows': [],
+                'errors': [f"Colunas obrigatórias ausentes: {', '.join(missing_required)}"],
+                'ignored_columns': []
+            }
+
+        ignored_columns = [col for col in expected_headers if col not in {'ALUNO_NOME', 'CURSO', 'CPF', 'RA'}]
+
+        idx_nome = header_map.get('ALUNO_NOME')
+        idx_curso = header_map.get('CURSO')
+        idx_cpf = header_map.get('CPF')
+        idx_ra = header_map.get('RA')
+        idx_email = header_map.get('EMAIL')
+
+        parsed_rows = []
+        for row_number, row in enumerate(rows[1:], start=2):
+            if row is None:
+                continue
+
+            nome = str(row[idx_nome]).strip() if idx_nome is not None and idx_nome < len(row) and row[idx_nome] is not None else ''
+            curso_nome = str(row[idx_curso]).strip() if idx_curso is not None and idx_curso < len(row) and row[idx_curso] is not None else ''
+            cpf_raw = str(row[idx_cpf]).strip() if idx_cpf is not None and idx_cpf < len(row) and row[idx_cpf] is not None else ''
+            ra = str(row[idx_ra]).strip() if idx_ra is not None and idx_ra < len(row) and row[idx_ra] is not None else None
+            email = str(row[idx_email]).strip() if idx_email is not None and idx_email < len(row) and row[idx_email] is not None else ''
+
+            if not any([nome, curso_nome, cpf_raw, ra, email]):
+                continue
+
+            parsed_rows.append({
+                'row_number': row_number,
+                'nome': nome,
+                'curso_nome': curso_nome,
+                'cpf_raw': cpf_raw,
+                'ra': ra,
+                'email': email,
+            })
+
+        return {
+            'ok': True,
+            'message': 'Arquivo lido com sucesso.',
+            'rows': parsed_rows,
+            'errors': [],
+            'ignored_columns': ignored_columns,
+        }
+
+    def process_student_record(self, row_data):
+        """Processes one student row and commits per-row for real-time progress updates."""
+        row_number = row_data.get('row_number')
+        nome = row_data.get('nome', '')
+        curso_nome = row_data.get('curso_nome', '')
+        cpf_raw = row_data.get('cpf_raw', '')
+        ra = row_data.get('ra')
+        email = row_data.get('email', '')
+
+        cpf_digits = self._normalize_cpf_digits(cpf_raw)
+        cpf_masked = self._format_cpf_mask(cpf_digits)
+
+        base_payload = {
+            'row_number': row_number,
+            'nome': nome,
+            'cpf': cpf_masked or cpf_raw,
+            'curso': curso_nome,
+            'ra': ra,
+        }
+
+        if len(cpf_digits) != 11 or not cpf_masked:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': f"CPF inválido ({cpf_raw}).",
+            }
+
+        if not nome:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': 'ALUNO_NOME ausente.',
+            }
+
+        if not curso_nome:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': 'CURSO ausente.',
+            }
+
+        course_obj = Course.query.filter(Course.nome.ilike(curso_nome)).first()
+        if not course_obj:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': f"Curso não encontrado ({curso_nome}).",
+            }
+
+        existing = self._find_user_by_cpf_flexible(cpf_masked)
+        if existing:
+            if ra:
+                ra_owner = User.query.filter(User.ra == ra, User.username != existing.username).first()
+                if ra_owner:
+                    db.session.rollback()
+                    return {
+                        **base_payload,
+                        'status': 'error',
+                        'message': f"RA {ra} já pertence a outro usuário.",
+                    }
+
+            changed = False
+            if existing.nome != nome:
+                existing.nome = nome
+                changed = True
+            if existing.course_id != course_obj.id:
+                existing.course_id = course_obj.id
+                changed = True
+            if ra and existing.ra != ra:
+                existing.ra = ra
+                changed = True
+
+            if changed:
+                db.session.commit()
+                return {
+                    **base_payload,
+                    'status': 'updated',
+                    'message': f"Usuário {existing.username} atualizado.",
+                }
+
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'unchanged',
+                'message': f"Usuário {existing.username} sem alteração.",
+            }
+
+        if not email:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': 'Novo aluno sem EMAIL, criação bloqueada.',
+            }
+
+        username = cpf_digits
+        username_owner = self.user_repo.get_by_username(username)
+        if username_owner:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': f"Username {username} já existe para outro usuário.",
+            }
+
+        if ra:
+            ra_owner = User.query.filter_by(ra=ra).first()
+            if ra_owner:
+                db.session.rollback()
+                return {
+                    **base_payload,
+                    'status': 'error',
+                    'message': f"RA {ra} já cadastrado.",
+                }
+
+        user = User(
+            username=username,
+            email=email,
+            nome=nome,
+            cpf=cpf_masked,
+            ra=ra,
+            role='participante',
+            course_id=course_obj.id,
+            can_create_events=False,
+        )
+        user.set_password(cpf_digits)
+        db.session.add(user)
+        db.session.commit()
+        return {
+            **base_payload,
+            'status': 'created',
+            'message': f"Usuário {username} criado.",
+        }
+
+    def import_students_xlsx(self, file_stream):
+        """
+        Imports and upserts students from an academic XLSX file.
+
+        Rules:
+        - Upsert key: CPF
+        - Existing users: update only nome, curso and ra
+        - New users: create only if email is present in the row
+        - New users always receive role='participante'
+        - Username for new users is CPF digits (no punctuation)
+        """
+        parsed = self.parse_students_xlsx(file_stream)
+        if not parsed.get('ok'):
+            return {
+                'message': parsed.get('message', 'Falha ao ler XLSX.'),
+                'total_rows': 0,
+                'created': 0,
+                'updated': 0,
+                'unchanged': 0,
+                'errors': parsed.get('errors', []),
+                'ignored_columns': parsed.get('ignored_columns', []),
+            }
+
+        created = 0
+        updated = 0
+        unchanged = 0
+        errors = []
+        processed_rows = len(parsed.get('rows', []))
+
+        for row_data in parsed.get('rows', []):
+            outcome = self.process_student_record(row_data)
+            status = outcome.get('status')
+            if status == 'created':
+                created += 1
+            elif status == 'updated':
+                updated += 1
+            elif status == 'unchanged':
+                unchanged += 1
+            else:
+                errors.append(f"Linha {outcome.get('row_number')}: {outcome.get('message')}")
+
+        return {
+            'message': f"Processadas {processed_rows} linhas.",
+            'total_rows': processed_rows,
+            'created': created,
+            'updated': updated,
+            'unchanged': unchanged,
+            'errors': errors,
+            'ignored_columns': parsed.get('ignored_columns', []),
+        }
 
     def update_user_permissions(self, username, can_create_events):
         """Updates specific permission flags for a user."""

@@ -1,42 +1,20 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmação de presença</title>
-</head>
-<body>
-    <table border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-            <td style="color: #1a202c; font-size: 24px; font-weight: bold; text-align: center;">
-                Presença confirmada
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 20px 0;">
-                <hr style="border: 0; border-top: 1px solid #e2e8f0;">
-            </td>
-        </tr>
-        <tr>
-            <td style="color: #4a5568; font-size: 16px; line-height: 1.6;">
-                <p style="margin: 0 0 20px 0;">Prezado(a) <strong>{{ user_name }}</strong>,</p>
-                <p style="margin: 0 0 20px 0;">Registramos sua presença na atividade acadêmica informada abaixo.</p>
-            </td>
-        </tr>
-        <tr>
-            <td style="background-color: #edf2f7; border-left: 4px solid #005A9C; padding: 20px; font-size: 16px; border-radius: 4px;">
-                <p style="margin: 0 0 8px 0; color: #2d3748;"><strong>Evento:</strong> {{ event_name }}</p>
-                <p style="margin: 0; color: #2d3748;"><strong>Atividade:</strong> {{ activity_name }}</p>
-            </td>
-        </tr>
-        <tr>
-            <td align="center" style="padding: 30px 0;">
-                <a href="{{ app_url }}" target="_blank"
-                   style="display: inline-block; background-color: #005A9C; color: #ffffff; text-decoration: none; padding: 14px 26px; border-radius: 5px; font-size: 16px; font-weight: bold;">
-                    Acessar meus eventos
-                </a>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+{% extends 'emails/base.html' %}
+
+{% block email_content %}
+<h2 style="margin:0 0 10px 0; color:#0f172a; font-size:24px;">Presença confirmada</h2>
+<p style="margin:0 0 14px 0;">Prezado(a) <strong>{{ user_name }}</strong>,</p>
+<p style="margin:0 0 14px 0;">Registramos sua presença com sucesso.</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0; background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #044d84; border-radius:10px;">
+    <tr><td style="padding:14px;"><strong>Evento:</strong> {{ event_name }}</td></tr>
+    <tr><td style="padding:0 14px 14px 14px;"><strong>Atividade:</strong> {{ activity_name }}</td></tr>
+</table>
+
+<table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 12px 0;">
+    <tr>
+        <td style="background:#044d84; border-radius:8px;">
+            <a href="{{ app_url }}" style="display:inline-block; padding:11px 18px; color:#fff; text-decoration:none; font-weight:700;">Acessar meus eventos</a>
+        </td>
+    </tr>
+</table>
+{% endblock %}

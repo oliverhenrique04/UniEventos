@@ -2,11 +2,12 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.enrollment_repository import EnrollmentRepository
 from app.services.notification_service import NotificationService
-from app.models import Event, Activity, Enrollment, Course, db
+from app.models import Event, Activity, Enrollment, Course, User, db
 import secrets
-from datetime import datetime
+from datetime import datetime, date
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
+from app.utils import normalize_cpf
 
 class EventService:
     """
@@ -43,10 +44,32 @@ class EventService:
                 continue
         return None
 
+    @staticmethod
+    def _parse_fast_event_hours(value):
+        raw = str(value).strip() if value is not None else ''
+        if not raw:
+            raise ValueError('Carga horária é obrigatória para Evento Rápido.')
+        try:
+            hours = int(raw)
+        except (ValueError, TypeError):
+            raise ValueError('Carga horária inválida para Evento Rápido.')
+        if hours <= 0:
+            raise ValueError('Carga horária do Evento Rápido deve ser maior que zero.')
+        return hours
+
     def create_event(self, owner_username, data):
         """Creates a new event and its associated activities."""
-        is_rapido = data.get('is_rapido')
+        is_rapido = bool(data.get('is_rapido'))
+        fast_event_hours = self._parse_fast_event_hours(data.get('carga_horaria_rapida')) if is_rapido else None
         token = secrets.token_urlsafe(12)
+        data_inicio = self._parse_date(data.get('data_inicio'))
+        data_fim = self._parse_date(data.get('data_fim'))
+
+        # Fast events must always have at least the creation date.
+        if is_rapido and not data_inicio:
+            data_inicio = date.today()
+        if is_rapido and not data_fim:
+            data_fim = data_inicio
         
         # Safe coordinate parsing
         try:
@@ -63,9 +86,9 @@ class EventService:
             latitude=lat,
             longitude=lon,
             tipo='RAPIDO' if is_rapido else 'PADRAO',
-            data_inicio=self._parse_date(data.get('data_inicio')),
+            data_inicio=data_inicio,
             hora_inicio=self._parse_time(data.get('hora_inicio')),
-            data_fim=self._parse_date(data.get('data_fim')),
+            data_fim=data_fim,
             hora_fim=self._parse_time(data.get('hora_fim')),
             token_publico=token,
             status='ABERTO'
@@ -73,11 +96,97 @@ class EventService:
         self.event_repo.save(event)
         
         if is_rapido:
-            self._create_default_checkin_activity(event)
+            self._create_default_checkin_activity(event, fast_event_hours)
         else:
             self._create_activities(event, data.get('atividades', []))
+
+        self._notify_owner_event_created(event)
             
         return event
+
+    def _notify_owner_event_created(self, event):
+        """Sends an email confirmation to the event owner when an event is created."""
+        owner = User.query.filter_by(username=event.owner_username).first()
+        if not owner or not owner.email:
+            return
+
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        event_link = f"{app_url}/inscrever/{event.token_publico}" if app_url else f"/inscrever/{event.token_publico}"
+        manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
+        event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
+        event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
+
+        self.notification_service.send_email_task(
+            to_email=owner.email,
+            subject=f"Evento criado: {event.nome}",
+            template_name='event_created_owner.html',
+            template_data={
+                'user_name': owner.nome or owner.username,
+                'event_name': event.nome,
+                'event_type': event.tipo,
+                'event_date': event_date,
+                'event_time': event_time,
+                'event_status': event.status,
+                'event_link': event_link,
+                'manage_link': manage_link,
+                'year': datetime.now().year,
+            },
+        )
+
+    def _notify_owner_event_updated(self, event):
+        """Sends an email confirmation to the event owner when an event is updated."""
+        owner = User.query.filter_by(username=event.owner_username).first()
+        if not owner or not owner.email:
+            return
+
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        event_link = f"{app_url}/editar_evento/{event.id}" if app_url else f"/editar_evento/{event.id}"
+        manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
+        event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
+        event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
+
+        self.notification_service.send_email_task(
+            to_email=owner.email,
+            subject=f"Evento atualizado: {event.nome}",
+            template_name='event_updated_owner.html',
+            template_data={
+                'user_name': owner.nome or owner.username,
+                'event_name': event.nome,
+                'event_type': event.tipo,
+                'event_date': event_date,
+                'event_time': event_time,
+                'event_status': event.status,
+                'event_link': event_link,
+                'manage_link': manage_link,
+                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                'year': datetime.now().year,
+            },
+        )
+
+    def _notify_owner_event_deleted(self, owner_username, event_name, event_type, event_date, event_time):
+        """Sends an email confirmation to the event owner when an event is deleted."""
+        owner = User.query.filter_by(username=owner_username).first()
+        if not owner or not owner.email:
+            return
+
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
+
+        self.notification_service.send_email_task(
+            to_email=owner.email,
+            subject=f"Evento excluído: {event_name}",
+            template_name='event_deleted_owner.html',
+            template_data={
+                'user_name': owner.nome or owner.username,
+                'event_name': event_name,
+                'event_type': event_type,
+                'event_date': event_date,
+                'event_time': event_time,
+                'manage_link': manage_link,
+                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                'year': datetime.now().year,
+            },
+        )
 
     def update_event(self, event_id, owner_username, role, data):
         """Updates an existing event's information and its associated activities.
@@ -98,6 +207,9 @@ class EventService:
         # Security check: Only the owner or an admin can modify an event.
         if role != 'admin' and event.owner_username != owner_username:
             return None, "Sem permissão para editar este evento"
+
+        is_rapido = bool(data.get('is_rapido'))
+        fast_event_hours = self._parse_fast_event_hours(data.get('carga_horaria_rapida')) if is_rapido else None
             
         # Safe coordinate parsing to prevent crashes on invalid input
         try:
@@ -118,20 +230,21 @@ class EventService:
         event.hora_fim = self._parse_time(data.get('hora_fim', event.hora_fim))
         
         # Non-destructive activity synchronization
-        if 'atividades' in data or data.get('is_rapido'):
-            if data.get('is_rapido'):
+        if 'atividades' in data or is_rapido:
+            if is_rapido:
                 # For fast events, check if default activity exists before recreating
                 has_checkin = any(a.nome == "Check-in Presença" for a in event.activities)
                 if not has_checkin:
                     # Only clear if changing from PADRAO to RAPIDO
                     for activity in event.activities:
                         self.activity_repo.delete(activity)
-                    self._create_default_checkin_activity(event)
+                    self._create_default_checkin_activity(event, fast_event_hours)
                 else:
                     # Update existing check-in activity with new event details
                     checkin = next(a for a in event.activities if a.nome == "Check-in Presença")
                     checkin.data_atv = event.data_inicio
                     checkin.hora_atv = event.hora_inicio
+                    checkin.carga_horaria = fast_event_hours
                     checkin.latitude = event.latitude
                     checkin.longitude = event.longitude
                     self.activity_repo.save(checkin)
@@ -139,6 +252,7 @@ class EventService:
                 self._sync_activities(event, data.get('atividades', []))
             
         self.event_repo.save(event)
+        self._notify_owner_event_updated(event)
         return event, "Evento atualizado com sucesso!"
 
     def _sync_activities(self, event, activities_data):
@@ -246,7 +360,11 @@ class EventService:
             if filters.get('nome'):
                 query = query.filter(Enrollment.nome.ilike(f"%{filters['nome']}%"))
             if filters.get('cpf'):
-                query = query.filter(Enrollment.user_cpf.ilike(f"%{filters['cpf']}%"))
+                    cpf_digits = normalize_cpf(filters['cpf'])
+                    if cpf_digits:
+                        query = query.filter(Enrollment.user_cpf.ilike(f"%{cpf_digits}%"))
+            if filters.get('activity_id'):
+                query = query.filter(Enrollment.activity_id == filters['activity_id'])
             if filters.get('presente') is not None:
                 query = query.filter(Enrollment.presente == filters['presente'])
 
@@ -300,7 +418,15 @@ class EventService:
         if not event: return False, "Evento não encontrado"
         if role != 'admin' and event.owner_username != owner_username:
             return False, "Permissão negada"
+
+        event_name = event.nome
+        event_type = event.tipo
+        event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
+        event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
+        event_owner = event.owner_username
+
         self.event_repo.delete(event)
+        self._notify_owner_event_deleted(event_owner, event_name, event_type, event_date, event_time)
         return True, "Evento removido com sucesso."
 
     def get_activity(self, activity_id):
@@ -401,8 +527,8 @@ class EventService:
         query = Enrollment.query.filter_by(user_cpf=user_cpf, presente=True).filter(Enrollment.cert_hash.isnot(None)).join(Activity)
         return query.order_by(Activity.data_atv.asc(), Activity.hora_atv.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
-    def _create_default_checkin_activity(self, event):
-        activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=0, vagas=-1, latitude=event.latitude, longitude=event.longitude)
+    def _create_default_checkin_activity(self, event, workload_hours):
+        activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=workload_hours, vagas=-1, latitude=event.latitude, longitude=event.longitude)
         self.activity_repo.save(activity)
 
     def _create_activities(self, event, activities_data):

@@ -27,7 +27,7 @@ class ReportService:
             query = query.filter(Enrollment.nome.ilike(f"%{filter_nome}%"))
             
         # Order by Activity name then Participant name
-        query = query.join(Activity, Enrollment.activity_id == Activity.id).order_by(Activity.nome.asc(), Enrollment.nome.asc())
+        query = query.order_by(Activity.nome.asc(), Enrollment.nome.asc())
         
         return query.paginate(page=page, per_page=per_page, error_out=False)
 

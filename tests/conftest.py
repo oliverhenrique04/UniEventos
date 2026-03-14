@@ -24,7 +24,7 @@ def runner(app):
 @pytest.fixture
 def admin_user(app):
     with app.app_context():
-        user = User(username='admin_test', role='admin', nome='Admin Test', cpf='000')
+        user = User(username='admin_test', role='admin', nome='Admin Test', cpf='00000000000')
         user.set_password('1234')
         db.session.add(user)
         db.session.commit()

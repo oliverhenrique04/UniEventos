@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from datetime import date, time
 from app.models import (
     Event,
@@ -10,6 +11,8 @@ from app.models import (
     InstitutionalCertificateRecipient,
 )
 from app.extensions import db
+from openpyxl import Workbook
+from app.services.auth_service import AuthService
 
 
 def _login_admin(client):
@@ -34,6 +37,29 @@ def _create_event_for_certs(app, owner_username='admin_test'):
 
 def _login_participant(client):
     client.post('/api/login', json={'username': 'participant_test', 'password': '1234'})
+
+
+def _build_students_xlsx_for_api(rows, include_email=True):
+    wb = Workbook()
+    ws = wb.active
+
+    headers = [
+        'ALUNO_NOME', 'IES', 'CURSO', 'TURMA', 'CPF', 'DATANASCIMENTO',
+        'SEXO', 'ESTADOCIVIL', 'MAE', 'NIVEL ESCOLAR', 'RA', 'TURNO',
+        'PERIODO', 'RUA_NUMERO', 'BAIRRO', 'CEP', 'MUNICIPIO', 'ESTADO',
+        'Total Geral'
+    ]
+    if include_email:
+        headers.append('EMAIL')
+
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return stream
 
 
 def _seed_profile_history_data(app):
@@ -240,3 +266,95 @@ def test_profile_certificates_return_public_download_and_preview_urls(client, ap
     assert event_item['preview_url'].startswith('/api/certificates/preview_public/')
     assert inst_item['download_url'].startswith('/api/institutional_certificates/download_public/')
     assert inst_item['preview_url'].startswith('/api/institutional_certificates/preview_public/')
+
+
+def test_importar_alunos_xlsx_requires_admin(client, app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='participant_import',
+            role='participante',
+            nome='Participante',
+            cpf='321.654.987-00',
+            email='participant_import@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.commit()
+
+    client.post('/api/login', json={'username': 'participant_import', 'password': '1234'})
+
+    xlsx = _build_students_xlsx_for_api([
+        ['Aluno', 'Uni', 'Curso X', 'T1', '12345678900', '', '', '', '', '', '', '', '', '', '', '', '', '', 1, 'a@a.com']
+    ])
+    res = client.post(
+        '/api/importar_alunos_xlsx',
+        data={'file': (xlsx, 'alunos.xlsx')},
+        content_type='multipart/form-data'
+    )
+    assert res.status_code == 403
+
+
+def test_importar_alunos_xlsx_admin_processes_file(client, app, admin_user):
+    with app.app_context():
+        from app.models import Course
+
+        db.session.add(Course(nome='Direito'))
+        db.session.commit()
+
+    _login_admin(client)
+    xlsx = _build_students_xlsx_for_api([
+        ['Aluno API', 'Uni', 'Direito', 'T1', '12345678900', '', '', '', '', '', 'RA-API', '', '', '', '', '', '', '', 1, 'api@example.com']
+    ])
+
+    res = client.post(
+        '/api/importar_alunos_xlsx',
+        data={'file': (xlsx, 'alunos.xlsx')},
+        content_type='multipart/form-data'
+    )
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['created'] == 1
+    assert payload['updated'] == 0
+
+
+def test_update_profile_api_updates_name_email(client, app, admin_user):
+    _login_admin(client)
+
+    res = client.put('/api/me/profile', json={
+        'nome': 'Admin Atualizado',
+        'email': 'admin_updated@test.local'
+    })
+
+    assert res.status_code == 200
+    with app.app_context():
+        user = db.session.get(User, 'admin_test')
+        assert user.nome == 'Admin Atualizado'
+        assert user.email == 'admin_updated@test.local'
+
+
+def test_change_password_api_requires_current_password(client, admin_user):
+    _login_admin(client)
+    res = client.put('/api/me/password', json={
+        'current_password': 'senha_errada',
+        'new_password': 'novasenha123'
+    })
+    assert res.status_code == 400
+
+
+def test_password_forgot_always_returns_success(client):
+    res = client.post('/api/password/forgot', json={'email': 'naoexiste@test.local'})
+    assert res.status_code == 200
+    assert 'mensagem' in res.get_json()
+
+
+def test_password_reset_with_token_updates_password(client, app, admin_user):
+    with app.app_context():
+        service = AuthService()
+        token = service._password_reset_serializer().dumps({'username': 'admin_test'})
+
+    res = client.post('/api/password/reset', json={'token': token, 'password': 'nova12345'})
+    assert res.status_code == 200
+
+    login_res = client.post('/api/login', json={'cpf': '00000000000', 'password': 'nova12345'})
+    assert login_res.status_code == 200

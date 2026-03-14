@@ -1,6 +1,7 @@
 from app.models import User
 from .base_repository import BaseRepository
 from typing import Optional
+from app.utils import normalize_cpf
 
 class UserRepository(BaseRepository[User]):
     """
@@ -31,4 +32,7 @@ class UserRepository(BaseRepository[User]):
         Returns:
             User: The user object or None.
         """
-        return self.find_one_by(cpf=cpf)
+        normalized = normalize_cpf(cpf)
+        if not normalized:
+            return None
+        return self.find_one_by(cpf=normalized)

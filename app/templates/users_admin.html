@@ -12,6 +12,9 @@
             <button onclick="abrirModalImportar()" class="btn btn-outline-primary shadow-sm">
                 <i class="fa-solid fa-file-csv me-2"></i>Importar CSV
             </button>
+            <button onclick="abrirModalImportarXlsx()" class="btn btn-outline-primary shadow-sm">
+                <i class="fa-solid fa-file-excel me-2"></i>Importar XLSX Alunos
+            </button>
             <button onclick="abrirModalPermissoes()" class="btn btn-outline-primary shadow-sm">
                 <i class="fa-solid fa-users-gear me-2"></i>Permissões em Lote
             </button>
@@ -172,6 +175,94 @@
     </div>
 </div>
 
+<!-- Modal Import XLSX -->
+<div class="modal fade" id="modalImportXlsx" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Importar Alunos (XLSX)</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="glass-panel p-3 border-top border-2 border-primary mb-3">
+                    <p class="small text-muted mb-2">Estrutura esperada: ALUNO_NOME, CURSO, EMAIL, CPF e RA.</p>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-9">
+                            <input type="file" id="fileXlsx" class="form-control" accept=".xlsx">
+                        </div>
+                        <div class="col-md-3 d-grid">
+                            <button id="btnStartImportXlsx" onclick="enviarXlsx()" class="btn btn-primary">
+                                <i class="fa-solid fa-upload me-2"></i>Iniciar Importação
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3" id="importResumoCards">
+                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Total</div><div class="fw-bold" id="impTotal">0</div></div></div>
+                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Processadas</div><div class="fw-bold" id="impProcessadas">0</div></div></div>
+                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Criadas</div><div class="fw-bold text-success" id="impCriadas">0</div></div></div>
+                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Atualizadas</div><div class="fw-bold text-primary" id="impAtualizadas">0</div></div></div>
+                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Sem alteração</div><div class="fw-bold text-secondary" id="impInalteradas">0</div></div></div>
+                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Erros</div><div class="fw-bold text-danger" id="impErros">0</div></div></div>
+                </div>
+
+                <div class="small mb-2"><span class="badge bg-info text-dark" id="impStatusBadge">Aguardando arquivo</span> <span class="text-muted" id="impStatusMessage"></span></div>
+
+                <div class="row g-2 align-items-end mb-2">
+                    <div class="col-md-3">
+                        <label class="small fw-bold">Filtrar por</label>
+                        <select id="impFilterField" class="form-select form-select-sm" onchange="aplicarFiltroImportacao()">
+                            <option value="all">Todos os campos</option>
+                            <option value="row_number">Linha</option>
+                            <option value="nome">Aluno</option>
+                            <option value="cpf">CPF</option>
+                            <option value="curso">Curso</option>
+                            <option value="ra">RA</option>
+                            <option value="status">Status</option>
+                            <option value="message">Mensagem</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="small fw-bold">Busca</label>
+                        <input type="text" id="impFilterQuery" class="form-control form-control-sm" placeholder="Digite para filtrar a tabela..." oninput="aplicarFiltroImportacao()">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button class="btn btn-light btn-sm border" onclick="limparFiltroImportacao()">
+                            <i class="fa-solid fa-eraser me-1"></i>Limpar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive border rounded">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-3">Linha</th>
+                                <th>Aluno</th>
+                                <th>CPF</th>
+                                <th>Curso</th>
+                                <th>RA</th>
+                                <th>Status</th>
+                                <th class="pe-3">Mensagem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaImportXlsx">
+                            <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma linha processada.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="mt-2">
+                    <ul class="pagination pagination-sm justify-content-end mb-0" id="paginacaoImportXlsx"></ul>
+                </nav>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Bulk Permissions -->
 <div class="modal fade" id="modalBulkPermissions" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -240,11 +331,25 @@
 <script>
     let MODO_EDICAO = false;
     let CURSOS_CACHE = [];
+    let IMPORT_JOB_ID = null;
+    let IMPORT_POLL_TIMER = null;
+    let IMPORT_PAGE = 1;
+    const IMPORT_PER_PAGE = 10;
+    let IMPORT_FILTER_FIELD = 'all';
+    let IMPORT_FILTER_QUERY = '';
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarCursosSelect();
         carregarUsuarios(1);
         carregarEventosParaInscricao();
+
+        const importModalEl = document.getElementById('modalImportXlsx');
+        importModalEl.addEventListener('hidden.bs.modal', () => {
+            if (IMPORT_POLL_TIMER) {
+                clearInterval(IMPORT_POLL_TIMER);
+                IMPORT_POLL_TIMER = null;
+            }
+        });
     });
 
     async function carregarCursosSelect() {
@@ -452,6 +557,33 @@
         new bootstrap.Modal(document.getElementById('modalImportCsv')).show();
     }
 
+    function abrirModalImportarXlsx() {
+        document.getElementById('fileXlsx').value = '';
+        document.getElementById('impFilterField').value = 'all';
+        document.getElementById('impFilterQuery').value = '';
+        IMPORT_JOB_ID = null;
+        IMPORT_PAGE = 1;
+        IMPORT_FILTER_FIELD = 'all';
+        IMPORT_FILTER_QUERY = '';
+        if (IMPORT_POLL_TIMER) {
+            clearInterval(IMPORT_POLL_TIMER);
+            IMPORT_POLL_TIMER = null;
+        }
+        atualizarResumoImportacao({
+            total_rows: 0,
+            processed_rows: 0,
+            created: 0,
+            updated: 0,
+            unchanged: 0,
+            errors_count: 0,
+            status: 'idle',
+            message: 'Aguardando arquivo para iniciar.'
+        });
+        renderTabelaImportacao([]);
+        renderPaginacaoImportacao(1, 1);
+        new bootstrap.Modal(document.getElementById('modalImportXlsx')).show();
+    }
+
     async function enviarCsv() {
         const fileInput = document.getElementById('fileCsv');
         if (!fileInput.files[0]) return;
@@ -471,6 +603,216 @@
             Swal.fire('Sucesso', json.mensagem, 'success');
         } else {
             Swal.fire('Erro', json.erro || 'Falha na importação', 'error');
+        }
+    }
+
+    async function enviarXlsx() {
+        const fileInput = document.getElementById('fileXlsx');
+        if (!fileInput.files[0]) {
+            Swal.fire('Atenção', 'Selecione um arquivo XLSX.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btnStartImportXlsx');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Iniciando...';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const res = await fetch('/api/importar_alunos_xlsx/start', {
+            method: 'POST',
+            body: formData
+        });
+
+        const json = await res.json();
+        if (!res.ok) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-upload me-2"></i>Iniciar Importação';
+            Swal.fire('Erro', json.erro || 'Falha ao iniciar importação XLSX', 'error');
+            return;
+        }
+
+        IMPORT_JOB_ID = json.job_id;
+        IMPORT_PAGE = 1;
+        IMPORT_FILTER_FIELD = (document.getElementById('impFilterField').value || 'all');
+        IMPORT_FILTER_QUERY = (document.getElementById('impFilterQuery').value || '').trim();
+        if (IMPORT_POLL_TIMER) clearInterval(IMPORT_POLL_TIMER);
+        await atualizarStatusImportacao();
+        IMPORT_POLL_TIMER = setInterval(atualizarStatusImportacao, 1200);
+    }
+
+    async function aplicarFiltroImportacao() {
+        IMPORT_FILTER_FIELD = (document.getElementById('impFilterField').value || 'all');
+        IMPORT_FILTER_QUERY = (document.getElementById('impFilterQuery').value || '').trim();
+        IMPORT_PAGE = 1;
+        await atualizarStatusImportacao();
+    }
+
+    async function limparFiltroImportacao() {
+        document.getElementById('impFilterField').value = 'all';
+        document.getElementById('impFilterQuery').value = '';
+        IMPORT_FILTER_FIELD = 'all';
+        IMPORT_FILTER_QUERY = '';
+        IMPORT_PAGE = 1;
+        await atualizarStatusImportacao();
+    }
+
+    function atualizarResumoImportacao(data) {
+        document.getElementById('impTotal').innerText = data.total_rows || 0;
+        document.getElementById('impProcessadas').innerText = data.processed_rows || 0;
+        document.getElementById('impCriadas').innerText = data.created || 0;
+        document.getElementById('impAtualizadas').innerText = data.updated || 0;
+        document.getElementById('impInalteradas').innerText = data.unchanged || 0;
+        document.getElementById('impErros').innerText = data.errors_count || 0;
+
+        const badge = document.getElementById('impStatusBadge');
+        const status = data.status || 'idle';
+        badge.className = 'badge';
+        if (status === 'running' || status === 'queued') badge.classList.add('bg-warning', 'text-dark');
+        else if (status === 'completed') badge.classList.add('bg-success');
+        else if (status === 'failed') badge.classList.add('bg-danger');
+        else badge.classList.add('bg-info', 'text-dark');
+        badge.innerText = status.toUpperCase();
+        document.getElementById('impStatusMessage').innerText = data.message || '';
+    }
+
+    function badgeStatusImport(status) {
+        if (status === 'created') return '<span class="badge bg-success">Criado</span>';
+        if (status === 'updated') return '<span class="badge bg-primary">Atualizado</span>';
+        if (status === 'unchanged') return '<span class="badge bg-secondary">Sem alteração</span>';
+        return '<span class="badge bg-danger">Erro</span>';
+    }
+
+    function escapeHtml(text) {
+        return String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function highlightImportText(text, fieldName) {
+        const safeText = escapeHtml(text || '-');
+        const query = (IMPORT_FILTER_QUERY || '').trim();
+        const selectedField = (IMPORT_FILTER_FIELD || 'all').trim();
+
+        if (!query) return safeText;
+        if (selectedField !== 'all' && selectedField !== fieldName) return safeText;
+
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (!escapedQuery) return safeText;
+
+        const rx = new RegExp(`(${escapedQuery})`, 'ig');
+        return safeText.replace(rx, '<mark class="px-1 rounded bg-warning-subtle">$1</mark>');
+    }
+
+    function renderTabelaImportacao(rows) {
+        const tbody = document.getElementById('tabelaImportXlsx');
+        if (!rows || !rows.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Nenhuma linha processada.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(row => `
+            <tr>
+                <td class="ps-3">${highlightImportText(row.row_number || '-', 'row_number')}</td>
+                <td>${highlightImportText(row.nome || '-', 'nome')}</td>
+                <td>${highlightImportText(row.cpf || '-', 'cpf')}</td>
+                <td>${highlightImportText(row.curso || '-', 'curso')}</td>
+                <td>${highlightImportText(row.ra || '-', 'ra')}</td>
+                <td>${badgeStatusImport(row.status)}</td>
+                <td class="pe-3"><small class="text-muted">${highlightImportText(row.message || '', 'message')}</small></td>
+            </tr>
+        `).join('');
+    }
+
+    function renderPaginacaoImportacao(current, total) {
+        const container = document.getElementById('paginacaoImportXlsx');
+        container.innerHTML = '';
+        if (total <= 1) return;
+
+        const makeItem = (label, page, disabled = false, active = false) => {
+            const li = document.createElement('li');
+            li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.innerText = label;
+            if (!disabled) {
+                a.onclick = async (e) => {
+                    e.preventDefault();
+                    IMPORT_PAGE = page;
+                    await atualizarStatusImportacao();
+                };
+            }
+            li.appendChild(a);
+            return li;
+        };
+
+        container.appendChild(makeItem('«', Math.max(1, current - 1), current === 1));
+
+        const pages = [];
+        const range = 1;
+        for (let i = 1; i <= total; i++) {
+            if (i === 1 || i === total || (i >= current - range && i <= current + range)) {
+                pages.push(i);
+            } else if (pages[pages.length - 1] !== '...') {
+                pages.push('...');
+            }
+        }
+
+        pages.forEach(p => {
+            if (p === '...') container.appendChild(makeItem('...', 1, true, false));
+            else container.appendChild(makeItem(String(p), p, false, p === current));
+        });
+
+        container.appendChild(makeItem('»', Math.min(total, current + 1), current === total));
+    }
+
+    async function atualizarStatusImportacao() {
+        if (!IMPORT_JOB_ID) return;
+
+        const params = new URLSearchParams({
+            page: String(IMPORT_PAGE),
+            per_page: String(IMPORT_PER_PAGE),
+            field: IMPORT_FILTER_FIELD,
+            q: IMPORT_FILTER_QUERY,
+        });
+        const res = await fetch(`/api/importar_alunos_xlsx/status/${IMPORT_JOB_ID}?${params.toString()}`);
+        const json = await res.json();
+        if (!res.ok) {
+            if (IMPORT_POLL_TIMER) {
+                clearInterval(IMPORT_POLL_TIMER);
+                IMPORT_POLL_TIMER = null;
+            }
+            document.getElementById('btnStartImportXlsx').disabled = false;
+            document.getElementById('btnStartImportXlsx').innerHTML = '<i class="fa-solid fa-upload me-2"></i>Iniciar Importação';
+            Swal.fire('Erro', json.erro || 'Falha ao obter status da importação', 'error');
+            return;
+        }
+
+        atualizarResumoImportacao(json);
+        renderTabelaImportacao(json.rows || []);
+        const pag = json.pagination || {};
+        renderPaginacaoImportacao(pag.page || 1, pag.pages || 1);
+
+        if (json.completed) {
+            if (IMPORT_POLL_TIMER) {
+                clearInterval(IMPORT_POLL_TIMER);
+                IMPORT_POLL_TIMER = null;
+            }
+
+            document.getElementById('btnStartImportXlsx').disabled = false;
+            document.getElementById('btnStartImportXlsx').innerHTML = '<i class="fa-solid fa-upload me-2"></i>Iniciar Importação';
+
+            if (json.status === 'completed') {
+                carregarUsuarios(1);
+                Toast.fire({ icon: 'success', title: 'Importação finalizada.' });
+            } else {
+                Swal.fire('Erro', json.message || 'A importação falhou.', 'error');
+            }
         }
     }
 

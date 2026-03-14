@@ -20,6 +20,11 @@ def logout():
     # I'll just redirect to the api logout or implement it here.
     return redirect('/api/logout')
 
+
+@bp.route('/resetar-senha/<token>')
+def resetar_senha(token):
+    return render_template('reset_password.html', token=token)
+
 @bp.route('/inscrever/<token>')
 def inscrever_via_link(token):
     """Public page to view event details via shared token link."""

@@ -1,0 +1,16 @@
+{% extends 'emails/base.html' %}
+
+{% block email_content %}
+<h2 style="margin:0 0 10px 0; color:#0f172a; font-size:24px;">Evento excluído</h2>
+<p style="margin:0 0 14px 0;">Prezado(a) <strong>{{ user_name }}</strong>,</p>
+<p style="margin:0 0 14px 0;">Confirmamos a exclusão do evento abaixo em {{ changed_at }}.</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0; background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #dc2626; border-radius:10px;">
+    <tr><td style="padding:14px;"><strong>Evento:</strong> {{ event_name }}</td></tr>
+    <tr><td style="padding:0 14px 6px 14px;"><strong>Tipo:</strong> {{ event_type }}</td></tr>
+    <tr><td style="padding:0 14px 6px 14px;"><strong>Data:</strong> {{ event_date }}</td></tr>
+    <tr><td style="padding:0 14px 14px 14px;"><strong>Hora:</strong> {{ event_time }}</td></tr>
+</table>
+
+<p style="margin:0;"><a href="{{ manage_link }}" style="color:#044d84;">Ir para Gestão de Eventos</a></p>
+{% endblock %}

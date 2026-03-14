@@ -222,7 +222,7 @@
     {% if user.role in ['admin', 'professor', 'coordenador'] %}
     <div class="row g-4">
 
-        <div class="col-lg-8">
+        <div class="col-lg-12">
             <div class="d-flex align-items-center justify-content-between mb-4 px-2 flex-wrap gap-2">
                 <h4 class="m-0">
                     <i class="fa-solid fa-calendar-days text-primary me-2"></i>Meus Eventos
@@ -252,65 +252,6 @@
             </nav>
         </div>
 
-        <div class="col-lg-4">
-            <div class="glass-panel bg-white sticky-top" style="top: 100px; z-index: 10;">
-                <h5 class="fw-bold mb-4">
-                    <i class="fa-solid fa-plus-circle text-primary me-2"></i>Criar Novo Evento
-                </h5>
-
-                <form id="formEvento">
-                    <div class="p-3 bg-indigo-50 rounded-4 border border-indigo-100 mb-4">
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" id="checkRapido">
-                            <label class="form-check-label fw-bold ms-2" for="checkRapido">Evento Rápido</label>
-                        </div>
-                        <div class="form-text mt-1 small">Gera um check-in único e imediato.</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Título do Evento</label>
-                        <input type="text" class="form-control" id="evNome" placeholder="Ex: Workshop de IA" required>
-                    </div>
-
-                    <div id="camposCompletos">
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">Descrição</label>
-                            <textarea class="form-control" id="evDesc" rows="3"
-                                placeholder="O que acontecerá no evento?"></textarea>
-                        </div>
-
-                        <div class="row g-2 mb-4">
-                            <div class="col-6">
-                                <label class="form-label small fw-bold text-muted">Início</label>
-                                <input type="date" id="evDataIni" class="form-control mb-2">
-                                <input type="time" id="evHoraIni" class="form-control">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-bold text-muted">Fim</label>
-                                <input type="date" id="evDataFim" class="form-control mb-2">
-                                <input type="time" id="evHoraFim" class="form-control">
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <label class="fw-bold small text-uppercase letter-spacing-1">Atividades</label>
-                                <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2"
-                                    id="btnAddAtvCriar">
-                                    <i class="fa-solid fa-plus me-1"></i> Add
-                                </button>
-                            </div>
-                            <div id="containerAtividades" class="d-grid gap-3"></div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 py-3 shadow-lg">
-                        Publicar Evento <i class="fa-solid fa-rocket ms-2"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-
     </div>
     {% endif %}
 
@@ -334,7 +275,7 @@
     <div class="row justify-content-center mb-5">
         <div class="col-12 col-md-10 col-lg-6 text-center">
             <!-- Scanner Section -->
-            <div class="glass-panel border-top border-5 border-primary py-5 px-4 mb-5 shadow-lg bg-white">
+            <div id="checkin-digital" class="glass-panel border-top border-5 border-primary py-5 px-4 mb-5 shadow-lg bg-white">
                 <div class="mb-4">
                     <div class="bg-indigo-50 d-inline-flex p-4 rounded-circle mb-3">
                         <i class="fa-solid fa-qrcode fa-3x text-primary"></i>
@@ -637,6 +578,7 @@
     let EVENTO_SELECIONADO_ID = null;
     const pendingEnrollmentActions = new Set();
     let CACHE_EVENTOS = [];
+    let pendingProjectorEventId = null;
     let eventosAlunoState = null;
     let eventosAlunoLastQuery = '';
 
@@ -644,6 +586,21 @@
         if (userRole === 'admin') carregarUsuarios();
         if (userRole !== 'participante') carregarEventosGestor(1);
         if (userRole === 'participante') carregarEventosAluno(1);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if (userRole === 'participante' && urlParams.get('open_checkin') === '1') {
+            const checkinSection = document.getElementById('checkin-digital');
+            if (checkinSection) {
+                checkinSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            setTimeout(() => iniciarScanner(), 250);
+        }
+        if (userRole !== 'participante') {
+            const projectorEventId = Number(urlParams.get('open_projector'));
+            if (Number.isInteger(projectorEventId) && projectorEventId > 0) {
+                pendingProjectorEventId = projectorEventId;
+            }
+        }
 
         // Datas mínimas no formulário de evento
         const dIni = document.getElementById('evDataIni');
@@ -681,6 +638,13 @@
             clearTimeout(t);
             t = setTimeout(() => fn(...args), wait);
         };
+    }
+
+    function clearQueryParam(paramName) {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has(paramName)) return;
+        url.searchParams.delete(paramName);
+        history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
 
     function renderPaginacao(current, total, containerId, callback) {
@@ -978,6 +942,16 @@
             if (reqId !== gestorReqId) return;
 
             CACHE_EVENTOS = data.items || [];
+
+            if (pendingProjectorEventId) {
+                const hasTargetEvent = CACHE_EVENTOS.some((e) => e.id === pendingProjectorEventId);
+                if (hasTargetEvent) {
+                    abrirProjetor(pendingProjectorEventId);
+                    pendingProjectorEventId = null;
+                    clearQueryParam('open_projector');
+                }
+            }
+
             if (CACHE_EVENTOS.length === 0) {
                 div.innerHTML = `
           <div class="col-12 text-center text-muted py-5 px-4 glass-panel border-dashed">

@@ -23,7 +23,8 @@ def serialize_user(user):
         'nome': user.nome,
         'cpf': user.cpf,
         'ra': user.ra,
-        'curso': user.curso
+        'curso': user.curso,
+        'can_create_events': user.can_create_events,
     }
 
 def serialize_activity(activity, current_user=None):
@@ -66,9 +67,14 @@ def serialize_event(event, current_user=None):
     # Sort activities chronologically
     sorted_activities = sorted(event.activities, key=lambda a: (a.data_atv or '', a.hora_atv or ''))
     
+    from app.models import User
+    owner_user = User.query.filter_by(username=event.owner_username).first() if event.owner_username else None
+    owner_name = owner_user.nome if owner_user else (event.owner_username or 'Sistema')
+
     return {
         'id': event.id,
         'owner': event.owner_username,
+        'owner_name': owner_name,
         'nome': event.nome,
         'descricao': event.descricao,
         'curso': event.curso, # Derived from normalized course relation

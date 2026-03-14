@@ -1,6 +1,40 @@
 from .extensions import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.types import TypeDecorator, String
+from sqlalchemy.sql import operators
+from app.utils import normalize_cpf
+
+
+class CPFDigitsType(TypeDecorator):
+    """Stores CPF as 11 digits and normalizes bound values for comparisons."""
+
+    impl = String(11)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        normalized = normalize_cpf(value)
+        if not normalized:
+            return None
+        if len(normalized) != 11:
+            raise ValueError('CPF deve conter 11 digitos')
+        return normalized
+
+    def process_result_value(self, value, dialect):
+        return value
+
+    def coerce_compared_value(self, op, value):
+        # Preserve wildcard semantics in LIKE/ILIKE operations.
+        if op in (
+            operators.like_op,
+            operators.not_like_op,
+            operators.ilike_op,
+            operators.not_ilike_op,
+        ):
+            return String()
+        return self
 
 
 class User(UserMixin, db.Model):
@@ -21,7 +55,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20))
     nome = db.Column(db.String(100))
-    cpf = db.Column(db.String(14), unique=True)
+    cpf = db.Column(CPFDigitsType(), unique=True)
     ra = db.Column(db.String(20), unique=True, nullable=True) # Added for academic tracking
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=True)
     can_create_events = db.Column(db.Boolean, default=False)
@@ -219,7 +253,7 @@ class Enrollment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'))
-    user_cpf = db.Column(db.String(14), db.ForeignKey('users.cpf'))
+    user_cpf = db.Column(CPFDigitsType(), db.ForeignKey('users.cpf'))
     nome = db.Column(db.String(100))  # Snapshot of name
     presente = db.Column(db.Boolean, default=False)
     cert_hash = db.Column(db.String(64), unique=True, nullable=True) # For validation
@@ -291,7 +325,7 @@ class InstitutionalCertificateRecipient(db.Model):
     user_username = db.Column(db.String(50), db.ForeignKey('users.username'), nullable=True)
     nome = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), nullable=True)
-    cpf = db.Column(db.String(14), nullable=True)
+    cpf = db.Column(CPFDigitsType(), nullable=True)
     metadata_json = db.Column(db.Text, nullable=True)
     cert_hash = db.Column(db.String(16), unique=True, nullable=True)
     cert_entregue = db.Column(db.Boolean, default=False)

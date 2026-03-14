@@ -11,13 +11,16 @@ class EmailTemplateService:
     
     def __init__(self):
         """Initialize the template environment."""
-        # Get the path to templates directory
+        # Support both template references styles:
+        # - direct file names (e.g. welcome.html) from templates/emails
+        # - prefixed inheritance paths (e.g. emails/base.html) from templates
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        templates_root_dir = os.path.join(base_dir, 'templates')
         templates_dir = os.path.join(base_dir, 'templates', 'emails')
         
         # Initialize Jinja2 environment
         self.env = Environment(
-            loader=FileSystemLoader(templates_dir),
+            loader=FileSystemLoader([templates_root_dir, templates_dir]),
             autoescape=True
         )
     

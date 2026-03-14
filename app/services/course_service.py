@@ -35,7 +35,7 @@ class CourseService:
         """
         Updates an existing course.
         """
-        course = self.course_repo.get(course_id)
+        course = self.course_repo.get_by_id(course_id)
         if not course:
             return None, "Curso não encontrado."
             
@@ -53,6 +53,9 @@ class CourseService:
         """
         Deletes a course.
         """
-        if self.course_repo.delete(course_id):
-            return True, "Curso removido com sucesso."
-        return False, "Falha ao remover curso."
+        course = self.course_repo.get_by_id(course_id)
+        if not course:
+            return False, "Curso não encontrado."
+
+        self.course_repo.delete(course)
+        return True, "Curso removido com sucesso."

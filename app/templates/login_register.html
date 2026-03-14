@@ -68,6 +68,27 @@
             color: #044d84;
             margin-bottom: 0.5rem;
         }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            border: 0;
+            background: transparent;
+            color: #64748b;
+            z-index: 5;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .password-toggle:hover {
+            color: #1e293b;
+        }
     </style>
 {% endblock %}
 
@@ -76,7 +97,6 @@
         <div class="text-center mb-4">
             <i class="fa-solid fa-graduation-cap logo-icon"></i>
             <h3 class="fw-bold text-dark m-0">EuroEventos</h3>
-            <p class="text-muted small">Gestão Acadêmica Simplificada</p>
         </div>
         
         <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
@@ -93,18 +113,27 @@
             <div class="tab-pane fade show active" id="pills-login">
                 <form onsubmit="fazerLogin(event)">
                     <div class="form-floating mb-3">
-                        <input type="text" class="form-control" id="loginUser" placeholder="Usuário" required>
-                        <label>Usuário</label>
+                        <input type="text" class="form-control" id="loginCpf" placeholder="CPF" required>
+                        <label>CPF</label>
                     </div>
-                    <div class="form-floating mb-4">
+                    <div class="form-floating mb-4 password-wrapper">
                         <input type="password" class="form-control" id="loginPass" placeholder="Senha" required>
                         <label>Senha</label>
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            id="toggleLoginPass"
+                            onclick="togglePasswordVisibility('loginPass', 'toggleLoginPass')"
+                            aria-label="Mostrar ou ocultar senha do login"
+                        >
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
                     </div>
                     <button type="submit" class="btn btn-primary w-100 mb-3">
                         Acessar Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
                     </button>
                     <div class="text-center">
-                        <a href="#" class="text-decoration-none small text-muted">Esqueceu a senha?</a>
+                        <a href="#" class="text-decoration-none small text-muted" onclick="abrirRecuperacaoSenha(event)">Esqueceu a senha?</a>
                     </div>
                 </form>
             </div>
@@ -124,13 +153,18 @@
                         <input type="text" class="form-control" id="regCpf" placeholder="CPF" required>
                         <label>CPF</label>
                     </div>
-                    <div class="form-floating mb-2">
-                        <input type="text" class="form-control" id="regUser" placeholder="Usuário" required>
-                        <label>Usuário (Login)</label>
-                    </div>
-                    <div class="form-floating mb-4">
+                    <div class="form-floating mb-4 password-wrapper">
                         <input type="password" class="form-control" id="regPass" placeholder="Senha" required>
                         <label>Senha</label>
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            id="toggleRegPass"
+                            onclick="togglePasswordVisibility('regPass', 'toggleRegPass')"
+                            aria-label="Mostrar ou ocultar senha do cadastro"
+                        >
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         Criar Conta
@@ -143,6 +177,20 @@
 
 {% block scripts %}
     <script>
+        function togglePasswordVisibility(inputId, buttonId) {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(buttonId);
+            if (!input || !button) return;
+
+            const icon = button.querySelector('i');
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+
+            if (icon) {
+                icon.className = showing ? 'fa-regular fa-eye' : 'fa-regular fa-eye-slash';
+            }
+        }
+
         async function fazerLogin(e) {
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
@@ -154,7 +202,7 @@
                 const res = await fetch('/api/login', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        username: document.getElementById('loginUser').value,
+                        cpf: document.getElementById('loginCpf').value,
                         password: document.getElementById('loginPass').value
                     })
                 });
@@ -192,7 +240,6 @@
                         nome: document.getElementById('regNome').value,
                         email: document.getElementById('regEmail').value,
                         cpf: document.getElementById('regCpf').value,
-                        username: document.getElementById('regUser').value,
                         password: document.getElementById('regPass').value
                     })
                 });
@@ -220,6 +267,38 @@
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+            }
+        }
+
+        async function abrirRecuperacaoSenha(e) {
+            e.preventDefault();
+            const result = await Swal.fire({
+                title: 'Recuperar senha',
+                input: 'email',
+                inputLabel: 'Informe seu e-mail cadastrado',
+                inputPlaceholder: 'seuemail@dominio.com',
+                showCancelButton: true,
+                confirmButtonText: 'Enviar instruções',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#044d84'
+            });
+
+            if (!result.isConfirmed || !result.value) return;
+
+            try {
+                const res = await fetch('/api/password/forgot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: result.value })
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    Swal.fire('Pronto', json.mensagem || 'Instruções enviadas para o e-mail informado.', 'success');
+                } else {
+                    Swal.fire('Erro', json.erro || 'Não foi possível processar a solicitação.', 'error');
+                }
+            } catch (_) {
+                Swal.fire('Erro', 'Falha de conexão ao solicitar recuperação.', 'error');
             }
         }
     </script>

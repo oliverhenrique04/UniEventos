@@ -37,12 +37,21 @@
                     <div class="col-4">
                         <div class="p-2 bg-light rounded-4">
                             <div class="fw-bold text-primary fs-4" id="stat-institutional-certs">0</div>
-                            <div class="text-muted x-small text-uppercase fw-bold">Institucional</div>
+                            <div class="text-muted x-small text-uppercase fw-bold">Inst.</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 justify-content-end mb-4">
+        <button class="btn btn-outline-primary" onclick="abrirModalPerfilDados()">
+            <i class="fa-solid fa-user-pen me-2"></i>Atualizar dados
+        </button>
+        <button class="btn btn-outline-warning" onclick="abrirModalSenha()">
+            <i class="fa-solid fa-key me-2"></i>Modificar senha
+        </button>
     </div>
 
     <!-- Navegação por Abas -->
@@ -96,6 +105,95 @@
         <div class="tab-pane fade" id="tab-certificados">
             <div class="row row-cols-1 row-cols-md-3 g-4" id="lista-certificados"></div>
             <nav class="mt-5"><ul class="pagination justify-content-center" id="pag-certificados"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPerfilDados" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Atualizar dados do perfil</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPerfilDados" onsubmit="salvarPerfil(event)">
+                    <div class="mb-3">
+                        <label class="small fw-bold">Usuário (login)</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.username }}" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">Nome</label>
+                        <input type="text" id="perfilNome" class="form-control" value="{{ user.nome }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">E-mail</label>
+                        <input type="email" id="perfilEmail" class="form-control" value="{{ user.email or '' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">CPF</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.cpf or '-' }}" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">RA</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.ra or '-' }}" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">Curso</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.curso or '-' }}" disabled>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary" form="formPerfilDados" type="submit">Salvar dados</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPerfilSenha" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold">Modificar senha</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPerfilSenha" onsubmit="alterarSenha(event)">
+                    <div class="mb-3">
+                        <label class="small fw-bold">Senha atual</label>
+                        <div class="input-group">
+                            <input type="password" id="senhaAtual" class="form-control" required>
+                            <button class="btn btn-outline-secondary" type="button" id="btnToggleSenhaAtual" onclick="toggleSenhaCampo('senhaAtual', 'btnToggleSenhaAtual')" aria-label="Mostrar ou ocultar senha atual">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold">Nova senha</label>
+                        <div class="input-group">
+                            <input type="password" id="senhaNova" class="form-control" required>
+                            <button class="btn btn-outline-secondary" type="button" id="btnToggleSenhaNova" onclick="toggleSenhaCampo('senhaNova', 'btnToggleSenhaNova')" aria-label="Mostrar ou ocultar nova senha">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="small fw-bold">Confirmar nova senha</label>
+                        <div class="input-group">
+                            <input type="password" id="senhaNovaConfirm" class="form-control" required>
+                            <button class="btn btn-outline-secondary" type="button" id="btnToggleSenhaConfirm" onclick="toggleSenhaCampo('senhaNovaConfirm', 'btnToggleSenhaConfirm')" aria-label="Mostrar ou ocultar confirmação de senha">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-warning text-dark" form="formPerfilSenha" type="submit">Atualizar senha</button>
+            </div>
         </div>
     </div>
 </div>
@@ -290,6 +388,101 @@
         });
         ul.appendChild(createItem(current + 1, false, current === total, '»'));
         container.appendChild(ul);
+    }
+
+    async function salvarPerfil(e) {
+        e.preventDefault();
+        const payload = {
+            nome: document.getElementById('perfilNome').value,
+            email: document.getElementById('perfilEmail').value,
+        };
+
+        const res = await fetch('/api/me/profile', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPerfilDados')).hide();
+            Toast.fire({ icon: 'success', title: json.mensagem || 'Perfil atualizado.' });
+            setTimeout(() => window.location.reload(), 700);
+        } else {
+            Swal.fire('Erro', json.erro || 'Falha ao atualizar perfil.', 'error');
+        }
+    }
+
+    async function alterarSenha(e) {
+        e.preventDefault();
+        const atual = document.getElementById('senhaAtual').value;
+        const nova = document.getElementById('senhaNova').value;
+        const confirm = document.getElementById('senhaNovaConfirm').value;
+
+        if (nova !== confirm) {
+            Swal.fire('Atenção', 'A confirmação da nova senha não confere.', 'warning');
+            return;
+        }
+
+        const res = await fetch('/api/me/password', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ current_password: atual, new_password: nova })
+        });
+        const json = await res.json();
+        if (res.ok) {
+            document.getElementById('senhaAtual').value = '';
+            document.getElementById('senhaNova').value = '';
+            document.getElementById('senhaNovaConfirm').value = '';
+            resetSenhaPreview();
+            bootstrap.Modal.getInstance(document.getElementById('modalPerfilSenha')).hide();
+            Toast.fire({ icon: 'success', title: json.mensagem || 'Senha alterada.' });
+        } else {
+            Swal.fire('Erro', json.erro || 'Falha ao alterar senha.', 'error');
+        }
+    }
+
+    function toggleSenhaCampo(inputId, buttonId) {
+        const input = document.getElementById(inputId);
+        const button = document.getElementById(buttonId);
+        if (!input || !button) return;
+
+        const icon = button.querySelector('i');
+        const mostrando = input.type === 'text';
+        input.type = mostrando ? 'password' : 'text';
+
+        if (icon) {
+            icon.className = mostrando ? 'fa-regular fa-eye' : 'fa-regular fa-eye-slash';
+        }
+    }
+
+    function resetSenhaPreview() {
+        const campos = [
+            { inputId: 'senhaAtual', buttonId: 'btnToggleSenhaAtual' },
+            { inputId: 'senhaNova', buttonId: 'btnToggleSenhaNova' },
+            { inputId: 'senhaNovaConfirm', buttonId: 'btnToggleSenhaConfirm' },
+        ];
+
+        campos.forEach(({ inputId, buttonId }) => {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(buttonId);
+            if (input) input.type = 'password';
+            if (button) {
+                const icon = button.querySelector('i');
+                if (icon) icon.className = 'fa-regular fa-eye';
+            }
+        });
+    }
+
+    function abrirModalPerfilDados() {
+        new bootstrap.Modal(document.getElementById('modalPerfilDados')).show();
+    }
+
+    function abrirModalSenha() {
+        document.getElementById('senhaAtual').value = '';
+        document.getElementById('senhaNova').value = '';
+        document.getElementById('senhaNovaConfirm').value = '';
+        resetSenhaPreview();
+        new bootstrap.Modal(document.getElementById('modalPerfilSenha')).show();
     }
 </script>
 {% endblock %}

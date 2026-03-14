@@ -91,6 +91,8 @@ def criar_evento():
     try:
         event = event_service.create_event(current_user.username, data)
         return jsonify({"mensagem": "Criado!", "link": f"/inscrever/{event.token_publico}"})
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
@@ -117,6 +119,8 @@ def editar_evento():
             return jsonify({"erro": message}), status_code
             
         return jsonify({"mensagem": message})
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
     except Exception as e:
         return jsonify({"erro": f"Erro interno ao atualizar evento: {str(e)}"}), 500
 
@@ -178,6 +182,7 @@ def listar_participantes_evento(event_id):
     filters = {
         'nome': request.args.get('nome'),
         'cpf': request.args.get('cpf'),
+        'activity_id': request.args.get('activity_id', type=int),
         'presente': request.args.get('presente', type=lambda v: v.lower() == 'true') if request.args.get('presente') else None
     }
     
@@ -301,6 +306,12 @@ def meu_historico():
                 .join(Enrollment, Activity.id == Enrollment.activity_id)\
                 .filter(Activity.event_id == ev.id, Enrollment.user_cpf == current_user.cpf, Enrollment.presente == True).scalar() or 0
             
+            
+            # Check if any certificate has been generated and published (has cert_hash)
+            has_cert = db.session.query(Enrollment.id)\
+                .join(Activity, Activity.id == Enrollment.activity_id)\
+                .filter(Activity.event_id == ev.id, Enrollment.user_cpf == current_user.cpf, Enrollment.cert_hash.isnot(None), Enrollment.presente == True).first() is not None
+
             items.append({
                 "id": ev.id,
                 "nome": ev.nome,
@@ -308,6 +319,8 @@ def meu_historico():
                 "horas": int(ev_hours),
                 "tipo": ev.tipo,
                 "token": ev.token_publico
+            ,
+                "cert_disponivel": has_cert
             })
         
         return jsonify({
