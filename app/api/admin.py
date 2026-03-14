@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.services.admin_service import AdminService
 from app.serializers import serialize_user
+from app.models import Activity, Event
 from threading import Thread, Lock
 from math import ceil
 from uuid import uuid4
@@ -206,7 +207,7 @@ def _bytes_to_mb(size_bytes: int) -> float:
 @bp.route('/listar_usuarios', methods=['GET'])
 @login_required
 def listar_usuarios():
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return jsonify([]), 403
     
     page = request.args.get('page', 1, type=int)
@@ -270,6 +271,20 @@ def inscricao_manual():
         activity_id = int(data.get('activity_id'))
     except (TypeError, ValueError):
         return jsonify({"erro": "Atividade inválida."}), 400
+
+    activity = db.session.get(Activity, activity_id)
+    if not activity:
+        return jsonify({"erro": "Atividade não encontrada."}), 404
+
+    event = db.session.get(Event, activity.event_id)
+    if not event:
+        return jsonify({"erro": "Evento não encontrado."}), 404
+
+    if current_user.role == 'professor' and event.owner_username != current_user.username:
+        return jsonify({"erro": "Acesso negado para este evento."}), 403
+    if current_user.role in ['coordenador', 'gestor']:
+        if not current_user.course_id or not event.course_id or current_user.course_id != event.course_id:
+            return jsonify({"erro": "Acesso negado para este curso."}), 403
 
     success, msg = admin_service.manual_enroll(data.get('cpf'), activity_id)
     

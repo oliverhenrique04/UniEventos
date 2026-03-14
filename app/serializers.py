@@ -71,6 +71,36 @@ def serialize_event(event, current_user=None):
     owner_user = User.query.filter_by(username=event.owner_username).first() if event.owner_username else None
     owner_name = owner_user.nome if owner_user else (event.owner_username or 'Sistema')
 
+    can_edit = False
+    can_delete = False
+    can_manage_participants = False
+    can_manage_certificates = False
+
+    if current_user:
+        same_course = bool(current_user.course_id and event.course_id and current_user.course_id == event.course_id)
+        is_owner = event.owner_username == current_user.username
+
+        if current_user.role == 'admin':
+            can_edit = True
+            can_delete = True
+            can_manage_participants = True
+            can_manage_certificates = True
+        elif current_user.role == 'professor':
+            can_edit = is_owner
+            can_delete = is_owner
+            can_manage_participants = is_owner
+            can_manage_certificates = is_owner
+        elif current_user.role == 'coordenador':
+            can_edit = same_course
+            can_delete = same_course
+            can_manage_participants = same_course
+            can_manage_certificates = same_course
+        elif current_user.role == 'gestor':
+            can_edit = same_course
+            can_delete = same_course
+            can_manage_participants = same_course
+            can_manage_certificates = same_course
+
     return {
         'id': event.id,
         'owner': event.owner_username,
@@ -88,5 +118,9 @@ def serialize_event(event, current_user=None):
         'status': event.status,
         'total_inscritos': total_inscritos,
         'total_presentes': total_presentes,
-        'atividades': [serialize_activity(a, current_user) for a in sorted_activities]
+        'atividades': [serialize_activity(a, current_user) for a in sorted_activities],
+        'can_edit': can_edit,
+        'can_delete': can_delete,
+        'can_manage_participants': can_manage_participants,
+        'can_manage_certificates': can_manage_certificates,
     }

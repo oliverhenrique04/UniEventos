@@ -57,6 +57,34 @@ class EventService:
             raise ValueError('Carga horária do Evento Rápido deve ser maior que zero.')
         return hours
 
+    @staticmethod
+    def can_view_event(user, event):
+        if not user or not event:
+            return False
+        if user.role == 'admin':
+            return True
+        if user.role == 'gestor':
+            return True
+        if user.role == 'professor':
+            return event.owner_username == user.username
+        if user.role == 'coordenador':
+            return bool(user.course_id and event.course_id and user.course_id == event.course_id)
+        return False
+
+    @staticmethod
+    def can_manage_event(user, event):
+        if not user or not event:
+            return False
+        if user.role == 'admin':
+            return True
+        if user.role == 'professor':
+            return event.owner_username == user.username
+        if user.role == 'coordenador':
+            return bool(user.course_id and event.course_id and user.course_id == event.course_id)
+        if user.role == 'gestor':
+            return bool(user.course_id and event.course_id and user.course_id == event.course_id)
+        return False
+
     def create_event(self, owner_username, data):
         """Creates a new event and its associated activities."""
         is_rapido = bool(data.get('is_rapido'))
@@ -189,13 +217,12 @@ class EventService:
             },
         )
 
-    def update_event(self, event_id, owner_username, role, data):
+    def update_event(self, event_id, user, data):
         """Updates an existing event's information and its associated activities.
         
         Args:
             event_id (int): ID of the event to update.
-            owner_username (str): Username of the person attempting the update.
-            role (str): Role of the user (to check for admin permissions).
+            user (User): Current authenticated user attempting the update.
             data (dict): Dictionary containing the updated event data.
             
         Returns:
@@ -206,7 +233,7 @@ class EventService:
             return None, "Evento não encontrado"
             
         # Security check: Only the owner or an admin can modify an event.
-        if role != 'admin' and event.owner_username != owner_username:
+        if not self.can_manage_event(user, event):
             return None, "Sem permissão para editar este evento"
 
         is_rapido = bool(data.get('is_rapido'))
@@ -316,8 +343,20 @@ class EventService:
     def get_events_for_user_paginated(self, user, page=1, per_page=12, filters=None):
         """Lists events visible to a specific user with chronological sorting and filters."""
         query = Event.query
-        if user.role not in ['admin', 'participante']:
+        if user.role == 'participante':
+            query = query.filter(Event.status == 'ABERTO')
+        elif user.role == 'professor':
             query = query.filter_by(owner_username=user.username)
+        elif user.role == 'coordenador':
+            if user.course_id:
+                query = query.filter(Event.course_id == user.course_id)
+            else:
+                query = query.filter(Event.id == -1)
+        elif user.role == 'gestor':
+            # Gestor can consult events across courses.
+            pass
+        elif user.role != 'admin':
+            query = query.filter(Event.id == -1)
         
         if filters:
             if filters.get('nome'):
@@ -332,9 +371,23 @@ class EventService:
 
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
-    def list_events_paginated(self, page=1, per_page=10, filters=None):
+    def list_events_paginated(self, user, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of events with chronological sorting and filters."""
         query = Event.query
+
+        if user.role == 'professor':
+            query = query.filter(Event.owner_username == user.username)
+        elif user.role == 'coordenador':
+            if user.course_id:
+                query = query.filter(Event.course_id == user.course_id)
+            else:
+                query = query.filter(Event.id == -1)
+        elif user.role == 'gestor':
+            # Gestor can consult all events; edition constraints are enforced elsewhere.
+            pass
+        elif user.role != 'admin':
+            query = query.filter(Event.id == -1)
+
         if filters:
             if filters.get('nome'):
                 query = query.filter(Event.nome.ilike(f"%{filters['nome']}%"))
@@ -414,10 +467,10 @@ class EventService:
     def get_event_by_id(self, event_id):
         return self.event_repo.get_by_id(event_id)
 
-    def delete_event(self, event_id, owner_username, role):
+    def delete_event(self, event_id, user):
         event = self.event_repo.get_by_id(event_id)
         if not event: return False, "Evento não encontrado"
-        if role != 'admin' and event.owner_username != owner_username:
+        if not self.can_manage_event(user, event):
             return False, "Permissão negada"
 
         event_name = event.nome
