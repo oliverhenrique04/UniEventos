@@ -2455,8 +2455,9 @@
                 joditInstance = Jodit.make('#joditEditor', {
                     height: 420,
                     toolbarAdaptive: false,
-                    removeButtons: ['source', 'fullsize', 'about', 'speechRecognize', 'print', 'file', 'video'],
+                    removeButtons: ['fullsize', 'about', 'speechRecognize', 'print', 'file', 'video'],
                     buttons: [
+                        'source', '|',
                         'bold', 'italic', 'underline', 'strikethrough', '|',
                         'ul', 'ol', '|',
                         'fontsize', 'font', 'brush', '|',
@@ -2465,11 +2466,15 @@
                         'undo', 'redo', '|',
                         'eraser', 'copyformat'
                     ],
-                    enter: 'BR',
+                    enter: 'P',
                     showCharsCounter: false,
                     showWordsCounter: false,
                     showXPathInStatusbar: false,
-                    defaultFontSizePoints: 'px'
+                    defaultFontSizePoints: 'px',
+                    style: {
+                        "text-align-last": "left",
+                        "text-align": "justify"
+                    }
                 });
             }
             joditInstance.value = _joditPendingContent;
