@@ -109,9 +109,13 @@
         <div>
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-certificate me-2"></i>Certificados Acadêmicos</h3>
         </div>
+        {% if user.role in ['admin', 'extensao'] %}
         <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado">
             <i class="fa-solid fa-plus me-1"></i>Novo Certificado
         </button>
+        {% else %}
+        <span class="badge bg-info-subtle text-info border border-info-subtle">Somente consulta</span>
+        {% endif %}
     </div>
 
     <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
@@ -281,7 +285,7 @@
                     <button class="btn btn-sm btn-outline-dark" id="btnExportarCsv"><i class="fa-solid fa-file-export me-1"></i>Exportar CSV</button>
                 </div>
 
-                <div class="clean-section">
+                <div class="clean-section" id="secBuscaUsuariosDestinatarios">
                     <div class="clean-section-title"><i class="fa-solid fa-magnifying-glass me-1"></i>Buscar e selecionar usuarios</div>
                     <div class="row g-2 align-items-end mb-3">
                         <div class="col-md-9">
@@ -325,7 +329,7 @@
                     </div>
                 </div>
 
-                <div class="clean-section">
+                <div class="clean-section" id="secInclusaoLoteDestinatarios">
                     <div class="clean-section-title"><i class="fa-solid fa-upload me-1"></i>Inclusao por lote</div>
                     <div class="alert alert-light border small mb-3">
                         Informe uma linha por destinatario no formato: <strong>nome;email;cpf;carga_horaria;curso_usuario</strong>
@@ -443,6 +447,8 @@
 
 {% block scripts %}
 <script>
+const CURRENT_ROLE = "{{ user.role }}";
+const CAN_CREATE_CERTIFICATES = ['admin', 'extensao'].includes(CURRENT_ROLE);
 const tabelaBody = document.querySelector('#tabelaInstitucionais tbody');
 const formNovo = document.getElementById('formNovoCertificado');
 const formEditar = document.getElementById('formEditarCertificado');
@@ -467,6 +473,7 @@ let previewDestinatarioHandlersBound = false;
 let previewDestinatarioCurrentUrl = '';
 let previewDestinatarioCurrentRecipientId = null;
 let editarCertificadoModalInstance = null;
+let ACTIVE_CERT_CAN_EDIT = false;
 
 function bindPreviewDestinatarioHandlers() {
     if (previewDestinatarioHandlersBound) return;
@@ -556,13 +563,35 @@ function renderCertificatesEmpty() {
                     <i class="fa-regular fa-folder-open fs-2 text-muted"></i>
                     <div class="fw-semibold text-slate-700">Nenhum certificado institucional cadastrado</div>
                     <small class="text-muted">Crie o primeiro certificado para iniciar os envios Acadêmicos.</small>
-                    <button class="btn btn-sm btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado">
-                        <i class="fa-solid fa-plus me-1"></i>Criar certificado
-                    </button>
+                    ${CAN_CREATE_CERTIFICATES
+                        ? '<button class="btn btn-sm btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado"><i class="fa-solid fa-plus me-1"></i>Criar certificado</button>'
+                        : ''}
                 </div>
             </td>
         </tr>
     `;
+}
+
+function updateDestinatariosModo() {
+    const secBusca = document.getElementById('secBuscaUsuariosDestinatarios');
+    const secLote = document.getElementById('secInclusaoLoteDestinatarios');
+    if (secBusca) secBusca.style.display = ACTIVE_CERT_CAN_EDIT ? '' : 'none';
+    if (secLote) secLote.style.display = ACTIVE_CERT_CAN_EDIT ? '' : 'none';
+
+    const noticeId = 'destinatariosModoConsultaAviso';
+    let notice = document.getElementById(noticeId);
+    if (!ACTIVE_CERT_CAN_EDIT) {
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = noticeId;
+            notice.className = 'alert alert-info mb-3';
+            notice.innerHTML = '<i class="fa-solid fa-eye me-1"></i>Modo consulta: este certificado não pode ser editado pelo seu perfil.';
+            const modalBody = document.querySelector('#modalDestinatarios .modal-body');
+            modalBody?.insertBefore(notice, modalBody.firstChild);
+        }
+    } else if (notice) {
+        notice.remove();
+    }
 }
 
 function renderRecipientsLoading() {
@@ -713,24 +742,28 @@ async function carregarCertificadosInstitucionais(page = 1) {
             <td><small class="fw-bold text-slate-600">${formatDateDisplay(item.data_emissao)}</small></td>
             <td>${statusBadge(item.status || 'RASCUNHO')}</td>
             <td>
-                <div class="input-group input-group-sm">
-                    <select class="form-select" id="status_${item.id}">
-                        <option value="RASCUNHO" ${(item.status || 'RASCUNHO') === 'RASCUNHO' ? 'selected' : ''}>Rascunho</option>
-                        <option value="ENVIADO" ${(item.status || '') === 'ENVIADO' ? 'selected' : ''}>Enviado</option>
-                        <option value="ARQUIVADO" ${(item.status || '') === 'ARQUIVADO' ? 'selected' : ''}>Arquivado</option>
-                    </select>
-                    <button class="btn btn-outline-secondary" onclick="atualizarStatusCertificado(${item.id})">OK</button>
-                </div>
+                ${item.can_edit
+                    ? `<div class="input-group input-group-sm">
+                        <select class="form-select" id="status_${item.id}">
+                            <option value="RASCUNHO" ${(item.status || 'RASCUNHO') === 'RASCUNHO' ? 'selected' : ''}>Rascunho</option>
+                            <option value="ENVIADO" ${(item.status || '') === 'ENVIADO' ? 'selected' : ''}>Enviado</option>
+                            <option value="ARQUIVADO" ${(item.status || '') === 'ARQUIVADO' ? 'selected' : ''}>Arquivado</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" onclick="atualizarStatusCertificado(${item.id})">OK</button>
+                    </div>`
+                    : `<span class="text-muted small">Somente consulta</span>`}
             </td>
             <td><span class="badge bg-light text-dark border">${item.recipients_count}</span></td>
             <td class="text-end">
                 <div class="btn-group shadow-sm">
-                    <button class="btn btn-sm btn-light border" onclick="abrirDestinatarios(${item.id})" title="Destinatarios"><i class="fa-solid fa-users text-primary"></i></button>
-                    <button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Designer"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i></button>
-                    <button class="btn btn-sm btn-light border" onclick="abrirEdicaoCertificado(${item.id})" title="Editar"><i class="fa-solid fa-pen-to-square text-info"></i></button>
-                    <button class="btn btn-sm btn-light border" onclick="enviarCertificado(${item.id}, this)" title="Enviar"><i class="fa-solid fa-paper-plane text-success"></i></button>
-                    <button class="btn btn-sm btn-light border" onclick="duplicarCertificado(${item.id})" title="Duplicar"><i class="fa-regular fa-copy text-indigo-600"></i></button>
-                    <button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir"><i class="fa-solid fa-trash-can text-danger"></i></button>
+                    <button class="btn btn-sm btn-light border" onclick="abrirDestinatarios(${item.id}, ${item.can_edit ? 'true' : 'false'})" title="Destinatarios"><i class="fa-solid fa-users text-primary"></i></button>
+                    ${item.can_edit
+                        ? `<button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Designer"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i></button>
+                           <button class="btn btn-sm btn-light border" onclick="abrirEdicaoCertificado(${item.id})" title="Editar"><i class="fa-solid fa-pen-to-square text-info"></i></button>
+                           <button class="btn btn-sm btn-light border" onclick="enviarCertificado(${item.id}, this)" title="Enviar"><i class="fa-solid fa-paper-plane text-success"></i></button>
+                           <button class="btn btn-sm btn-light border" onclick="duplicarCertificado(${item.id})" title="Duplicar"><i class="fa-regular fa-copy text-indigo-600"></i></button>
+                           <button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir"><i class="fa-solid fa-trash-can text-danger"></i></button>`
+                        : `<button class="btn btn-sm btn-light border" title="Somente consulta" disabled><i class="fa-solid fa-lock text-muted"></i></button>`}
                 </div>
             </td>
         </tr>
@@ -952,8 +985,9 @@ async function atualizarStatusCertificado(id) {
     await carregarCertificadosInstitucionais(paginaAtual);
 }
 
-function abrirDestinatarios(id) {
+function abrirDestinatarios(id, canEdit = false) {
     certificateIdAtivo = id;
+    ACTIVE_CERT_CAN_EDIT = !!canEdit;
     resetUserSearchState();
     document.getElementById('inputBuscaUsuario').value = '';
     document.getElementById('inputCargaHorariaPadrao').value = '';
@@ -964,6 +998,7 @@ function abrirDestinatarios(id) {
     recipientsTotalPages = 1;
     recipientsSortBy = 'id';
     recipientsSortDir = 'desc';
+    updateDestinatariosModo();
     updateRecipientsPaginationInfo();
     updateRecipientsSortIndicators();
     document.querySelector('#tabelaBuscaUsuarios tbody').innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">Use a busca para listar usuarios.</td></tr>';
@@ -1022,10 +1057,10 @@ async function carregarDestinatarios(id, page = 1) {
             <td>${item.nome || ''}${hasMissing ? ' <span class="badge text-bg-warning text-dark ms-2 missing-row-badge">Incompleto</span>' : ''}</td>
             <td>${item.email || '-'}</td>
             <td>${item.cpf || '-'}</td>
-            <td><input type="text" class="form-control form-control-sm" id="carga_${item.id}" value="${item.carga_horaria || ''}" placeholder="Ex.: 20"></td>
-            <td><input type="text" class="form-control form-control-sm" id="curso_${item.id}" value="${item.curso_usuario || ''}" placeholder="Curso"></td>
+            <td><input type="text" class="form-control form-control-sm" id="carga_${item.id}" value="${item.carga_horaria || ''}" placeholder="Ex.: 20" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}></td>
+            <td><input type="text" class="form-control form-control-sm" id="curso_${item.id}" value="${item.curso_usuario || ''}" placeholder="Curso" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}></td>
             <td class="text-end pe-1">
-                <button class="btn btn-sm btn-outline-secondary" onclick="salvarDadosDestinatario(${item.id}, this)" title="Salvar dados">
+                <button class="btn btn-sm btn-outline-secondary" onclick="salvarDadosDestinatario(${item.id}, this)" title="Salvar dados" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}>
                     <i class="fa-solid fa-floppy-disk"></i>
                 </button>
             </td>
@@ -1043,12 +1078,12 @@ async function carregarDestinatarios(id, page = 1) {
                 </button>
             </td>
             <td class="text-end pe-1">
-                <button class="btn btn-sm btn-outline-success" onclick="reenviarDestinatario(${item.id}, this)" ${item.email ? '' : 'disabled'}>
+                <button class="btn btn-sm btn-outline-success" onclick="reenviarDestinatario(${item.id}, this)" ${(ACTIVE_CERT_CAN_EDIT && item.email) ? '' : 'disabled'}>
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </td>
             <td class="text-end pe-1">
-                <button class="btn btn-sm btn-outline-danger" onclick="removerDestinatario(${item.id})">
+                <button class="btn btn-sm btn-outline-danger" onclick="removerDestinatario(${item.id})" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}>
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </td>
@@ -1059,6 +1094,10 @@ async function carregarDestinatarios(id, page = 1) {
 
 async function salvarDadosDestinatario(recipientId, buttonEl = null) {
     if (!certificateIdAtivo) return;
+    if (!ACTIVE_CERT_CAN_EDIT) {
+        uiError('Seu perfil esta em modo somente consulta para este certificado.');
+        return;
+    }
     const cargaInput = document.getElementById(`carga_${recipientId}`);
     const cursoInput = document.getElementById(`curso_${recipientId}`);
     const payload = {
@@ -1101,6 +1140,10 @@ function parseDestinatarios(rawText) {
 
 async function adicionarDestinatarios() {
     if (!certificateIdAtivo) return;
+    if (!ACTIVE_CERT_CAN_EDIT) {
+        uiError('Seu perfil esta em modo somente consulta para este certificado.');
+        return;
+    }
     const addButton = document.getElementById('btnAdicionarDestinatarios');
     setButtonLoading(addButton, true, 'Adicionando...');
     const texto = document.getElementById('inputDestinatarios').value;
@@ -1134,6 +1177,10 @@ async function adicionarDestinatarios() {
 
 async function removerDestinatario(recipientId) {
     if (!certificateIdAtivo) return;
+    if (!ACTIVE_CERT_CAN_EDIT) {
+        uiError('Seu perfil esta em modo somente consulta para este certificado.');
+        return;
+    }
     const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`), {
         method: 'DELETE'
     });
@@ -1149,6 +1196,10 @@ async function removerDestinatario(recipientId) {
 
 async function reenviarDestinatario(recipientId, buttonEl = null) {
     if (!certificateIdAtivo) return;
+    if (!ACTIVE_CERT_CAN_EDIT) {
+        uiError('Seu perfil esta em modo somente consulta para este certificado.');
+        return;
+    }
     setButtonLoading(buttonEl, true, 'Reenviando...');
     try {
         const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/resend`), {
@@ -1169,6 +1220,10 @@ async function reenviarDestinatario(recipientId, buttonEl = null) {
 
 async function importarDestinatariosCsv() {
     if (!certificateIdAtivo) return;
+    if (!ACTIVE_CERT_CAN_EDIT) {
+        uiError('Seu perfil esta em modo somente consulta para este certificado.');
+        return;
+    }
     const importButton = document.getElementById('btnImportarCsv');
     setButtonLoading(importButton, true, 'Importando...');
     const input = document.getElementById('fileDestinatariosCsv');

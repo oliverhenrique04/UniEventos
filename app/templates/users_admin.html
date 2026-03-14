@@ -214,6 +214,7 @@
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-users-gear text-primary me-2"></i>Gestão de Usuários</h3>
         </div>
         <div class="btn-action-group">
+            {% if user.role == 'admin' %}
             <button onclick="abrirModalImportar()" class="btn btn-action btn-import-csv shadow-sm">
                 <i class="fa-solid fa-file-csv me-2"></i>Importar CSV
             </button>
@@ -226,6 +227,9 @@
             <button onclick="abrirModalNovoUsuario()" class="btn btn-action btn-new-user shadow-sm">
                 <i class="fa-solid fa-plus me-2"></i>Novo Usuário
             </button>
+            {% else %}
+            <span class="badge bg-info-subtle text-info border border-info-subtle align-self-center">Somente consulta</span>
+            {% endif %}
         </div>
     </div>
 
@@ -617,6 +621,8 @@
 
 {% block scripts %}
 <script>
+    const USER_ROLE = "{{ user.role }}";
+    const IS_READ_ONLY = USER_ROLE === 'gestor';
     let MODO_EDICAO = false;
     let CURSOS_CACHE = [];
     let IMPORT_JOB_ID = null;
@@ -629,7 +635,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         carregarCursosSelect();
         carregarUsuarios(1);
-        carregarEventosParaInscricao();
+        if (!IS_READ_ONLY) {
+            carregarEventosParaInscricao();
+        }
 
         const cpfInput = document.getElementById('uCpf');
         if (cpfInput) {
@@ -728,14 +736,16 @@
                     <td class="d-none d-md-table-cell"><span class="badge bg-light text-dark border rounded-2 px-2 py-1">${u.curso || 'Não informado'}</span></td>
                     <td>${roleBadge}</td>
                     <td class="text-end pe-3 pe-md-4">
-                        <div class="btn-group shadow-sm" role="group">
-                            <button type="button" class="btn btn-sm btn-outline-success rounded-start-3 border-end-0" onclick="abrirInscricaoManual('${u.cpf}', '${u.nome}')" title="Inscrever Manualmente">
-                                <i class="fa-solid fa-user-plus"></i>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-inscricao-manual rounded-end-3 border-start-0" onclick="abrirModalEditarUsuario(${JSON.stringify(u).replace(/"/g, '&quot;')})" title="Editar">
-                                <i class="fa-solid fa-pen text-primary"></i>
-                            </button>
-                        </div>
+                        ${IS_READ_ONLY
+                            ? '<span class="text-muted small">Somente consulta</span>'
+                            : `<div class="btn-group shadow-sm" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-success rounded-start-3 border-end-0" onclick="abrirInscricaoManual('${u.cpf}', '${u.nome}')" title="Inscrever Manualmente">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-inscricao-manual rounded-end-3 border-start-0" onclick="abrirModalEditarUsuario(${JSON.stringify(u).replace(/"/g, '&quot;')})" title="Editar">
+                                    <i class="fa-solid fa-pen text-primary"></i>
+                                </button>
+                            </div>`}
                     </td>
                 </tr>
             `;
@@ -787,6 +797,10 @@
     }
 
     function abrirModalNovoUsuario() {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         MODO_EDICAO = false;
         document.getElementById('formUsuario').reset();
         document.getElementById('userId').value = '';
@@ -797,6 +811,10 @@
     }
 
     function abrirModalEditarUsuario(u) {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         MODO_EDICAO = true;
         document.getElementById('userId').value = u.username;
         document.getElementById('uUsername').value = u.username;
@@ -813,6 +831,10 @@
     }
 
     async function salvarUsuario() {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         const cpf = document.getElementById('uCpf').value;
         const usernameGerado = gerarUsernamePorCpf(cpf);
 
@@ -852,6 +874,10 @@
     }
 
     async function confirmarExcluir() {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         const username = document.getElementById('userId').value;
         const confirm = await Swal.fire({ title: 'Excluir Usuário?', text: "Esta ação não pode ser desfeita.", icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
@@ -866,11 +892,19 @@
 
     // --- CSV IMPORT ---
     function abrirModalImportar() {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         document.getElementById('fileCsv').value = '';
         new bootstrap.Modal(document.getElementById('modalImportCsv')).show();
     }
 
     function abrirModalImportarXlsx() {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         document.getElementById('fileXlsx').value = '';
         document.getElementById('impFilterField').value = 'all';
         document.getElementById('impFilterQuery').value = '';
@@ -1136,6 +1170,10 @@
 
     // --- BULK PERMISSIONS ---
     function abrirModalPermissoes() {
+        if (IS_READ_ONLY) {
+            Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
+            return;
+        }
         new bootstrap.Modal(document.getElementById('modalBulkPermissions')).show();
     }
 

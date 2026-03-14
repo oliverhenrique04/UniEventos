@@ -213,6 +213,132 @@
         .timer-circle svg { width: 110px; height: 110px; }
         .timer-text { font-size: 1.75rem; }
     }
+
+    .analytics-hero {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(130deg, #f7fbff 0%, #edf6ff 42%, #f4fbf7 100%);
+        border-top: 4px solid #0b6cb8;
+    }
+
+    .analytics-hero::before {
+        content: "";
+        position: absolute;
+        top: -60px;
+        right: -60px;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(4, 77, 132, 0.16) 0%, rgba(4, 77, 132, 0) 72%);
+        pointer-events: none;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .kpi-card {
+        background: #fff;
+        border: 1px solid #e6eef8;
+        border-radius: 14px;
+        padding: 1rem;
+        box-shadow: 0 8px 20px rgba(12, 74, 110, 0.06);
+    }
+
+    .kpi-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #57738e;
+    }
+
+    .kpi-value {
+        font-size: 1.65rem;
+        font-weight: 800;
+        color: #14324b;
+        line-height: 1.1;
+    }
+
+    .insight-card {
+        background: #fff;
+        border: 1px solid #e9eef6;
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    }
+
+    .insight-card .insight-head {
+        border-bottom: 1px solid #edf2f7;
+        padding: 0.9rem 1rem;
+        font-weight: 700;
+        color: #19324d;
+    }
+
+    .rank-list {
+        margin: 0;
+        padding: 0.8rem 1rem 1rem;
+        list-style: none;
+    }
+
+    .rank-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.65rem;
+        align-items: center;
+        padding: 0.55rem 0;
+        border-bottom: 1px dashed #edf2f7;
+    }
+
+    .rank-item:last-child {
+        border-bottom: 0;
+    }
+
+    .rank-track {
+        margin-top: 0.3rem;
+        width: 100%;
+        height: 6px;
+        background: #edf3fa;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .rank-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0ea5e9 0%, #2563eb 100%);
+    }
+
+    .risk-table td,
+    .risk-table th {
+        vertical-align: middle;
+    }
+
+    .metric-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        background: #f6fbff;
+        border: 1px solid #d8e8fb;
+        color: #21507a;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    @media (max-width: 992px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 576px) {
+        .kpi-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -221,6 +347,149 @@
 
     {% if user.role in ['admin', 'professor', 'coordenador', 'gestor'] %}
     <div class="row g-4">
+
+        {% if user.role in ['admin', 'gestor'] %}
+        <div class="col-lg-12">
+            <div class="glass-panel analytics-hero p-4 p-lg-5 shadow-sm">
+                <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-4">
+                    <div>
+                        <h3 class="fw-bold text-gradient mb-1">
+                            <i class="fa-solid fa-chart-line text-primary me-2"></i>Painel Analítico de Gestão
+                        </h3>
+                        <p class="text-muted mb-0">Visão estratégica de desempenho por curso, presença e emissão de certificados.</p>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Período analítico">
+                            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="7">7d</button>
+                            <button type="button" class="btn btn-primary analytics-period-btn" data-days="30">30d</button>
+                            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="90">90d</button>
+                        </div>
+                        <select class="form-select form-select-sm" id="analyticsCourseFilter" style="min-width: 220px;">
+                            <option value="">Todos os cursos</option>
+                        </select>
+                        <span class="metric-pill" id="analyticsLastUpdate">Atualizando insights...</span>
+                        <button class="btn btn-sm btn-outline-primary" id="btnRefreshGestorAnalytics">
+                            <i class="fa-solid fa-rotate me-1"></i>Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="insight-card mb-3">
+                    <div class="insight-head d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <span><i class="fa-solid fa-bullseye text-success me-2"></i>Metas e Alertas Proativos</span>
+                        <small class="text-muted">Defina limites para identificar desvios operacionais em tempo real</small>
+                    </div>
+                    <div class="p-3 p-lg-4">
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-1">Meta mínima de presença (%)</label>
+                                <input type="number" class="form-control form-control-sm" id="goalPresenceInput" min="1" max="100" value="75">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-1">Meta mínima de emissão (%)</label>
+                                <input type="number" class="form-control form-control-sm" id="goalEmissionInput" min="1" max="100" value="85">
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button class="btn btn-sm btn-success" id="btnSaveAnalyticsGoals">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i>Salvar metas
+                                </button>
+                            </div>
+                        </div>
+                        <div id="analyticsAlerts" class="small text-muted">Aguardando análise de metas...</div>
+                    </div>
+                </div>
+
+                <div id="gestorKpiGrid" class="kpi-grid mb-4">
+                    <div class="kpi-card"><div class="kpi-label">Eventos</div><div class="kpi-value">--</div></div>
+                    <div class="kpi-card"><div class="kpi-label">Alunos Inscritos</div><div class="kpi-value">--</div></div>
+                    <div class="kpi-card"><div class="kpi-label">Taxa de Presença</div><div class="kpi-value">--</div></div>
+                    <div class="kpi-card"><div class="kpi-label">Eventos sem Certificado</div><div class="kpi-value">--</div></div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-6">
+                        <div class="insight-card h-100">
+                            <div class="insight-head"><i class="fa-solid fa-graduation-cap text-primary me-2"></i>Eventos por Curso</div>
+                            <ul class="rank-list" id="rankingEventosCurso">
+                                <li class="text-muted small">Carregando...</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="insight-card h-100">
+                            <div class="insight-head"><i class="fa-solid fa-users text-info me-2"></i>Alunos Inscritos por Curso</div>
+                            <ul class="rank-list" id="rankingAlunosCurso">
+                                <li class="text-muted small">Carregando...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="insight-card mb-3">
+                    <div class="insight-head"><i class="fa-solid fa-school text-primary me-2"></i>Certificados Acadêmicos (Institucionais)</div>
+                    <div class="p-3 p-lg-4">
+                        <div class="row g-3 mb-3" id="academicoSummaryCards">
+                            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Certificados</div><div class="kpi-value">--</div></div></div>
+                            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Destinatários</div><div class="kpi-value">--</div></div></div>
+                            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Entregues</div><div class="kpi-value">--</div></div></div>
+                            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Taxa de Entrega</div><div class="kpi-value">--</div></div></div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-lg-6">
+                                <div class="insight-card h-100">
+                                    <div class="insight-head"><i class="fa-solid fa-tags text-info me-2"></i>Certificados por Categoria</div>
+                                    <ul class="rank-list" id="rankingAcademicoCategoria">
+                                        <li class="text-muted small">Carregando...</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0 risk-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Certificado</th>
+                                                <th>Categoria</th>
+                                                <th>Destinatários</th>
+                                                <th>Pendentes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tabelaPendenciasAcademicoGestor">
+                                            <tr><td colspan="4" class="text-center text-muted py-3">Carregando...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-head d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                        <span><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Eventos com Pendência de Certificado</span>
+                        <small class="text-muted">Priorize os eventos com maior volume pendente</small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 risk-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Evento</th>
+                                    <th>Curso</th>
+                                    <th>Inscritos</th>
+                                    <th>Presentes</th>
+                                    <th>Certificados</th>
+                                    <th>Pendentes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaPendenciasCertificadosGestor">
+                                <tr><td colspan="6" class="text-center text-muted py-3">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         {% if user.role == 'admin' %}
         <div class="col-lg-12">
@@ -257,9 +526,11 @@
                     <i class="fa-solid fa-calendar-days text-primary me-2"></i>Eventos sob Minha Coordenação
                 </h3>
                 <div class="d-flex gap-2">
+                    {% if user.role != 'gestor' or user.course_id %}
                     <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-sm btn-primary shadow-sm">
                         <i class="fa-solid fa-plus me-1"></i> Criar Evento
                     </a>
+                    {% endif %}
                     <div class="dropdown">
                         <button class="btn btn-sm btn-light border dropdown-toggle" type="button"
                             data-bs-toggle="dropdown">
@@ -284,7 +555,7 @@
     </div>
     {% endif %}
 
-    {% if user.role in ['extensao', 'gestor'] %}
+    {% if user.role in ['extensao'] %}
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="glass-panel bg-white p-4 p-md-5 shadow-sm border-top border-4 border-primary">
@@ -603,6 +874,7 @@
 {% block scripts %}
 <script>
     const userRole = "{{ user.role }}";
+    const currentUsername = "{{ user.username if user else '' }}";
     let intervaloQR = null;
     let atividadeAtualID = null;
     let EVENTO_SELECIONADO_ID = null;
@@ -611,11 +883,24 @@
     let pendingProjectorEventId = null;
     let eventosAlunoState = null;
     let eventosAlunoLastQuery = '';
+    const analyticsState = {
+        periodDays: 30,
+        courseId: '',
+        goals: {
+            presence: 75,
+            emission: 85,
+        },
+    };
 
     document.addEventListener("DOMContentLoaded", () => {
         if (userRole === 'admin') {
             carregarUsuarios();
             inicializarPainelLimpezaCertificados();
+        }
+        if (userRole === 'gestor') {
+            inicializarControlesAnalyticsGestor();
+            carregarDashboardGestorAnalytics();
+            document.getElementById('btnRefreshGestorAnalytics')?.addEventListener('click', () => carregarDashboardGestorAnalytics(true));
         }
         if (userRole !== 'participante') carregarEventosGestor(1);
         if (userRole === 'participante') carregarEventosAluno(1);
@@ -810,6 +1095,318 @@
         }
 
         ul.appendChild(createItem(current + 1, false, current === total, '»'));
+    }
+
+    function formatInteger(value) {
+        return Number(value || 0).toLocaleString('pt-BR');
+    }
+
+    function formatPercent(value) {
+        return `${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    }
+
+    function getAnalyticsGoalsStorageKey() {
+        return `gestor-dashboard-goals:${currentUsername || 'anonymous'}`;
+    }
+
+    function loadAnalyticsGoalsFromStorage() {
+        try {
+            const raw = localStorage.getItem(getAnalyticsGoalsStorageKey());
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            const presence = Number(parsed?.presence);
+            const emission = Number(parsed?.emission);
+            if (presence >= 1 && presence <= 100) analyticsState.goals.presence = presence;
+            if (emission >= 1 && emission <= 100) analyticsState.goals.emission = emission;
+        } catch (_) {}
+    }
+
+    function saveAnalyticsGoalsToStorage() {
+        localStorage.setItem(getAnalyticsGoalsStorageKey(), JSON.stringify(analyticsState.goals));
+    }
+
+    async function parseJsonSafeResponse(res) {
+        const text = await res.text();
+        try {
+            return JSON.parse(text || '{}');
+        } catch (_) {
+            if (!res.ok) {
+                throw new Error(`Falha na API (${res.status}). Resposta inválida recebida.`);
+            }
+            throw new Error('Resposta inválida do servidor. Recarregue a página e tente novamente.');
+        }
+    }
+
+    function setActivePeriodButton() {
+        document.querySelectorAll('.analytics-period-btn').forEach(btn => {
+            const isActive = Number(btn.dataset.days) === Number(analyticsState.periodDays);
+            btn.classList.toggle('btn-primary', isActive);
+            btn.classList.toggle('btn-outline-primary', !isActive);
+        });
+    }
+
+    async function carregarCursosAnalyticsFiltro() {
+        const select = document.getElementById('analyticsCourseFilter');
+        if (!select) return;
+
+        try {
+            const res = await fetch(apiUrl('/api/courses/'), { headers: { 'Accept': 'application/json' } });
+            const data = await parseJsonSafeResponse(res);
+            if (!res.ok || !Array.isArray(data)) return;
+
+            const options = data
+                .map(c => `<option value="${c.id}">${c.nome}</option>`)
+                .join('');
+            select.insertAdjacentHTML('beforeend', options);
+        } catch (_) {}
+    }
+
+    function renderAlertasProativos(summary, pipeline, institutionalSummary) {
+        const container = document.getElementById('analyticsAlerts');
+        if (!container) return;
+
+        const alerts = [];
+        const presenceRate = Number(summary?.presence_rate || 0);
+        if (presenceRate < analyticsState.goals.presence) {
+            alerts.push(`Taxa de presença abaixo da meta (${formatPercent(presenceRate)} < ${formatPercent(analyticsState.goals.presence)}).`);
+        }
+
+        const withCertificate = Number(pipeline?.with_certificate || 0);
+        const withoutCertificate = Number(pipeline?.without_certificate || 0);
+        const emissionRate = (withCertificate + withoutCertificate) > 0
+            ? (withCertificate / (withCertificate + withoutCertificate)) * 100
+            : 0;
+        if (emissionRate < analyticsState.goals.emission) {
+            alerts.push(`Emissão de certificados de eventos abaixo da meta (${formatPercent(emissionRate)} < ${formatPercent(analyticsState.goals.emission)}).`);
+        }
+
+        const academicDeliveryRate = Number(institutionalSummary?.delivery_rate || 0);
+        if (academicDeliveryRate < analyticsState.goals.emission && Number(institutionalSummary?.total_recipients || 0) > 0) {
+            alerts.push(`Entrega de certificados acadêmicos abaixo da meta (${formatPercent(academicDeliveryRate)} < ${formatPercent(analyticsState.goals.emission)}).`);
+        }
+
+        if (!alerts.length) {
+            container.innerHTML = '<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Todas as metas estão dentro do esperado no período selecionado.</span>';
+            return;
+        }
+
+        container.innerHTML = `<ul class="mb-0 ps-3">${alerts.map(item => `<li class="text-warning-emphasis">${item}</li>`).join('')}</ul>`;
+    }
+
+    function renderAcademicoSummary(summary) {
+        const wrapper = document.getElementById('academicoSummaryCards');
+        if (!wrapper) return;
+
+        wrapper.innerHTML = `
+            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Certificados</div><div class="kpi-value">${formatInteger(summary.total_certificates)}</div><small class="text-muted">Rascunho: ${formatInteger(summary.draft_certificates)} • Enviado: ${formatInteger(summary.sent_certificates)}</small></div></div>
+            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Destinatários</div><div class="kpi-value">${formatInteger(summary.total_recipients)}</div><small class="text-muted">Arquivados: ${formatInteger(summary.archived_certificates)}</small></div></div>
+            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Entregues</div><div class="kpi-value">${formatInteger(summary.delivered_recipients)}</div><small class="text-muted">Pendentes: ${formatInteger(summary.pending_recipients)}</small></div></div>
+            <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Taxa de Entrega</div><div class="kpi-value">${formatPercent(summary.delivery_rate)}</div><small class="text-muted">Eficiência de envio acadêmico</small></div></div>
+        `;
+    }
+
+    function renderPendenciasAcademicas(items) {
+        const tbody = document.getElementById('tabelaPendenciasAcademicoGestor');
+        if (!tbody) return;
+
+        if (!items || !items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sem pendências acadêmicas relevantes no período.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => `
+            <tr>
+                <td><span class="fw-semibold">${item.title}</span></td>
+                <td>${item.category || '-'}</td>
+                <td>${formatInteger(item.recipients_count)}</td>
+                <td><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${formatInteger(item.pending_count)}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    function inicializarControlesAnalyticsGestor() {
+        loadAnalyticsGoalsFromStorage();
+
+        const presenceInput = document.getElementById('goalPresenceInput');
+        const emissionInput = document.getElementById('goalEmissionInput');
+        if (presenceInput) presenceInput.value = analyticsState.goals.presence;
+        if (emissionInput) emissionInput.value = analyticsState.goals.emission;
+
+        setActivePeriodButton();
+        carregarCursosAnalyticsFiltro();
+
+        document.querySelectorAll('.analytics-period-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                analyticsState.periodDays = Number(btn.dataset.days || 30);
+                setActivePeriodButton();
+                carregarDashboardGestorAnalytics(true);
+            });
+        });
+
+        document.getElementById('analyticsCourseFilter')?.addEventListener('change', (ev) => {
+            analyticsState.courseId = ev.target.value || '';
+            carregarDashboardGestorAnalytics(true);
+        });
+
+        document.getElementById('btnSaveAnalyticsGoals')?.addEventListener('click', () => {
+            const presence = Number(document.getElementById('goalPresenceInput')?.value || analyticsState.goals.presence);
+            const emission = Number(document.getElementById('goalEmissionInput')?.value || analyticsState.goals.emission);
+            if (presence < 1 || presence > 100 || emission < 1 || emission > 100) {
+                Swal.fire('Metas inválidas', 'Informe valores entre 1 e 100 para presença e emissão.', 'warning');
+                return;
+            }
+            analyticsState.goals.presence = presence;
+            analyticsState.goals.emission = emission;
+            saveAnalyticsGoalsToStorage();
+            Toast.fire({ icon: 'success', title: 'Metas salvas com sucesso.' });
+            carregarDashboardGestorAnalytics(true);
+        });
+    }
+
+    function renderRankingList(containerId, items, maxValue) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        if (!items || !items.length) {
+            container.innerHTML = '<li class="text-muted small">Sem dados suficientes para análise.</li>';
+            return;
+        }
+
+        const top = Math.max(maxValue || 0, items[0]?.count || 1, 1);
+        container.innerHTML = items.map((item, index) => {
+            const ratio = Math.min((item.count / top) * 100, 100);
+            const label = item.course || item.category || item.label || 'Sem classificação';
+            return `
+                <li class="rank-item">
+                    <div>
+                        <div class="fw-semibold text-slate-700">${index + 1}. ${label}</div>
+                        <div class="rank-track"><div class="rank-fill" style="width:${ratio.toFixed(1)}%"></div></div>
+                    </div>
+                    <span class="badge bg-light text-dark border">${formatInteger(item.count)}</span>
+                </li>
+            `;
+        }).join('');
+    }
+
+    function renderPendenciasCertificados(items) {
+        const tbody = document.getElementById('tabelaPendenciasCertificadosGestor');
+        if (!tbody) return;
+
+        if (!items || !items.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhuma pendência crítica de certificado encontrada.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+            const data = item.start_date ? new Date(item.start_date).toLocaleDateString('pt-BR') : '-';
+            return `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${item.name}</div>
+                        <small class="text-muted">Início: ${data}</small>
+                    </td>
+                    <td>${item.course || '-'}</td>
+                    <td>${formatInteger(item.enrollments_count)}</td>
+                    <td>${formatInteger(item.presence_count)}</td>
+                    <td>${formatInteger(item.cert_generated_count)}</td>
+                    <td><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${formatInteger(item.pending_count)}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderGestorKpis(summary, pipeline) {
+        const grid = document.getElementById('gestorKpiGrid');
+        if (!grid) return;
+
+        const withCertificate = Number(pipeline?.with_certificate || 0);
+        const withoutCertificate = Number(pipeline?.without_certificate || 0);
+        const totalCertificateTracked = withCertificate + withoutCertificate;
+        const completionRate = totalCertificateTracked ? ((withCertificate / totalCertificateTracked) * 100) : 0;
+
+        grid.innerHTML = `
+            <div class="kpi-card">
+                <div class="kpi-label">Total de Eventos</div>
+                <div class="kpi-value">${formatInteger(summary.total_events)}</div>
+                <small class="text-muted">${formatInteger(summary.active_events)} abertos • ${formatInteger(summary.closed_events)} finalizados</small>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Alunos Inscritos</div>
+                <div class="kpi-value">${formatInteger(summary.unique_students)}</div>
+                <small class="text-muted">${formatInteger(summary.total_enrollments)} inscrições processadas</small>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Taxa de Presença</div>
+                <div class="kpi-value">${formatPercent(summary.presence_rate)}</div>
+                <small class="text-muted">Eficiência de participação nas atividades</small>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Pipeline de Certificados</div>
+                <div class="kpi-value">${formatPercent(completionRate)}</div>
+                <small class="text-muted">${formatInteger(withoutCertificate)} eventos sem emissão registrada</small>
+            </div>
+        `;
+    }
+
+    function renderAnalyticsTimestamp(isoDate) {
+        const el = document.getElementById('analyticsLastUpdate');
+        if (!el) return;
+
+        if (!isoDate) {
+            el.innerHTML = '<i class="fa-regular fa-clock"></i>Atualização indisponível';
+            return;
+        }
+
+        const dt = new Date(isoDate);
+        el.innerHTML = `<i class="fa-regular fa-clock"></i>Atualizado às ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    async function carregarDashboardGestorAnalytics(forceRefresh = false) {
+        const refreshBtn = document.getElementById('btnRefreshGestorAnalytics');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Atualizando';
+        }
+
+        try {
+            const params = new URLSearchParams();
+            params.set('period_days', String(analyticsState.periodDays));
+            if (analyticsState.courseId) params.set('course_id', String(analyticsState.courseId));
+            if (forceRefresh) params.set('t', String(Date.now()));
+
+            const res = await fetch(apiUrl(`/api/dashboard/analytics?${params.toString()}`), {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await parseJsonSafeResponse(res);
+            if (!res.ok) {
+                throw new Error(data.erro || 'Falha ao carregar painel analítico.');
+            }
+
+            renderGestorKpis(data.summary || {}, data.certificate_pipeline || {});
+            renderRankingList('rankingEventosCurso', data.events_by_course || [], data.events_by_course?.[0]?.count || 1);
+            renderRankingList('rankingAlunosCurso', data.students_by_course || [], data.students_by_course?.[0]?.count || 1);
+            renderAcademicoSummary(data.institutional_summary || {});
+            renderRankingList('rankingAcademicoCategoria', data.institutional_by_category || [], data.institutional_by_category?.[0]?.count || 1);
+            renderPendenciasAcademicas(data.institutional_pending || []);
+            renderPendenciasCertificados(data.pending_certificate_events || []);
+            renderAlertasProativos(data.summary || {}, data.certificate_pipeline || {}, data.institutional_summary || {});
+            renderAnalyticsTimestamp(data.generated_at);
+        } catch (error) {
+            const tbody = document.getElementById('tabelaPendenciasCertificadosGestor');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">${error.message || 'Não foi possível carregar os indicadores.'}</td></tr>`;
+            }
+            const tbodyAcademic = document.getElementById('tabelaPendenciasAcademicoGestor');
+            if (tbodyAcademic) {
+                tbodyAcademic.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-3">${error.message || 'Não foi possível carregar os indicadores acadêmicos.'}</td></tr>`;
+            }
+            Toast.fire({ icon: 'error', title: error.message || 'Falha ao carregar analytics.' });
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fa-solid fa-rotate me-1"></i>Atualizar';
+            }
+        }
     }
 
     function toggleForm() {
@@ -1109,7 +1706,7 @@
                 <button onclick="abrirRelatorio(${ev.id})" class="btn btn-sm btn-light border flex-grow-1" title="Lista de Inscritos">
                   <i class="fa-solid fa-users-viewfinder me-1"></i> Relatório
                 </button>
-                                ${['admin', 'coordenador', 'gestor'].includes(userRole) ? `
+                                ${ev.can_manage_certificates ? `
                                 <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Designer de Certificado">
                                     <i class="fa-solid fa-certificate"></i>
                                 </a>` : ''}
