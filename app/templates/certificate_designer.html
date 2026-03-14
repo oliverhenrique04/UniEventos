@@ -790,7 +790,7 @@
     let _joditPendingContent = '';
     let previewDesigner = null;
     let previewData = null;
-    let previewPdfUrl = null;
+    let previewPdfDataUri = null;
     let isRenderingPreview = false;
     let previewRenderPending = false;
     let previewModalHandlersBound = false;
@@ -841,11 +841,10 @@
     function clearPreviewPdfFrame() {
         const pdfFrame = document.getElementById('previewPdfFrame');
         if (pdfFrame) {
-            pdfFrame.src = '';
+            pdfFrame.src = 'about:blank';
         }
-        if (previewPdfUrl) {
-            URL.revokeObjectURL(previewPdfUrl);
-            previewPdfUrl = null;
+        if (previewPdfDataUri) {
+            previewPdfDataUri = null;
         }
     }
 
@@ -1326,11 +1325,8 @@
             });
             pdf.addImage(renderedImage, 'PNG', 0, 0, A4_LANDSCAPE_MM.w, A4_LANDSCAPE_MM.h, undefined, 'FAST');
 
-            if (previewPdfUrl) {
-                URL.revokeObjectURL(previewPdfUrl);
-            }
-            previewPdfUrl = URL.createObjectURL(pdf.output('blob'));
-            pdfFrame.src = previewPdfUrl;
+            previewPdfDataUri = pdf.output('datauristring');
+            pdfFrame.src = previewPdfDataUri;
         } finally {
             isRenderingPreview = false;
             if (previewRenderPending) {
