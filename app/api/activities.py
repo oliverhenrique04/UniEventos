@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_file, current_app
+from flask import Blueprint, request, jsonify, send_file, current_app, url_for
 from flask_login import login_required, current_user
 from app.models import Activity, Enrollment, db
 from app.utils import gerar_hash_dinamico, validar_hash_dinamico
@@ -98,5 +98,5 @@ def validar_presenca():
     return jsonify({
         "status": "success", 
         "mensagem": message, 
-        "download_link": f"/certificado/{evt_id}/{current_user.cpf}"
+        "download_link": url_for('reports.baixar_certificado', evt_id=evt_id, cpf=current_user.cpf)
     })

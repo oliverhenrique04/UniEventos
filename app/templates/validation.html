@@ -439,7 +439,7 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Verificando...';
 
         const finalHash = normalized; // rota espera sem hífen
-        window.location.href = `/validar/${finalHash}`;
+        window.location.href = pathUrl(`/validar/${finalHash}`);
         // se quiser preservar o botão em caso de navegação bloqueada:
         setTimeout(() => { btn.disabled = false; btn.innerHTML = original; }, 2500);
     }

@@ -6,6 +6,7 @@ import io
 import os
 
 from flask import Blueprint, jsonify, request, make_response, send_file, current_app
+from flask import url_for
 from flask_login import current_user, login_required
 from sqlalchemy import or_, func
 from werkzeug.utils import secure_filename
@@ -332,7 +333,7 @@ def create_institutional_certificate():
         descricao=(data.get('descricao') or '').strip() or None,
         data_emissao=data_emissao,
         signer_name=(data.get('signer_name') or '').strip() or None,
-        cert_bg_path=(data.get('cert_bg_path') or '').strip() or None,
+        cert_bg_path=(data.get('cert_bg_path') or '').strip() or 'file/fundo_padrao.png',
         cert_template_json=json.dumps(data.get('template') or {}, ensure_ascii=False),
         status='RASCUNHO',
     )
@@ -443,7 +444,7 @@ def setup_institutional_certificate(certificate_id):
     db.session.commit()
     return jsonify({
         'mensagem': 'Configuracao de certificado institucional atualizada com sucesso!',
-        'bg_url': f'/static/{bg_path}' if bg_path else (f"/static/{cert.cert_bg_path}" if cert.cert_bg_path else None),
+        'bg_url': url_for('static', filename=bg_path) if bg_path else (url_for('static', filename=cert.cert_bg_path) if cert.cert_bg_path else None),
     })
 
 
@@ -467,7 +468,7 @@ def upload_institutional_asset(certificate_id):
 
     return jsonify({
         'mensagem': 'Asset enviado com sucesso',
-        'asset_url': f'/static/certificates/assets/{filename}',
+        'asset_url': url_for('static', filename=f'certificates/assets/{filename}'),
         'asset_path': f'certificates/assets/{filename}',
     })
 

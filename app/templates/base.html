@@ -139,7 +139,26 @@
                 if (!url.startsWith('/')) return url;
                 if (url.startsWith('//')) return url;
                 if (url.startsWith(scriptRoot + '/')) return url;
-                if (url.startsWith('/api/') || url.startsWith('/static/') || url.startsWith('/logout') || url.startsWith('/validar') || url.startsWith('/cursos') || url.startsWith('/usuarios') || url.startsWith('/eventos_admin') || url.startsWith('/certificados_institucionais') || url.startsWith('/perfil') || url.startsWith('/meus_eventos')) {
+                if (
+                    url.startsWith('/api/') ||
+                    url.startsWith('/static/') ||
+                    url.startsWith('/logout') ||
+                    url.startsWith('/validar') ||
+                    url.startsWith('/cursos') ||
+                    url.startsWith('/usuarios') ||
+                    url.startsWith('/eventos_admin') ||
+                    url.startsWith('/certificados_institucionais') ||
+                    url.startsWith('/perfil') ||
+                    url.startsWith('/meus_eventos') ||
+                    url.startsWith('/designer_certificado') ||
+                    url.startsWith('/designer_certificado_institucional') ||
+                    url.startsWith('/gerenciar_entregas') ||
+                    url.startsWith('/criar_evento') ||
+                    url.startsWith('/editar_evento') ||
+                    url.startsWith('/inscrever') ||
+                    url.startsWith('/confirmar_presenca') ||
+                    url.startsWith('/resetar-senha')
+                ) {
                     return scriptRoot + url;
                 }
                 return url;

@@ -179,7 +179,7 @@ class Event(db.Model):
     longitude = db.Column(db.Float, nullable=True)
 
     # Certificate Customization
-    cert_bg_path = db.Column(db.String(200), nullable=True)
+    cert_bg_path = db.Column(db.String(200), nullable=True, default='file/fundo_padrao.png')
     cert_template_json = db.Column(db.Text, nullable=True) # JSON with positions of variables
 
     course_obj = db.relationship('Course', backref='events')
@@ -283,7 +283,7 @@ class InstitutionalCertificate(db.Model):
     descricao = db.Column(db.Text, nullable=True)
     data_emissao = db.Column(db.String(10), nullable=False)
     signer_name = db.Column(db.String(120), nullable=True)
-    cert_bg_path = db.Column(db.String(200), nullable=True)
+    cert_bg_path = db.Column(db.String(200), nullable=True, default='file/fundo_padrao.png')
     cert_template_json = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(20), default='RASCUNHO')
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)

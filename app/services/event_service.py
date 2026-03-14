@@ -83,6 +83,7 @@ class EventService:
             nome=data.get('nome'),
             descricao=data.get('descricao'),
             curso=data.get('curso'),
+            cert_bg_path='file/fundo_padrao.png',
             latitude=lat,
             longitude=lon,
             tipo='RAPIDO' if is_rapido else 'PADRAO',

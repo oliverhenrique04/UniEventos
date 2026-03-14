@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app, abort
+from flask import Blueprint, request, jsonify, current_app, abort, url_for
 from flask_login import login_required, current_user
 from app.services.certificate_service import CertificateService
 from werkzeug.utils import secure_filename
@@ -193,7 +193,7 @@ def setup_certificate(event_id):
     if success:
         return jsonify({
             "mensagem": "Configuração de certificado atualizada com sucesso!",
-            "bg_url": f"/static/{bg_path}" if bg_path else None
+            "bg_url": url_for('static', filename=bg_path) if bg_path else None
         })
     return jsonify({"erro": "Falha ao atualizar configuração"}), 400
 
@@ -222,7 +222,7 @@ def upload_asset(event_id):
 
     return jsonify({
         "mensagem": "Asset enviado com sucesso",
-        "asset_url": f"/static/certificates/assets/{filename}",
+        "asset_url": url_for('static', filename=f"certificates/assets/{filename}"),
         "asset_path": f"certificates/assets/{filename}"
     })
 

@@ -718,7 +718,7 @@ async function carregarCertificadosInstitucionais(page = 1) {
 }
 
 function abrirDesignerCertificado(id) {
-    window.location.href = `/designer_certificado_institucional/${id}`;
+    window.location.href = pathUrl(`/designer_certificado_institucional/${id}`);
 }
 
 function atualizarControlesPaginacao(total, current, pages) {

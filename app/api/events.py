@@ -1,5 +1,5 @@
 import json
-from flask import Blueprint, request, jsonify, abort
+from flask import Blueprint, request, jsonify, abort, url_for
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
 from app.models import Event, Activity, Enrollment, InstitutionalCertificate, InstitutionalCertificateRecipient, db
@@ -90,7 +90,10 @@ def criar_evento():
 
     try:
         event = event_service.create_event(current_user.username, data)
-        return jsonify({"mensagem": "Criado!", "link": f"/inscrever/{event.token_publico}"})
+        return jsonify({
+            "mensagem": "Criado!",
+            "link": url_for('main.inscrever_via_link', token=event.token_publico),
+        })
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
     except Exception as e:
@@ -403,8 +406,8 @@ def meu_historico():
                 "data": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
                 "horas": e.activity.carga_horaria,
                 "hash": e.cert_hash,
-                "download_url": f"/api/certificates/download_public/{e.cert_hash}" if e.cert_hash else f"/api/certificates/download/{e.id}",
-                "preview_url": f"/api/certificates/preview_public/{e.cert_hash}" if e.cert_hash else None,
+                "download_url": url_for('certificates.download_public', cert_hash=e.cert_hash) if e.cert_hash else url_for('certificates.download_single', enrollment_id=e.id),
+                "preview_url": url_for('certificates.preview_public', cert_hash=e.cert_hash) if e.cert_hash else None,
                 "issued_at": e.activity.data_atv.isoformat() if e.activity.data_atv else None,
             }
             for e in event_certificates
@@ -434,8 +437,8 @@ def meu_historico():
                     "data": cert.data_emissao,
                     "horas": metadata.get('carga_horaria'),
                     "hash": recipient.cert_hash,
-                    "download_url": f"/api/institutional_certificates/download_public/{recipient.cert_hash}",
-                    "preview_url": f"/api/institutional_certificates/preview_public/{recipient.cert_hash}",
+                    "download_url": url_for('institutional_certificates.download_public_by_hash', cert_hash=recipient.cert_hash),
+                    "preview_url": url_for('institutional_certificates.preview_public_by_hash', cert_hash=recipient.cert_hash),
                     "issued_at": cert.data_emissao,
                 })
 
