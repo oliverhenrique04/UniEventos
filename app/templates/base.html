@@ -130,9 +130,6 @@
         // Normalize absolute app paths when hosted under a subpath (e.g. /euroeventos).
         (function () {
             const scriptRoot = {{ request.script_root|tojson }} || '';
-            if (!scriptRoot) {
-                return;
-            }
 
             function withScriptRoot(url) {
                 if (typeof url !== 'string') return url;
@@ -181,17 +178,20 @@
             window.apiUrl = withScriptRoot;
             window.pathUrl = withScriptRoot;
 
+            function rewriteAttributeIfNeeded(el, attrName) {
+                if (!el.hasAttribute(attrName)) return;
+                const currentValue = el.getAttribute(attrName);
+                const normalizedValue = withScriptRoot(currentValue);
+                if (normalizedValue !== currentValue) {
+                    el.setAttribute(attrName, normalizedValue);
+                }
+            }
+
             function rewriteDomAbsolutePaths() {
                 document.querySelectorAll('a[href^="/"], img[src^="/"], iframe[src^="/"], form[action^="/"]').forEach((el) => {
-                    if (el.hasAttribute('href')) {
-                        el.setAttribute('href', withScriptRoot(el.getAttribute('href')));
-                    }
-                    if (el.hasAttribute('src')) {
-                        el.setAttribute('src', withScriptRoot(el.getAttribute('src')));
-                    }
-                    if (el.hasAttribute('action')) {
-                        el.setAttribute('action', withScriptRoot(el.getAttribute('action')));
-                    }
+                    rewriteAttributeIfNeeded(el, 'href');
+                    rewriteAttributeIfNeeded(el, 'src');
+                    rewriteAttributeIfNeeded(el, 'action');
                 });
             }
 
@@ -199,28 +199,22 @@
                 for (const mutation of mutations) {
                     if (mutation.type === 'attributes' && mutation.target instanceof Element) {
                         const el = mutation.target;
-                        if (mutation.attributeName === 'href' && el.hasAttribute('href')) {
-                            el.setAttribute('href', withScriptRoot(el.getAttribute('href')));
-                        }
-                        if (mutation.attributeName === 'src' && el.hasAttribute('src')) {
-                            el.setAttribute('src', withScriptRoot(el.getAttribute('src')));
-                        }
-                        if (mutation.attributeName === 'action' && el.hasAttribute('action')) {
-                            el.setAttribute('action', withScriptRoot(el.getAttribute('action')));
-                        }
+                        if (mutation.attributeName === 'href') rewriteAttributeIfNeeded(el, 'href');
+                        if (mutation.attributeName === 'src') rewriteAttributeIfNeeded(el, 'src');
+                        if (mutation.attributeName === 'action') rewriteAttributeIfNeeded(el, 'action');
                     }
                     if (mutation.type === 'childList') {
                         mutation.addedNodes.forEach((node) => {
                             if (!(node instanceof Element)) return;
                             if (node.matches('a[href^="/"], img[src^="/"], iframe[src^="/"], form[action^="/"]')) {
-                                if (node.hasAttribute('href')) node.setAttribute('href', withScriptRoot(node.getAttribute('href')));
-                                if (node.hasAttribute('src')) node.setAttribute('src', withScriptRoot(node.getAttribute('src')));
-                                if (node.hasAttribute('action')) node.setAttribute('action', withScriptRoot(node.getAttribute('action')));
+                                rewriteAttributeIfNeeded(node, 'href');
+                                rewriteAttributeIfNeeded(node, 'src');
+                                rewriteAttributeIfNeeded(node, 'action');
                             }
                             node.querySelectorAll?.('a[href^="/"], img[src^="/"], iframe[src^="/"], form[action^="/"]').forEach((el) => {
-                                if (el.hasAttribute('href')) el.setAttribute('href', withScriptRoot(el.getAttribute('href')));
-                                if (el.hasAttribute('src')) el.setAttribute('src', withScriptRoot(el.getAttribute('src')));
-                                if (el.hasAttribute('action')) el.setAttribute('action', withScriptRoot(el.getAttribute('action')));
+                                rewriteAttributeIfNeeded(el, 'href');
+                                rewriteAttributeIfNeeded(el, 'src');
+                                rewriteAttributeIfNeeded(el, 'action');
                             });
                         });
                     }

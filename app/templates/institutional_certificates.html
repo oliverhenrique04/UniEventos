@@ -463,7 +463,27 @@ let recipientsDebounceTimer = null;
 let recipientsSortBy = 'id';
 let recipientsSortDir = 'desc';
 let previewDestinatarioModalInstance = null;
+let previewDestinatarioHandlersBound = false;
+let previewDestinatarioCurrentUrl = '';
+let previewDestinatarioCurrentRecipientId = null;
 let editarCertificadoModalInstance = null;
+
+function bindPreviewDestinatarioHandlers() {
+    if (previewDestinatarioHandlersBound) return;
+    const modalEl = document.getElementById('modalPreviewDestinatario');
+    if (!modalEl) return;
+
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        const iframe = document.getElementById('recipientPreviewFrame');
+        if (iframe) {
+            iframe.src = 'about:blank';
+        }
+        previewDestinatarioCurrentUrl = '';
+        previewDestinatarioCurrentRecipientId = null;
+    });
+
+    previewDestinatarioHandlersBound = true;
+}
 
 function userSelectionKey(user) {
     if (!user) return '';
@@ -1313,27 +1333,34 @@ function baixarPdfDestinatario(recipientId) {
 
 function abrirPreviewDestinatario(recipientId, recipientNome = '') {
     if (!certificateIdAtivo) return;
+    bindPreviewDestinatarioHandlers();
+
+    if (!previewDestinatarioModalInstance) {
+        previewDestinatarioModalInstance = new bootstrap.Modal(document.getElementById('modalPreviewDestinatario'));
+    }
+
     const iframe = document.getElementById('recipientPreviewFrame');
     const subtitle = document.getElementById('previewDestinatarioTitulo');
     const safeNome = (recipientNome || '').trim();
     if (subtitle) {
         subtitle.textContent = safeNome ? `Destinatario: ${safeNome}` : '';
     }
+
+    const modalEl = document.getElementById('modalPreviewDestinatario');
+    const previewUrl = apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/preview?t=${Date.now()}`);
+
     if (iframe) {
-        iframe.src = apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/preview?t=${Date.now()}`);
+        const isModalOpen = modalEl && modalEl.classList.contains('show');
+        const sameRecipientOpen = isModalOpen && previewDestinatarioCurrentRecipientId === recipientId;
+        if (!sameRecipientOpen || previewDestinatarioCurrentUrl !== previewUrl) {
+            iframe.src = previewUrl;
+            previewDestinatarioCurrentUrl = previewUrl;
+            previewDestinatarioCurrentRecipientId = recipientId;
+        }
     }
-    if (!previewDestinatarioModalInstance) {
-        previewDestinatarioModalInstance = new bootstrap.Modal(document.getElementById('modalPreviewDestinatario'));
-    }
+
     previewDestinatarioModalInstance.show();
 }
-
-document.getElementById('modalPreviewDestinatario').addEventListener('hidden.bs.modal', () => {
-    const iframe = document.getElementById('recipientPreviewFrame');
-    if (iframe) {
-        iframe.src = '';
-    }
-});
 
 document.getElementById('btnSalvarNovo').addEventListener('click', criarCertificadoInstitucional);
 document.getElementById('btnSalvarEdicao').addEventListener('click', salvarEdicaoCertificado);
