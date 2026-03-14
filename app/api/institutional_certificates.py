@@ -935,12 +935,20 @@ def download_recipient_pdf(certificate_id, recipient_id):
         recipient.cert_hash = institutional_service.build_hash(certificate_id, recipient.nome, recipient.email)
         db.session.commit()
 
-    pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
-    if not pdf_path:
-        return jsonify({'erro': 'Falha ao gerar PDF'}), 500
+    try:
+        pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+        if not pdf_path:
+            return jsonify({'erro': 'Falha ao gerar PDF'}), 500
 
-    filename = f'institutional_{cert.id}_{recipient.id}.pdf'
-    return send_file(pdf_path, as_attachment=True, download_name=filename)
+        filename = f'institutional_{cert.id}_{recipient.id}.pdf'
+        return send_file(pdf_path, as_attachment=True, download_name=filename)
+    except Exception as exc:
+        current_app.logger.exception(
+            'Erro ao gerar/baixar PDF institucional (cert_id=%s, recipient_id=%s)',
+            certificate_id,
+            recipient_id,
+        )
+        return jsonify({'erro': f'Falha ao gerar PDF institucional: {str(exc)}'}), 500
 
 
 @bp.route('/download_public/<string:cert_hash>', methods=['GET'])

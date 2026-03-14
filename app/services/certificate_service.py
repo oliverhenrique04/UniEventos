@@ -236,8 +236,11 @@ class CertificateService:
         cert_hash = enrollment.cert_hash if enrollment else "VALID-SAMPLE-HASH"
         validation_url = build_absolute_app_url(f"/validar/{cert_hash}")
 
-        filename = f"cert_{event.id}_{user.cpf}.pdf"
-        filepath = os.path.join(current_app.root_path, 'static', 'certificates', 'generated', filename)
+        output_dir = os.path.join(current_app.root_path, 'static', 'certificates', 'generated')
+        os.makedirs(output_dir, exist_ok=True)
+        safe_identifier = str(getattr(user, 'cpf', '') or f"USER-{getattr(user, 'id', 'NA')}")
+        filename = f"cert_{event.id}_{safe_identifier}.pdf"
+        filepath = os.path.join(output_dir, filename)
         
         page_width, page_height = landscape(A4)
 
@@ -257,14 +260,18 @@ class CertificateService:
             activity_name = enrollment.activity.nome or ''
             speaker_name = enrollment.activity.palestrante or ''
 
+        user_name = str(getattr(user, 'nome', '') or '')
+        event_name = str(getattr(event, 'nome', '') or '')
+        user_cpf = str(getattr(user, 'cpf', '') or '')
+
         tags = {
-            '{{NOME}}': user.nome.upper(),
-            '{{EVENTO}}': event.nome,
+            '{{NOME}}': user_name.upper(),
+            '{{EVENTO}}': event_name,
             '{{ATIVIDADE}}': activity_name,
             '{{PALESTRANTE}}': speaker_name,
             '{{HORAS}}': str(total_hours),
             '{{DATA}}': event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else "",
-            '{{CPF}}': user.cpf,
+            '{{CPF}}': user_cpf,
             '{{HASH}}': cert_hash
         }
 
@@ -379,7 +386,12 @@ class CertificateService:
             f.addFromList(story, c)
         
         c.showPage()
-        c.save()
+        try:
+            c.save()
+        except FileNotFoundError:
+            # Defensive retry for environments where generated folder may be missing at runtime.
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            c.save()
         return filepath
 
     def queue_event_certificates(self, event_id):

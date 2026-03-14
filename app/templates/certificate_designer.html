@@ -788,6 +788,9 @@
     let previewDesigner = null;
     let previewData = null;
     let previewPdfUrl = null;
+    let isRenderingPreview = false;
+    let previewRenderPending = false;
+    let previewModalHandlersBound = false;
 
     function staticUrl(path) {
         if (!path) return '';
@@ -830,6 +833,34 @@
         }
 
         return raw.replace(/^static\//, '');
+    }
+
+    function clearPreviewPdfFrame() {
+        const pdfFrame = document.getElementById('previewPdfFrame');
+        if (pdfFrame) {
+            pdfFrame.src = '';
+        }
+        if (previewPdfUrl) {
+            URL.revokeObjectURL(previewPdfUrl);
+            previewPdfUrl = null;
+        }
+    }
+
+    function bindPreviewModalHandlers() {
+        if (previewModalHandlersBound) return;
+        const modalEl = document.getElementById('previewModal');
+        if (!modalEl) return;
+
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            clearPreviewPdfFrame();
+            previewRenderPending = false;
+        });
+
+        modalEl.addEventListener('shown.bs.modal', () => {
+            renderCertificatePreview();
+        });
+
+        previewModalHandlersBound = true;
     }
 
     function setActionButtonLoading(buttonId, loading, loadingText = 'Processando...') {
@@ -1099,28 +1130,37 @@
     }
 
     async function renderCertificatePreview() {
+        if (isRenderingPreview) {
+            previewRenderPending = true;
+            return;
+        }
+
         const pdfFrame = document.getElementById('previewPdfFrame');
         if (!pdfFrame) return;
 
-        if (previewDesigner) {
-            previewDesigner.dispose();
-        }
+        isRenderingPreview = true;
 
-        const previewBufferCanvas = document.createElement('canvas');
-        previewBufferCanvas.width = W;
-        previewBufferCanvas.height = H;
+        try {
 
-        previewDesigner = new fabric.StaticCanvas(previewBufferCanvas, {
-            width: W,
-            height: H,
-            selection: false,
-            renderOnAddRemove: false
-        });
+            if (previewDesigner) {
+                previewDesigner.dispose();
+            }
 
-        const snapshot = buildLiveSnapshotForPreview();
-        const tags = previewData || buildRandomPreviewData();
-        previewData = tags;
-        updatePreviewDataPanel(tags);
+            const previewBufferCanvas = document.createElement('canvas');
+            previewBufferCanvas.width = W;
+            previewBufferCanvas.height = H;
+
+            previewDesigner = new fabric.StaticCanvas(previewBufferCanvas, {
+                width: W,
+                height: H,
+                selection: false,
+                renderOnAddRemove: false
+            });
+
+            const snapshot = buildLiveSnapshotForPreview();
+            const tags = previewData || buildRandomPreviewData();
+            previewData = tags;
+            updatePreviewDataPanel(tags);
 
         if (designer?.backgroundImage) {
             await new Promise((resolve) => {
@@ -1266,28 +1306,35 @@
             return Promise.resolve();
         });
 
-        await Promise.all(loaders);
-        previewDesigner.requestRenderAll();
+            await Promise.all(loaders);
+            previewDesigner.requestRenderAll();
 
-        const renderedImage = previewDesigner.toDataURL({
-            format: 'png',
-            multiplier: 2
-        });
+            const renderedImage = previewDesigner.toDataURL({
+                format: 'png',
+                multiplier: 2
+            });
 
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-            orientation: 'landscape',
-            unit: 'mm',
-            format: 'a4',
-            compress: true
-        });
-        pdf.addImage(renderedImage, 'PNG', 0, 0, A4_LANDSCAPE_MM.w, A4_LANDSCAPE_MM.h, undefined, 'FAST');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+            pdf.addImage(renderedImage, 'PNG', 0, 0, A4_LANDSCAPE_MM.w, A4_LANDSCAPE_MM.h, undefined, 'FAST');
 
-        if (previewPdfUrl) {
-            URL.revokeObjectURL(previewPdfUrl);
+            if (previewPdfUrl) {
+                URL.revokeObjectURL(previewPdfUrl);
+            }
+            previewPdfUrl = URL.createObjectURL(pdf.output('blob'));
+            pdfFrame.src = previewPdfUrl;
+        } finally {
+            isRenderingPreview = false;
+            if (previewRenderPending) {
+                previewRenderPending = false;
+                setTimeout(() => renderCertificatePreview(), 0);
+            }
         }
-        previewPdfUrl = URL.createObjectURL(pdf.output('blob'));
-        pdfFrame.src = previewPdfUrl;
     }
 
     function regenerateCertificatePreview() {
@@ -1297,20 +1344,14 @@
 
     function openCertificatePreview() {
         const modalEl = document.getElementById('previewModal');
+        bindPreviewModalHandlers();
         previewData = buildRandomPreviewData();
-        modalEl.addEventListener('hidden.bs.modal', function disposePreviewPdf() {
-            modalEl.removeEventListener('hidden.bs.modal', disposePreviewPdf);
-            const pdfFrame = document.getElementById('previewPdfFrame');
-            if (pdfFrame) pdfFrame.src = '';
-            if (previewPdfUrl) {
-                URL.revokeObjectURL(previewPdfUrl);
-                previewPdfUrl = null;
-            }
-        });
-        modalEl.addEventListener('shown.bs.modal', function handler() {
-            modalEl.removeEventListener('shown.bs.modal', handler);
+
+        if (modalEl.classList.contains('show')) {
             renderCertificatePreview();
-        });
+            return;
+        }
+
         (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
     }
 
