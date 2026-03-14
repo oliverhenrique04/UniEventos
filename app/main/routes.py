@@ -22,7 +22,7 @@ def logout():
     # I already defined /api/logout in auth.py which does logout_user() then redirects.
     # But the frontend has <a href="/logout">. So this route is needed.
     # I'll just redirect to the api logout or implement it here.
-    return redirect('/api/logout')
+    return redirect(url_for('auth.logout'))
 
 
 @bp.route('/resetar-senha/<token>')

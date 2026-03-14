@@ -34,7 +34,7 @@ def registrar():
 @bp.route('/logout')
 def logout():
     logout_user()
-    return redirect('/')
+    return redirect(url_for('main.index'))
 
 
 @bp.route('/ava')
