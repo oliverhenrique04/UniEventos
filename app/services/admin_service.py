@@ -285,7 +285,7 @@ class AdminService:
             curso_nome = str(row[idx_curso]).strip() if idx_curso is not None and idx_curso < len(row) and row[idx_curso] is not None else ''
             cpf_raw = str(row[idx_cpf]).strip() if idx_cpf is not None and idx_cpf < len(row) and row[idx_cpf] is not None else ''
             ra = str(row[idx_ra]).strip() if idx_ra is not None and idx_ra < len(row) and row[idx_ra] is not None else None
-            email = str(row[idx_email]).strip().lower() if idx_email is not None and idx_email < len(row) and row[idx_email] is not None else ''
+            email = str(row[idx_email]).strip() if idx_email is not None and idx_email < len(row) and row[idx_email] is not None else ''
 
             if not any([nome, curso_nome, cpf_raw, ra, email]):
                 continue
@@ -297,8 +297,6 @@ class AdminService:
                 'cpf_raw': cpf_raw,
                 'ra': ra,
                 'email': email,
-                'has_ra_col': idx_ra is not None,
-                'has_email_col': idx_email is not None,
             })
 
         return {
@@ -317,8 +315,6 @@ class AdminService:
         cpf_raw = row_data.get('cpf_raw', '')
         ra = row_data.get('ra')
         email = row_data.get('email', '')
-        has_ra_col = bool(row_data.get('has_ra_col'))
-        has_email_col = bool(row_data.get('has_email_col'))
 
         cpf_digits = self._normalize_cpf_digits(cpf_raw)
         cpf_masked = self._format_cpf_mask(cpf_digits)
@@ -329,7 +325,6 @@ class AdminService:
             'cpf': cpf_masked or cpf_raw,
             'curso': curso_nome,
             'ra': ra,
-            'email': email,
         }
 
         if len(cpf_digits) != 11 or not cpf_masked:
@@ -367,49 +362,25 @@ class AdminService:
 
         existing = self._find_user_by_cpf_flexible(cpf_masked)
         if existing:
-            new_ra = ra if has_ra_col else existing.ra
-            if has_ra_col and (new_ra is None or str(new_ra).strip() == ''):
-                new_ra = None
-
-            new_email = email if has_email_col else existing.email
-            if has_email_col and (new_email is None or str(new_email).strip() == ''):
-                new_email = None
-
-            if has_ra_col and new_ra:
-                ra_owner = User.query.filter(User.ra == new_ra, User.username != existing.username).first()
+            if ra:
+                ra_owner = User.query.filter(User.ra == ra, User.username != existing.username).first()
                 if ra_owner:
                     db.session.rollback()
                     return {
                         **base_payload,
                         'status': 'error',
-                        'message': f"RA {new_ra} já pertence a outro usuário.",
-                    }
-
-            if has_email_col and new_email:
-                email_owner = User.query.filter(User.email == new_email, User.username != existing.username).first()
-                if email_owner:
-                    db.session.rollback()
-                    return {
-                        **base_payload,
-                        'status': 'error',
-                        'message': f"EMAIL {new_email} já pertence a outro usuário.",
+                        'message': f"RA {ra} já pertence a outro usuário.",
                     }
 
             changed = False
             if existing.nome != nome:
                 existing.nome = nome
                 changed = True
-            if existing.cpf != cpf_digits:
-                existing.cpf = cpf_digits
-                changed = True
             if existing.course_id != course_obj.id:
                 existing.course_id = course_obj.id
                 changed = True
-            if has_ra_col and existing.ra != new_ra:
-                existing.ra = new_ra
-                changed = True
-            if has_email_col and existing.email != new_email:
-                existing.email = new_email
+            if ra and existing.ra != ra:
+                existing.ra = ra
                 changed = True
 
             if changed:
@@ -445,18 +416,14 @@ class AdminService:
                 'message': f"Username {username} já existe para outro usuário.",
             }
 
-        new_ra = ra if has_ra_col else None
-        if new_ra is not None and str(new_ra).strip() == '':
-            new_ra = None
-
-        if new_ra:
-            ra_owner = User.query.filter_by(ra=new_ra).first()
+        if ra:
+            ra_owner = User.query.filter_by(ra=ra).first()
             if ra_owner:
                 db.session.rollback()
                 return {
                     **base_payload,
                     'status': 'error',
-                    'message': f"RA {new_ra} já cadastrado.",
+                    'message': f"RA {ra} já cadastrado.",
                 }
 
         user = User(
@@ -464,7 +431,7 @@ class AdminService:
             email=email,
             nome=nome,
             cpf=cpf_masked,
-            ra=new_ra,
+            ra=ra,
             role='participante',
             course_id=course_obj.id,
             can_create_events=False,
@@ -484,7 +451,7 @@ class AdminService:
 
         Rules:
         - Upsert key: CPF
-        - Existing users: update all mapped fields received from XLSX (nome, curso, ra, email)
+        - Existing users: update only nome, curso and ra
         - New users: create only if email is present in the row
         - New users always receive role='participante'
         - Username for new users is CPF digits (no punctuation)
