@@ -6,9 +6,9 @@
         <div>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1">
-                    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none">Dashboard</a></li>
                     {% if user.role in ['admin', 'coordenador'] %}
-                    <li class="breadcrumb-item"><a href="/designer_certificado/{{ event.id }}" class="text-decoration-none">Designer</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.designer_certificado', event_id=event.id) }}" class="text-decoration-none">Designer</a></li>
                     {% else %}
                     <li class="breadcrumb-item">Designer</li>
                     {% endif %}
@@ -97,7 +97,7 @@
 
     async function carregarEntregas(page = 1) {
         try {
-            const res = await fetch(`/api/certificates/list_delivery/${eventId}?page=${page}`);
+            const res = await fetch(apiUrl(`/api/certificates/list_delivery/${eventId}?page=${page}`));
             const data = await res.json();
             const tbody = document.getElementById('tabelaEntregas');
             tbody.innerHTML = '';
@@ -137,7 +137,7 @@
                                 <button onclick="abrirPreview(${item.enrollment_id})" class="btn btn-sm btn-light border" title="Visualizar Certificado">
                                     <i class="fa-solid fa-eye text-primary"></i>
                                 </button>
-                                <a href="/api/certificates/download/${item.enrollment_id}" class="btn btn-sm btn-light border" title="Baixar PDF">
+                                <a href="${apiUrl(`/api/certificates/download/${item.enrollment_id}`)}" class="btn btn-sm btn-light border" title="Baixar PDF">
                                     <i class="fa-solid fa-file-pdf text-danger"></i>
                                 </a>
                                 <button onclick="reenviarCertificado(${item.enrollment_id})" class="btn btn-sm btn-outline-primary rounded-end px-3">
@@ -215,7 +215,7 @@
         const email = document.getElementById('newEmail').value;
         
         try {
-            const res = await fetch(`/api/certificates/update_email/${id}`, {
+            const res = await fetch(apiUrl(`/api/certificates/update_email/${id}`), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({email: email})
@@ -231,7 +231,7 @@
     async function reenviarCertificado(id) {
         Toast.fire({ icon: 'info', title: 'Processando reenvio...' });
         try {
-            const res = await fetch(`/api/certificates/resend_single/${id}`, { method: 'POST' });
+            const res = await fetch(apiUrl(`/api/certificates/resend_single/${id}`), { method: 'POST' });
             const json = await res.json();
             if (res.ok) {
                 carregarEntregas();
@@ -253,7 +253,7 @@
 
         Toast.fire({ icon: 'info', title: 'Iniciando lote...' });
         try {
-            const res = await fetch(`/api/certificates/send_batch/${eventId}`, { method: 'POST' });
+            const res = await fetch(apiUrl(`/api/certificates/send_batch/${eventId}`), { method: 'POST' });
             if (res.ok) {
                 setTimeout(carregarEntregas, 2000);
                 Swal.fire('Iniciado!', 'O processo de lote foi iniciado.', 'success');
@@ -262,3 +262,5 @@
     }
 </script>
 {% endblock %}
+
+

@@ -653,7 +653,7 @@
     }
 
     async function carregarCursosSelect() {
-        const res = await fetch('/api/courses/');
+        const res = await fetch(apiUrl('/api/courses/'));
         CURSOS_CACHE = await res.json();
         
         const populate = (id) => {
@@ -689,7 +689,7 @@
         };
         
         const params = new URLSearchParams(filters);
-        const res = await fetch(`/api/listar_usuarios?${params.toString()}`);
+        const res = await fetch(apiUrl(`/api/listar_usuarios?${params.toString()}`));
         const data = await res.json();
         
         const tbody = document.getElementById('tabelaUsuarios');
@@ -854,7 +854,7 @@
         const confirm = await Swal.fire({ title: 'Excluir Usuário?', text: "Esta ação não pode ser desfeita.", icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
 
-        const res = await fetch(`/api/deletar_usuario/${username}`, { method: 'DELETE' });
+        const res = await fetch(apiUrl(`/api/deletar_usuario/${username}`), { method: 'DELETE' });
         if (res.ok) {
             bootstrap.Modal.getInstance(document.getElementById('modalUsuario')).hide();
             carregarUsuarios(1);
@@ -902,7 +902,7 @@
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
 
-        const res = await fetch('/api/importar_usuarios_csv', {
+        const res = await fetch(apiUrl('/api/importar_usuarios_csv'), {
             method: 'POST',
             body: formData
         });
@@ -931,7 +931,7 @@
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
 
-        const res = await fetch('/api/importar_alunos_xlsx/start', {
+        const res = await fetch(apiUrl('/api/importar_alunos_xlsx/start'), {
             method: 'POST',
             body: formData
         });
@@ -1091,7 +1091,7 @@
             field: IMPORT_FILTER_FIELD,
             q: IMPORT_FILTER_QUERY,
         });
-        const res = await fetch(`/api/importar_alunos_xlsx/status/${IMPORT_JOB_ID}?${params.toString()}`);
+        const res = await fetch(apiUrl(`/api/importar_alunos_xlsx/status/${IMPORT_JOB_ID}?${params.toString()}`));
         const json = await res.json();
         if (!res.ok) {
             if (IMPORT_POLL_TIMER) {
@@ -1141,7 +1141,7 @@
             can_create_events: document.getElementById('bulkCanCreate').checked
         };
 
-        const res = await fetch('/api/permissoes_curso_lote', {
+        const res = await fetch(apiUrl('/api/permissoes_curso_lote'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
@@ -1160,7 +1160,7 @@
     // --- MANUAL ENROLLMENT ---
     let EVENTOS_CACHE = [];
     async function carregarEventosParaInscricao() {
-        const res = await fetch('/api/eventos');
+        const res = await fetch(apiUrl('/api/eventos'));
         EVENTOS_CACHE = await res.json();
         const sel = document.getElementById('selEvento');
         EVENTOS_CACHE.forEach(e => {
@@ -1196,7 +1196,7 @@
         
         if (!data.activity_id) { Swal.fire('Atenção', 'Selecione uma atividade.', 'warning'); return; }
 
-        const res = await fetch('/api/inscricao_manual', {
+        const res = await fetch(apiUrl('/api/inscricao_manual'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
@@ -1212,3 +1212,4 @@
     }
 </script>
 {% endblock %}
+

@@ -32,7 +32,7 @@
 
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none">Dashboard</a></li>
             <li class="breadcrumb-item active" aria-current="page">Detalhes do Evento</li>
         </ol>
     </nav>
@@ -107,7 +107,7 @@
                     <h6 class="fw-bold text-indigo-700">Quer participar?</h6>
                     <p class="small text-indigo-600 mb-3">Faça login ou crie sua conta para se inscrever nas atividades.
                     </p>
-                    <a href="/" class="btn btn-primary w-100 rounded-pill shadow">Acessar Sistema</a>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary w-100 rounded-pill shadow">Acessar Sistema</a>
                 </div>
                 {% endif %}
             </div>
@@ -169,7 +169,7 @@
 
             let btnHtml = '';
             if (!isAuthenticated) {
-                btnHtml = `<a href="/" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
+                btnHtml = `<a href="${pathUrl('{{ url_for('main.index') }}')}" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
             } else if (isParticipant) {
                 const btnClass = a.inscrito
                     ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
@@ -246,7 +246,7 @@
         });
 
         try {
-            const res = await fetch('/api/toggle_inscricao', {
+            const res = await fetch(apiUrl('/api/toggle_inscricao'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ activity_id: atvId, acao })
@@ -288,3 +288,4 @@
     }
 </script>
 {% endblock %}
+

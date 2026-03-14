@@ -227,7 +227,7 @@
     });
 
     async function carregarCursos(page = PAGINA_ATUAL) {
-        const res = await fetch('/api/courses/');
+        const res = await fetch(apiUrl('/api/courses/'));
         CURSOS_CACHE = await res.json();
 
         PAGINA_ATUAL = page;
@@ -390,7 +390,7 @@
         const confirm = await Swal.fire({ title: 'Excluir Curso?', text: "Isso pode afetar usuários vinculados.", icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
 
-        const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+        const res = await fetch(apiUrl(`/api/courses/${id}`), { method: 'DELETE' });
         const json = await res.json();
         
         if (res.ok) {
@@ -403,3 +403,5 @@
     }
 </script>
 {% endblock %}
+
+

@@ -88,8 +88,8 @@
             <div>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-1">
-                        <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">Início</a></li>
-                        <li class="breadcrumb-item"><a href="/eventos_admin" class="text-decoration-none text-muted">Gestão</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none text-muted">Início</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('main.gerenciar_eventos') }}" class="text-decoration-none text-muted">Gestão</a></li>
                         <li class="breadcrumb-item active">Editar Evento</li>
                     </ol>
                 </nav>
@@ -97,7 +97,7 @@
                 <p class="text-muted mb-0">Atualize as informações do evento e suas atividades.</p>
             </div>
             <div class="d-flex gap-2">
-                <a href="/eventos_admin" class="btn btn-light border">Cancelar</a>
+                <a href="{{ url_for('main.gerenciar_eventos') }}" class="btn btn-light border">Cancelar</a>
                 <button type="submit" class="btn btn-primary px-4 shadow">
                     <i class="fa-solid fa-save me-2"></i> Salvar Alterações
                 </button>
@@ -453,7 +453,7 @@
 
     async function carregarCursosSelect() {
         try {
-            const res = await fetch('/api/courses/');
+            const res = await fetch(apiUrl('/api/courses/'));
             const data = await res.json();
             const sel = document.getElementById('evCurso');
             const selected = sel.getAttribute('data-selected');
@@ -516,13 +516,13 @@
         };
 
         try {
-            const res = await fetch('/api/editar_evento', {
+            const res = await fetch(apiUrl('/api/editar_evento'), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
             if (res.ok) {
-                Swal.fire('Sucesso', 'Evento atualizado!', 'success').then(() => window.location.href = '/eventos_admin');
+                Swal.fire('Sucesso', 'Evento atualizado!', 'success').then(() => window.location.href = pathUrl('{{ url_for('main.gerenciar_eventos') }}'));
             } else {
                 const json = await res.json();
                 Swal.fire('Erro', json.erro, 'error');
@@ -535,3 +535,5 @@
     };
 </script>
 {% endblock %}
+
+

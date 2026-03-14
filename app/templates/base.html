@@ -27,7 +27,7 @@
     {% if user %}
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand fs-4" href="/">
+            <a class="navbar-brand fs-4" href="{{ url_for('main.index') }}">
                 <i class="fa-solid fa-ticket me-2"></i>EuroEventos
             </a>
             
@@ -37,38 +37,38 @@
 
             <div class="collapse navbar-collapse justify-content-end mt-2 mt-lg-0" id="navbarMain">
                 <div class="d-flex align-items-center flex-column flex-lg-row gap-3">
-                    <a href="/validar" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.validar_busca') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-shield me-1"></i> Validar
                     </a>
                     {% if user.role == 'admin' %}
-                    <a href="/cursos" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.gerenciar_cursos') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-graduation-cap me-1"></i> Cursos
                     </a>
-                    <a href="/usuarios" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.gerenciar_usuarios') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-users-gear me-1"></i> Usuários
                     </a>
                     {% endif %}
                     {% if user.role in ['admin', 'professor', 'coordenador'] %}
-                    <a href="/eventos_admin" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.gerenciar_eventos') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-calendar-check me-1"></i> Eventos
                     </a>
                     {% endif %}
                     {% if user.role in ['admin', 'extensao'] %}
-                    <a href="/certificados_institucionais" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.certificados_institucionais_page') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-certificate me-1"></i> Acadêmicos
                     </a>
                     {% endif %}
                     {% if user.role == 'participante' %}
-                    <a href="/?open_checkin=1#checkin-digital" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.index', open_checkin=1) }}#checkin-digital" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-qrcode me-1"></i> Registro de Presença Digital
                     </a>
-                    <a href="/meus_eventos" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
+                    <a href="{{ url_for('main.meus_eventos') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-award me-1"></i> Participações
                     </a>
                     {% endif %}
                     {% if user.role %}
                     <div class="text-center text-lg-end">
-                        <a href="/perfil" class="text-decoration-none text-dark hover-primary">
+                        <a href="{{ url_for('main.perfil_usuario') }}" class="text-decoration-none text-dark hover-primary">
                             <div class="fw-bold"><i class="fa-solid fa-address-card me-1"></i>Meus Dados</div>
                         </a>
                         <span class="badge bg-indigo-100 text-indigo-700 border border-indigo-200" style="background:#e0e7ff; color:#4338ca;">
@@ -76,7 +76,7 @@
                         </span>
                     </div>
                     
-                    <a href="/logout" class="btn btn-outline-warning btn-sm w-15 w-lg-auto">
+                    <a href="{{ url_for('main.logout') }}" class="btn btn-outline-warning btn-sm w-15 w-lg-auto">
                         <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sair
                     </a>
                     {% endif %}
@@ -126,6 +126,98 @@
                 toast.addEventListener('mouseleave', Swal.resumeTimer)
             }
         });
+
+        // Normalize absolute app paths when hosted under a subpath (e.g. /euroeventos).
+        (function () {
+            const scriptRoot = {{ request.script_root|tojson }} || '';
+            if (!scriptRoot) {
+                return;
+            }
+
+            function withScriptRoot(url) {
+                if (typeof url !== 'string') return url;
+                if (!url.startsWith('/')) return url;
+                if (url.startsWith('//')) return url;
+                if (url.startsWith(scriptRoot + '/')) return url;
+                if (url.startsWith('/api/') || url.startsWith('/static/') || url.startsWith('/logout') || url.startsWith('/validar') || url.startsWith('/cursos') || url.startsWith('/usuarios') || url.startsWith('/eventos_admin') || url.startsWith('/certificados_institucionais') || url.startsWith('/perfil') || url.startsWith('/meus_eventos')) {
+                    return scriptRoot + url;
+                }
+                return url;
+            }
+
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = function (input, init) {
+                if (typeof input === 'string') {
+                    return originalFetch(withScriptRoot(input), init);
+                }
+                return originalFetch(input, init);
+            };
+
+            const originalOpen = window.open.bind(window);
+            window.open = function (url, target, features) {
+                return originalOpen(withScriptRoot(url), target, features);
+            };
+
+            window.withScriptRoot = withScriptRoot;
+            window.apiUrl = withScriptRoot;
+            window.pathUrl = withScriptRoot;
+
+            function rewriteDomAbsolutePaths() {
+                document.querySelectorAll('a[href^="/"], img[src^="/"], iframe[src^="/"], form[action^="/"]').forEach((el) => {
+                    if (el.hasAttribute('href')) {
+                        el.setAttribute('href', withScriptRoot(el.getAttribute('href')));
+                    }
+                    if (el.hasAttribute('src')) {
+                        el.setAttribute('src', withScriptRoot(el.getAttribute('src')));
+                    }
+                    if (el.hasAttribute('action')) {
+                        el.setAttribute('action', withScriptRoot(el.getAttribute('action')));
+                    }
+                });
+            }
+
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+                        const el = mutation.target;
+                        if (mutation.attributeName === 'href' && el.hasAttribute('href')) {
+                            el.setAttribute('href', withScriptRoot(el.getAttribute('href')));
+                        }
+                        if (mutation.attributeName === 'src' && el.hasAttribute('src')) {
+                            el.setAttribute('src', withScriptRoot(el.getAttribute('src')));
+                        }
+                        if (mutation.attributeName === 'action' && el.hasAttribute('action')) {
+                            el.setAttribute('action', withScriptRoot(el.getAttribute('action')));
+                        }
+                    }
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach((node) => {
+                            if (!(node instanceof Element)) return;
+                            if (node.matches('a[href^="/"], img[src^="/"], iframe[src^="/"], form[action^="/"]')) {
+                                if (node.hasAttribute('href')) node.setAttribute('href', withScriptRoot(node.getAttribute('href')));
+                                if (node.hasAttribute('src')) node.setAttribute('src', withScriptRoot(node.getAttribute('src')));
+                                if (node.hasAttribute('action')) node.setAttribute('action', withScriptRoot(node.getAttribute('action')));
+                            }
+                            node.querySelectorAll?.('a[href^="/"], img[src^="/"], iframe[src^="/"], form[action^="/"]').forEach((el) => {
+                                if (el.hasAttribute('href')) el.setAttribute('href', withScriptRoot(el.getAttribute('href')));
+                                if (el.hasAttribute('src')) el.setAttribute('src', withScriptRoot(el.getAttribute('src')));
+                                if (el.hasAttribute('action')) el.setAttribute('action', withScriptRoot(el.getAttribute('action')));
+                            });
+                        });
+                    }
+                }
+            });
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    rewriteDomAbsolutePaths();
+                    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'src', 'action'] });
+                });
+            } else {
+                rewriteDomAbsolutePaths();
+                observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'src', 'action'] });
+            }
+        })();
     </script>
     {% block scripts %}{% endblock %}
 </body>

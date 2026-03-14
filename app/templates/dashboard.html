@@ -228,7 +228,7 @@
                     <i class="fa-solid fa-calendar-days text-primary me-2"></i>Eventos sob Minha Coordenação
                 </h3>
                 <div class="d-flex gap-2">
-                    <a href="/criar_evento" class="btn btn-sm btn-primary shadow-sm">
+                    <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-sm btn-primary shadow-sm">
                         <i class="fa-solid fa-plus me-1"></i> Criar Evento
                     </a>
                     <div class="dropdown">
@@ -263,7 +263,7 @@
                     <i class="fa-solid fa-certificate text-primary me-2"></i>Certificados Acadêmicos
                 </h4>
                 <p class="text-muted mb-4">Gerencie certificados de monitoria, representação, iniciação científica e outras ações de extensão.</p>
-                <a href="/certificados_institucionais" class="btn btn-primary btn-lg">
+                <a href="{{ url_for('main.certificados_institucionais_page') }}" class="btn btn-primary btn-lg">
                     <i class="fa-solid fa-arrow-right me-2"></i>Acessar Gestão Institucional
                 </a>
             </div>
@@ -784,7 +784,7 @@
         };
 
         try {
-            const res = await fetch('/api/criar_evento', {
+            const res = await fetch(apiUrl('/api/criar_evento'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -937,7 +937,7 @@
     `;
 
         try {
-            const res = await fetch(`/api/eventos?page=${page}`, { signal: gestorAbort.signal, headers: { "Accept": "application/json" } });
+            const res = await fetch(apiUrl(`/api/eventos?page=${page}`), { signal: gestorAbort.signal, headers: { "Accept": "application/json" } });
             const data = await res.json();
             if (reqId !== gestorReqId) return;
 
@@ -990,7 +990,7 @@
                   <i class="fa-solid fa-users-viewfinder me-1"></i> Relatório
                 </button>
                                 ${['admin', 'coordenador'].includes(userRole) ? `
-                                <a href="/designer_certificado/${ev.id}" class="btn btn-sm btn-light border" title="Designer de Certificado">
+                                <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Designer de Certificado">
                                     <i class="fa-solid fa-certificate"></i>
                                 </a>` : ''}
                 <button onclick="abrirProjetor(${ev.id})" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm">
@@ -1205,7 +1205,7 @@
         });
 
         try {
-            const res = await fetch('/api/toggle_inscricao', {
+            const res = await fetch(apiUrl('/api/toggle_inscricao'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ activity_id: atvId, acao })
@@ -1364,7 +1364,7 @@
     // ADMIN - USUÁRIOS
     // --------------------------
     async function carregarUsuarios() {
-        const res = await fetch('/api/listar_usuarios', { headers: { "Accept": "application/json" } });
+        const res = await fetch(apiUrl('/api/listar_usuarios'), { headers: { "Accept": "application/json" } });
         const users = await res.json();
         const tbody = document.getElementById('listaUsuarios');
         if (!tbody) return;
@@ -1417,7 +1417,7 @@
             email: document.getElementById('editEmail').value
         };
 
-        const res = await fetch('/api/editar_usuario', {
+        const res = await fetch(apiUrl('/api/editar_usuario'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1493,7 +1493,7 @@
         };
 
         try {
-            const res = await fetch('/api/editar_evento', {
+            const res = await fetch(apiUrl('/api/editar_evento'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1607,7 +1607,7 @@
         }
 
         try {
-            const res = await fetch('/api/validar_presenca', { 
+            const res = await fetch(apiUrl('/api/validar_presenca'), { 
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'}, 
                 body: JSON.stringify({
@@ -1645,3 +1645,4 @@
     }
 </script>
 {% endblock %}
+

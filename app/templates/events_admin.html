@@ -172,7 +172,7 @@
         <div>
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-calendar-check text-primary me-2"></i>Gestão de Eventos</h3>
         </div>
-        <a href="/criar_evento" class="btn btn-primary shadow-sm">
+        <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-primary shadow-sm">
             <i class="fa-solid fa-plus me-2"></i> Novo Evento
         </a>
     </div>
@@ -506,7 +506,7 @@
             page: page
         };
         const params = new URLSearchParams(filters);
-        const res = await fetch(`/api/eventos_admin?${params.toString()}`);
+        const res = await fetch(apiUrl(`/api/eventos_admin?${params.toString()}`));
         const data = await res.json();
         EVENTOS_GESTAO_CACHE.clear();
         (data.items || []).forEach(ev => EVENTOS_GESTAO_CACHE.set(ev.id, ev));
@@ -547,7 +547,7 @@
                     <td><span class="badge bg-light text-dark border">${ev.owner_name || ev.owner || 'Sistema'}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-inline-grid gap-1" style="grid-template-columns: repeat(3, minmax(42px, 1fr)); min-width: 132px;">
-                            <a href="/editar_evento/${ev.id}" class="btn btn-sm btn-light border" title="Editar Evento">
+                            <a href="${pathUrl(`/editar_evento/${ev.id}`)}" class="btn btn-sm btn-light border" title="Editar Evento">
                                 <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
                             </a>
                             <button class="btn btn-sm btn-light border" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Registro de Presença">
@@ -560,7 +560,7 @@
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
                             ${['admin', 'coordenador'].includes('{{ user.role }}') ? `
-                            <a href="/designer_certificado/${ev.id}" class="btn btn-sm btn-light border" title="Certificado">
+                            <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Certificado">
                                 <i class="fa-solid fa-certificate text-warning"></i>
                             </a>` : `
                             <button class="btn btn-sm btn-light border" title="Certificado indisponível" disabled>
@@ -749,7 +749,7 @@
             return;
         }
 
-        const res = await fetch(`/api/notificar_participantes/${EVENTO_SELECIONADO_ID}`, {
+        const res = await fetch(apiUrl(`/api/notificar_participantes/${EVENTO_SELECIONADO_ID}`), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ assunto: subject, mensagem: message })
@@ -779,7 +779,7 @@
         if (q.length < 2) { div.classList.add('d-none'); return; }
 
         timeoutBusca = setTimeout(async () => {
-            const res = await fetch(`/api/buscar_participante?q=${encodeURIComponent(q)}`);
+            const res = await fetch(apiUrl(`/api/buscar_participante?q=${encodeURIComponent(q)}`));
             const users = await res.json();
             
             div.innerHTML = '';
@@ -821,7 +821,7 @@
             return;
         }
 
-        const res = await fetch('/api/inscricao_manual', {
+        const res = await fetch(apiUrl('/api/inscricao_manual'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ cpf: USUARIO_SELECIONADO_CPF, activity_id: activityId })
@@ -849,7 +849,7 @@
         // Note: I need an endpoint for deleting enrollment. I can use toggle_enrollment or a new one.
         // Let's assume a generic delete enrollment API or repurpose toggle.
         // Actually let's create a specific one in api/events.py for simplicity.
-        const res = await fetch(`/api/remover_inscricao/${enrollmentId}`, { method: 'DELETE' });
+        const res = await fetch(apiUrl(`/api/remover_inscricao/${enrollmentId}`), { method: 'DELETE' });
         if (res.ok) {
             carregarParticipantes(1);
             Toast.fire({ icon: 'success', title: 'Removido com sucesso.' });
@@ -867,7 +867,7 @@
             page: page
         };
         const params = new URLSearchParams(filters);
-        const res = await fetch(`/api/participantes_evento/${EVENTO_SELECIONADO_ID}?${params.toString()}`);
+        const res = await fetch(apiUrl(`/api/participantes_evento/${EVENTO_SELECIONADO_ID}?${params.toString()}`));
         const data = await res.json();
         
         const tbody = document.getElementById('tabelaParticipantes');
@@ -911,7 +911,7 @@
     }
 
     async function alternarPresenca(enrollmentId, status) {
-        const res = await fetch(`/api/alternar_presenca/${enrollmentId}`, {
+        const res = await fetch(apiUrl(`/api/alternar_presenca/${enrollmentId}`), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({presente: status})
@@ -967,7 +967,7 @@
     async function confirmarExcluirEvento(id) {
         const confirm = await Swal.fire({ title: 'Excluir Evento?', text: "Isso removerá todas as atividades e inscrições vinculadas.", icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
-        const res = await fetch(`/api/deletar_evento/${id}`, { method: 'DELETE' });
+        const res = await fetch(apiUrl(`/api/deletar_evento/${id}`), { method: 'DELETE' });
         if (res.ok) { carregarEventos(1); Toast.fire({ icon: 'success', title: 'Evento removido.' }); }
     }
 
@@ -981,7 +981,9 @@
             icon: 'info',
             showCancelButton: true,
             confirmButtonText: 'Sim, ir agora'
-        }).then(r => { if(r.isConfirmed) window.location.href = '/'; });
+        }).then(r => { if(r.isConfirmed) window.location.href = pathUrl('{{ url_for('main.index') }}'); });
     }
 </script>
 {% endblock %}
+
+

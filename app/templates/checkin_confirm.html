@@ -180,10 +180,10 @@
             window.close();
             // Fallback if close is blocked
             setTimeout(() => {
-                window.location.href = '/perfil';
+                window.location.href = pathUrl('{{ url_for('main.perfil_usuario') }}');
             }, 500);
         } else {
-            window.location.href = '/perfil';
+            window.location.href = pathUrl('{{ url_for('main.perfil_usuario') }}');
         }
     }
 
@@ -234,7 +234,7 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Registrando...';
 
         try {
-            const res = await fetch('/api/validar_presenca', {
+            const res = await fetch(apiUrl('/api/validar_presenca'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -260,7 +260,7 @@
                         </div>
                         
                         <div class="d-grid gap-3">
-                            <a href="/perfil" class="btn btn-confirm btn-lg shadow-sm">
+                            <a href="{{ url_for('main.perfil_usuario') }}" class="btn btn-confirm btn-lg shadow-sm">
                                 <i class="fa-solid fa-certificate me-2"></i> Ver Meus Certificados
                             </a>
                             <button onclick="fecharOuVoltar()" class="btn btn-outline-secondary rounded-pill py-2 fw-bold">
@@ -294,3 +294,4 @@
     }
 </script>
 {% endblock %}
+

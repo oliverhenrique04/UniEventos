@@ -662,7 +662,7 @@ async function carregarCertificadosInstitucionais(page = 1) {
         categoria: document.getElementById('filtroCategoria').value || '',
         status: document.getElementById('filtroStatus').value || ''
     });
-    const resp = await fetch(`/api/institutional_certificates?${params.toString()}`);
+    const resp = await fetch(apiUrl(`/api/institutional_certificates?${params.toString()}`));
     const data = await resp.json();
 
     if (!resp.ok) {
@@ -778,7 +778,7 @@ async function criarCertificadoInstitucional() {
     setButtonLoading(saveButton, true, 'Salvando...');
     const payload = Object.fromEntries(new FormData(formNovo).entries());
     try {
-        const resp = await fetch('/api/institutional_certificates', {
+        const resp = await fetch(apiUrl('/api/institutional_certificates'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -800,7 +800,7 @@ async function criarCertificadoInstitucional() {
 }
 
 async function abrirEdicaoCertificado(id) {
-    const resp = await fetch(`/api/institutional_certificates/${id}`);
+    const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}`));
     const data = await resp.json();
     if (!resp.ok) {
         uiError(data.erro || 'Falha ao carregar dados do certificado');
@@ -829,7 +829,7 @@ async function salvarEdicaoCertificado() {
     delete payload.id;
 
     try {
-        const resp = await fetch(`/api/institutional_certificates/${id}`, {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -851,7 +851,7 @@ async function salvarEdicaoCertificado() {
 async function enviarCertificado(id, buttonEl = null) {
     setButtonLoading(buttonEl, true, 'Enviando...');
     try {
-        const resp = await fetch(`/api/institutional_certificates/${id}/send`, { method: 'POST' });
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}/send`), { method: 'POST' });
         const data = await resp.json();
         if (!resp.ok || data.resultado === 'erro') {
             Swal.fire({
@@ -885,7 +885,7 @@ async function enviarCertificado(id, buttonEl = null) {
 }
 
 async function duplicarCertificado(id) {
-    const resp = await fetch(`/api/institutional_certificates/${id}/duplicate`, { method: 'POST' });
+    const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}/duplicate`), { method: 'POST' });
     const data = await resp.json();
     if (!resp.ok) {
         uiError(data.erro || 'Falha ao duplicar certificado');
@@ -906,7 +906,7 @@ async function excluirCertificado(id) {
     });
     if (!confirmacao.isConfirmed) return;
 
-    const resp = await fetch(`/api/institutional_certificates/${id}`, { method: 'DELETE' });
+    const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}`), { method: 'DELETE' });
     const data = await resp.json();
     if (!resp.ok) {
         uiError(data.erro || 'Falha ao excluir certificado');
@@ -918,7 +918,7 @@ async function excluirCertificado(id) {
 
 async function atualizarStatusCertificado(id) {
     const status = document.getElementById(`status_${id}`).value;
-    const resp = await fetch(`/api/institutional_certificates/${id}` , {
+    const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -963,7 +963,7 @@ async function carregarDestinatarios(id, page = 1) {
         sort_by: recipientsSortBy,
         sort_dir: recipientsSortDir,
     });
-    const resp = await fetch(`/api/institutional_certificates/${id}/recipients?${params.toString()}`);
+    const resp = await fetch(apiUrl(`/api/institutional_certificates/${id}/recipients?${params.toString()}`));
     const data = await resp.json();
     if (!resp.ok) {
         tabelaDestinatariosBody.innerHTML = `<tr><td colspan="13" class="text-danger text-center py-3">${data.erro || 'Erro ao carregar destinatarios'}</td></tr>`;
@@ -1048,7 +1048,7 @@ async function salvarDadosDestinatario(recipientId, buttonEl = null) {
 
     setButtonLoading(buttonEl, true, 'Salvando...');
     try {
-        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`, {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -1092,7 +1092,7 @@ async function adicionarDestinatarios() {
     }
 
     try {
-        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients`, {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ recipients })
@@ -1114,7 +1114,7 @@ async function adicionarDestinatarios() {
 
 async function removerDestinatario(recipientId) {
     if (!certificateIdAtivo) return;
-    const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`, {
+    const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}`), {
         method: 'DELETE'
     });
     const data = await resp.json();
@@ -1131,7 +1131,7 @@ async function reenviarDestinatario(recipientId, buttonEl = null) {
     if (!certificateIdAtivo) return;
     setButtonLoading(buttonEl, true, 'Reenviando...');
     try {
-        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/resend`, {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/resend`), {
             method: 'POST'
         });
         const data = await resp.json();
@@ -1162,7 +1162,7 @@ async function importarDestinatariosCsv() {
     formData.append('file', input.files[0]);
 
     try {
-        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients/import_csv`, {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/import_csv`), {
             method: 'POST',
             body: formData
         });
@@ -1249,7 +1249,7 @@ async function buscarUsuariosDestinatarios(page = 1) {
     try {
         const query = (document.getElementById('inputBuscaUsuario').value || '').trim();
         const params = new URLSearchParams({ q: query, page: String(page), per_page: '15' });
-        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/users/search?${params.toString()}`);
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/users/search?${params.toString()}`));
         const data = await resp.json();
         if (!resp.ok) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-danger text-center py-3">${data.erro || 'Falha na busca de usuarios'}</td></tr>`;
@@ -1281,7 +1281,7 @@ async function adicionarUsuariosSelecionados() {
 
     setButtonLoading(actionButton, true, 'Adicionando...');
     try {
-        const resp = await fetch(`/api/institutional_certificates/${certificateIdAtivo}/recipients`, {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ recipients })
@@ -1303,12 +1303,12 @@ async function adicionarUsuariosSelecionados() {
 
 function exportarDestinatariosCsv() {
     if (!certificateIdAtivo) return;
-    window.open(`/api/institutional_certificates/${certificateIdAtivo}/recipients/export_csv`, '_blank');
+    window.open(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/export_csv`), '_blank');
 }
 
 function baixarPdfDestinatario(recipientId) {
     if (!certificateIdAtivo) return;
-    window.open(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/download`, '_blank');
+    window.open(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/download`), '_blank');
 }
 
 function abrirPreviewDestinatario(recipientId, recipientNome = '') {
@@ -1440,3 +1440,5 @@ updateRecipientsSortIndicators();
 carregarCertificadosInstitucionais(1);
 </script>
 {% endblock %}
+
+

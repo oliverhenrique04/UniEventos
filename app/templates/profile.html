@@ -327,7 +327,7 @@
 
     async function carregarEstatisticas() {
         try {
-            const res = await fetch('/api/me/history?type=stats');
+            const res = await fetch(apiUrl('/api/me/history?type=stats'));
             if (!res.ok) return;
             const stats = await res.json();
             document.getElementById('stat-hours').innerText = stats.total_hours ?? 0;
@@ -340,7 +340,7 @@
 
     async function carregarHistorico(type, page) {
         CURRENT_TAB = type;
-        const res = await fetch(`/api/me/history?type=${type}&page=${page}`);
+        const res = await fetch(apiUrl(`/api/me/history?type=${type}&page=${page}`));
         if (!res.ok) {
             if (type === 'events') {
                 document.getElementById('lista-eventos').innerHTML = '<div class="col-12 text-center py-5 text-danger">Falha ao carregar agenda.</div>';
@@ -386,7 +386,7 @@
                         <p class="text-muted small mb-4 flex-grow-1">${ev.descricao || ''}</p>
                         <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
                             <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${formatIsoDate(ev.data_inicio)}</small>
-                            <a href="/inscrever/${ev.token_publico}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>
+                            <a href="${pathUrl(`/inscrever/${ev.token_publico}`)}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>
                         </div>
                     </div>
                 </div>`;
@@ -514,7 +514,7 @@
             email: document.getElementById('perfilEmail').value,
         };
 
-        const res = await fetch('/api/me/profile', {
+        const res = await fetch(apiUrl('/api/me/profile'), {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
@@ -540,7 +540,7 @@
             return;
         }
 
-        const res = await fetch('/api/me/password', {
+        const res = await fetch(apiUrl('/api/me/password'), {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ current_password: atual, new_password: nova })
@@ -603,3 +603,5 @@
     }
 </script>
 {% endblock %}
+
+

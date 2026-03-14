@@ -231,7 +231,7 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch('/api/login', {
+                const res = await fetch(API_LOGIN_URL, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         cpf: document.getElementById('loginCpf').value,
@@ -258,8 +258,14 @@
             }
         }
 
+        // URLs injetadas pelo Jinja2 para respeitar sub-rotas em produção
+        const API_LOGIN_URL = "{{ url_for('auth.login', _external=False) }}";
+        const API_AVA_URL = "{{ url_for('auth.ava_login_redirect', _external=False) }}";
+        const API_REGISTRAR_URL = "{{ url_for('auth.registrar', _external=False) }}";
+        const API_PASSWORD_FORGOT_URL = "{{ url_for('auth.password_forgot', _external=False) }}";
+
         function entrarComAva() {
-            window.location.href = '/api/ava';
+            window.location.href = API_AVA_URL;
         }
 
         async function fazerCadastro(e) {
@@ -270,7 +276,7 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch('/api/registrar', {
+                const res = await fetch(API_REGISTRAR_URL, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         nome: document.getElementById('regNome').value,
@@ -322,7 +328,7 @@
             if (!result.isConfirmed || !result.value) return;
 
             try {
-                const res = await fetch('/api/password/forgot', {
+                const res = await fetch(API_PASSWORD_FORGOT_URL, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ email: result.value })

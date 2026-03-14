@@ -82,7 +82,7 @@
                 <p class="text-muted mb-0 mt-1">Consulte os eventos com participação confirmada e emita seus certificados.</p>
             </div>
             <div>
-                <a href="/" class="btn btn-action btn-dashboard shadow-sm"><i class="fa-solid fa-house me-2"></i>Painel Principal</a>
+                <a href="{{ url_for('main.index') }}" class="btn btn-action btn-dashboard shadow-sm"><i class="fa-solid fa-house me-2"></i>Painel Principal</a>
             </div>
         </div>
     </div>
@@ -123,7 +123,7 @@
     });
 
     async function carregarParticipados(page) {
-        const res = await fetch(`/api/me/history?type=participated&page=${page}`);
+        const res = await fetch(apiUrl(`/api/me/history?type=participated&page=${page}`));
         const data = await res.json();
         
         const div = document.getElementById('lista-participados');
@@ -135,7 +135,7 @@
                     <i class="fa-solid fa-graduation-cap fa-3x mb-3 text-slate-200"></i>
                     <h4 class="fw-bold">Nenhuma participação confirmada</h4>
                     <p class="text-muted">Participe de eventos e valide sua presença por código QR para aparecer aqui.</p>
-                    <a href="/" class="btn btn-primary rounded-pill px-4 mt-2">Ver Próximos Eventos</a>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary rounded-pill px-4 mt-2">Ver Próximos Eventos</a>
                 </div>`;
             return;
         }
@@ -166,7 +166,7 @@
                                 `<button class="btn btn-secondary rounded-pill px-4 shadow-sm" disabled title="Os certificados ainda não foram gerados ou publicados pelo responsável do evento.">
                                     <i class="fa-solid fa-stamp me-2"></i> Emitir Certificados
                                 </button>`}
-                                <a href="/inscrever/${ev.token}" class="btn btn-light border rounded-pill px-4">
+                                <a href="${pathUrl(`/inscrever/${ev.token}`)}" class="btn btn-light border rounded-pill px-4">
                                     <i class="fa-solid fa-circle-info me-2"></i> Detalhes
                                 </a>
                             </div>
@@ -186,7 +186,7 @@
 
         try {
             // Reuse the certificates filter but for a specific event
-            const res = await fetch(`/api/me/history?type=certificates&per_page=100`);
+            const res = await fetch(apiUrl(`/api/me/history?type=certificates&per_page=100`));
             const data = await res.json();
             const eventCerts = data.items.filter(c => c.event_id == eventId);
 
@@ -202,7 +202,7 @@
                                 <span class="font-monospace">HASH: ${cert.hash || '---'}</span>
                             </div>
                         </div>
-                        <a href="/api/certificates/download/${cert.enrollment_id}" class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm">
+                        <a href="${apiUrl(`/api/certificates/download/${cert.enrollment_id}`)}" class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm">
                             <i class="fa-solid fa-download me-1"></i> Download
                         </a>
                     </div>`;
@@ -254,3 +254,5 @@
     }
 </script>
 {% endblock %}
+
+
