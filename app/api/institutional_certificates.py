@@ -29,7 +29,7 @@ MAX_DESIGN_IMAGE_SIZE = 8 * 1024 * 1024
 
 
 def _can_manage_institutional_certificates():
-    return current_user.role in ['admin', 'extensao']
+    return current_user.role in ['admin', 'extensao', 'gestor']
 
 
 def _parse_date_iso(date_str):

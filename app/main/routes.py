@@ -45,7 +45,7 @@ def inscrever_via_link(token):
 @login_required
 def designer_certificado(event_id):
     """Page for visually designing and configuring certificates."""
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return "Acesso negado", 403
     from app.models import Event
     event = db.session.get(Event, event_id)
@@ -57,7 +57,7 @@ def designer_certificado(event_id):
 @login_required
 def gerenciar_entregas(event_id):
     """Page for managing individual certificate deliveries and status."""
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return "Acesso negado", 403
     from app.models import Event
     event = db.session.get(Event, event_id)
@@ -70,7 +70,7 @@ def gerenciar_entregas(event_id):
 @login_required
 def certificados_institucionais_page():
     """Page for extension profile to manage institutional certificates."""
-    if current_user.role not in ['admin', 'extensao']:
+    if current_user.role not in ['admin', 'extensao', 'gestor']:
         return "Acesso negado", 403
     return render_template('institutional_certificates.html', user=current_user)
 
@@ -79,7 +79,7 @@ def certificados_institucionais_page():
 @login_required
 def designer_certificado_institucional(certificate_id):
     """Page for visually designing institutional certificates."""
-    if current_user.role not in ['admin', 'extensao']:
+    if current_user.role not in ['admin', 'extensao', 'gestor']:
         return "Acesso negado", 403
 
     from app.models import InstitutionalCertificate
@@ -104,7 +104,7 @@ def gerenciar_usuarios():
 @login_required
 def gerenciar_cursos():
     """Page for full administrative course management CRUD."""
-    if current_user.role != 'admin':
+    if current_user.role not in ['admin', 'gestor']:
         return "Acesso negado", 403
     return render_template('courses_admin.html', user=current_user)
 
@@ -125,7 +125,7 @@ def confirmar_presenca_page(atv_id, token_hash):
 @login_required
 def gerenciar_eventos():
     """Page for full administrative event management CRUD and participant control."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return "Acesso negado", 403
     return render_template('events_admin.html', user=current_user)
 
@@ -145,7 +145,7 @@ def meus_eventos():
 @login_required
 def criar_evento_page():
     """Dedicated page for creating new events with multiple activities."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return "Acesso negado", 403
     return render_template('event_create.html', user=current_user)
 
@@ -153,7 +153,7 @@ def criar_evento_page():
 @login_required
 def editar_evento_page(event_id):
     """Page for editing an existing event."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return "Acesso negado", 403
     from app.models import Event
     event = db.session.get(Event, event_id)

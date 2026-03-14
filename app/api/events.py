@@ -131,7 +131,7 @@ def editar_evento():
 @login_required
 def listar_eventos_admin():
     """Paginated and filtered list of all events for administrative purposes."""
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return jsonify([]), 403
     
     page = request.args.get('page', 1, type=int)
@@ -160,7 +160,7 @@ def notificar_participantes(event_id):
     Sends a broadcast email notification to all participants of an event.
     Only authorized personnel (admin, professor, coordinator) can call this.
     """
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return jsonify({"erro": "Acesso negado"}), 403
     
     data = request.json

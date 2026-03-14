@@ -232,7 +232,7 @@ def listar_usuarios():
 @bp.route('/buscar_participante', methods=['GET'])
 @login_required
 def buscar_participante():
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return jsonify([]), 403
     
     termo = request.args.get('q', '')
@@ -262,7 +262,7 @@ def deletar_usuario(username):
 @bp.route('/inscricao_manual', methods=['POST'])
 @login_required
 def inscricao_manual():
-    if current_user.role not in ['admin', 'professor', 'coordenador']:
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return jsonify({"erro": "Negado"}), 403
     
     data = request.json

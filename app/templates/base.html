@@ -40,20 +40,22 @@
                     <a href="{{ url_for('main.validar_busca') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-shield me-1"></i> Validar
                     </a>
-                    {% if user.role == 'admin' %}
+                    {% if user.role in ['admin', 'gestor'] %}
                     <a href="{{ url_for('main.gerenciar_cursos') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-graduation-cap me-1"></i> Cursos
                     </a>
+                    {% if user.role == 'admin' %}
                     <a href="{{ url_for('main.gerenciar_usuarios') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-users-gear me-1"></i> Usuários
                     </a>
                     {% endif %}
-                    {% if user.role in ['admin', 'professor', 'coordenador'] %}
+                    {% endif %}
+                    {% if user.role in ['admin', 'professor', 'coordenador', 'gestor'] %}
                     <a href="{{ url_for('main.gerenciar_eventos') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-calendar-check me-1"></i> Eventos
                     </a>
                     {% endif %}
-                    {% if user.role in ['admin', 'extensao'] %}
+                    {% if user.role in ['admin', 'extensao', 'gestor'] %}
                     <a href="{{ url_for('main.certificados_institucionais_page') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-certificate me-1"></i> Acadêmicos
                     </a>
