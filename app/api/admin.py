@@ -46,6 +46,19 @@ def _load_job(job_id: str):
         return None
 
 
+def _get_active_job_for_user(username: str):
+    if not username:
+        return None
+    for job in _IMPORT_JOBS.values():
+        if job.get('created_by') != username:
+            continue
+        if job.get('completed'):
+            continue
+        if job.get('status') in {'queued', 'running'}:
+            return job
+    return None
+
+
 def _update_job(job_id, **kwargs):
     with _IMPORT_JOBS_LOCK:
         job = _IMPORT_JOBS.get(job_id)
@@ -301,6 +314,15 @@ def importar_alunos_xlsx_start():
     if file.filename == '':
         return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
 
+    with _IMPORT_JOBS_LOCK:
+        active_job = _get_active_job_for_user(current_user.username)
+        if active_job:
+            return jsonify({
+                'job_id': active_job['job_id'],
+                'message': 'Já existe uma importação em andamento para este usuário.',
+                'reused': True,
+            }), 202
+
     job_id = uuid4().hex
     file_content = file.read()
 
@@ -310,6 +332,7 @@ def importar_alunos_xlsx_start():
             'status': 'queued',
             'completed': False,
             'message': 'Importação iniciada.',
+            'created_by': current_user.username,
             'total_rows': 0,
             'processed_rows': 0,
             'created': 0,

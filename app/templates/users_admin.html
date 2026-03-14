@@ -918,6 +918,11 @@
     }
 
     async function enviarXlsx() {
+        if (IMPORT_JOB_ID && IMPORT_POLL_TIMER) {
+            Swal.fire('Importação em andamento', 'Já existe uma importação XLSX em processamento.', 'info');
+            return;
+        }
+
         const fileInput = document.getElementById('fileXlsx');
         if (!fileInput.files[0]) {
             Swal.fire('Atenção', 'Selecione um arquivo XLSX.', 'warning');
@@ -1161,8 +1166,10 @@
     let EVENTOS_CACHE = [];
     async function carregarEventosParaInscricao() {
         const res = await fetch(apiUrl('/api/eventos'));
-        EVENTOS_CACHE = await res.json();
+        const data = await res.json();
+        EVENTOS_CACHE = Array.isArray(data) ? data : (data.items || []);
         const sel = document.getElementById('selEvento');
+        sel.innerHTML = '<option value="">-- Selecione o Evento --</option>';
         EVENTOS_CACHE.forEach(e => {
             sel.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
         });
