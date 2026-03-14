@@ -14,14 +14,35 @@ config = context.config
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
+_fallback_app = None
+_fallback_appctx = None
+
+
+def get_app():
+    global _fallback_app
+    global _fallback_appctx
+    try:
+        return current_app._get_current_object()
+    except RuntimeError:
+        if _fallback_app is None:
+            from app import create_app
+            _fallback_app = create_app()
+            _fallback_appctx = _fallback_app.app_context()
+            _fallback_appctx.push()
+        return _fallback_app
+
+
+def get_migrate_extension():
+    return get_app().extensions['migrate']
+
 
 def get_engine():
     try:
         # this works with Flask-SQLAlchemy<3 and Alchemical
-        return current_app.extensions['migrate'].db.get_engine()
+        return get_migrate_extension().db.get_engine()
     except (TypeError, AttributeError):
         # this works with Flask-SQLAlchemy>=3
-        return current_app.extensions['migrate'].db.engine
+        return get_migrate_extension().db.engine
 
 
 def get_engine_url():
@@ -37,7 +58,7 @@ def get_engine_url():
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 config.set_main_option('sqlalchemy.url', get_engine_url())
-target_db = current_app.extensions['migrate'].db
+target_db = get_migrate_extension().db
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -90,7 +111,7 @@ def run_migrations_online():
                 directives[:] = []
                 logger.info('No changes in schema detected.')
 
-    conf_args = current_app.extensions['migrate'].configure_args
+    conf_args = get_migrate_extension().configure_args
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
 
