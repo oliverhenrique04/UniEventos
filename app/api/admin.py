@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 import tempfile
 import time
+from datetime import datetime
 
 bp = Blueprint('admin', __name__, url_prefix='/api')
 admin_service = AdminService()
@@ -191,6 +192,16 @@ def _apply_import_rows_filter(rows, field, query):
         return any(q in str(value).lower() for value in searchable)
 
     return [row for row in rows if match_row(row)]
+
+
+def _cert_generated_dir() -> Path:
+    return Path(current_app.root_path) / 'static' / 'certificates' / 'generated'
+
+
+def _bytes_to_mb(size_bytes: int) -> float:
+    if size_bytes <= 0:
+        return 0.0
+    return round(size_bytes / (1024 * 1024), 2)
 
 @bp.route('/listar_usuarios', methods=['GET'])
 @login_required
@@ -460,3 +471,102 @@ def permissoes_curso_lote():
         data.get('can_create_events')
     )
     return jsonify({"mensagem": msg, "count": count})
+
+
+@bp.route('/admin/certificados/cache/cleanup', methods=['POST'])
+@login_required
+def cleanup_generated_certificates_cache():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    raw_days = payload.get('older_than_days', 90)
+    dry_run = bool(payload.get('dry_run', True))
+
+    try:
+        older_than_days = int(raw_days)
+    except (TypeError, ValueError):
+        return jsonify({"erro": "older_than_days inválido"}), 400
+
+    if older_than_days < 1 or older_than_days > 3650:
+        return jsonify({"erro": "older_than_days deve estar entre 1 e 3650"}), 400
+
+    target_dir = _cert_generated_dir()
+    if not target_dir.exists():
+        return jsonify({
+            "mode": "dry_run" if dry_run else "execute",
+            "older_than_days": older_than_days,
+            "target_dir": str(target_dir),
+            "total_files": 0,
+            "candidate_files": 0,
+            "deleted_files": 0,
+            "failed_files": 0,
+            "freed_bytes": 0,
+            "freed_mb": 0,
+            "message": "Diretório de certificados gerados não existe.",
+            "sample_files": []
+        })
+
+    cutoff_ts = time.time() - (older_than_days * 86400)
+    all_files = []
+    candidate_files = []
+
+    for path in target_dir.glob('*.pdf'):
+        if not path.is_file():
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+
+        file_info = {
+            'name': path.name,
+            'path': str(path),
+            'size_bytes': stat.st_size,
+            'modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat(timespec='seconds'),
+            'modified_ts': stat.st_mtime,
+        }
+        all_files.append(file_info)
+        if stat.st_mtime <= cutoff_ts:
+            candidate_files.append(file_info)
+
+    candidate_files.sort(key=lambda item: item['modified_ts'])
+    total_candidate_bytes = sum(item['size_bytes'] for item in candidate_files)
+
+    deleted_files = 0
+    failed_files = 0
+    freed_bytes = 0
+
+    if not dry_run:
+        for item in candidate_files:
+            try:
+                Path(item['path']).unlink(missing_ok=True)
+                deleted_files += 1
+                freed_bytes += item['size_bytes']
+            except OSError:
+                failed_files += 1
+
+    response = {
+        "mode": "dry_run" if dry_run else "execute",
+        "older_than_days": older_than_days,
+        "target_dir": str(target_dir),
+        "total_files": len(all_files),
+        "candidate_files": len(candidate_files),
+        "deleted_files": deleted_files,
+        "failed_files": failed_files,
+        "freed_bytes": 0 if dry_run else freed_bytes,
+        "freed_mb": 0 if dry_run else _bytes_to_mb(freed_bytes),
+        "estimated_freed_bytes": total_candidate_bytes,
+        "estimated_freed_mb": _bytes_to_mb(total_candidate_bytes),
+        "message": "Simulação concluída." if dry_run else "Limpeza concluída.",
+        "sample_files": [
+            {
+                "name": item['name'],
+                "size_mb": _bytes_to_mb(item['size_bytes']),
+                "modified_at": item['modified_at'],
+            }
+            for item in candidate_files[:10]
+        ]
+    }
+
+    return jsonify(response)
