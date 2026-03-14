@@ -7,7 +7,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1">
                     <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none">Dashboard</a></li>
-                    {% if user.role in ['admin', 'coordenador'] %}
+                    {% if user.role in ['admin', 'coordenador', 'gestor'] %}
                     <li class="breadcrumb-item"><a href="{{ url_for('main.designer_certificado', event_id=event.id) }}" class="text-decoration-none">Designer</a></li>
                     {% else %}
                     <li class="breadcrumb-item">Designer</li>

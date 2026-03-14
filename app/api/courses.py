@@ -14,7 +14,7 @@ def list_courses():
 @bp.route('/', methods=['POST'])
 @login_required
 def create_course():
-    if current_user.role != 'admin':
+    if current_user.role not in ['admin', 'gestor']:
         return jsonify({"erro": "Negado"}), 403
     
     course, msg = course_service.create_course(request.json)
@@ -25,7 +25,7 @@ def create_course():
 @bp.route('/<int:course_id>', methods=['PUT'])
 @login_required
 def update_course(course_id):
-    if current_user.role != 'admin':
+    if current_user.role not in ['admin', 'gestor']:
         return jsonify({"erro": "Negado"}), 403
         
     course, msg = course_service.update_course(course_id, request.json)
@@ -36,7 +36,7 @@ def update_course(course_id):
 @bp.route('/<int:course_id>', methods=['DELETE'])
 @login_required
 def delete_course(course_id):
-    if current_user.role != 'admin':
+    if current_user.role not in ['admin', 'gestor']:
         return jsonify({"erro": "Negado"}), 403
         
     success, msg = course_service.delete_course(course_id)

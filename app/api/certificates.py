@@ -75,7 +75,7 @@ def _can_manage_event(event):
 
 
 def _can_manage_certificates(event):
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return False
     return _can_manage_event(event)
 
@@ -158,7 +158,7 @@ def setup_certificate(event_id):
     Configures the certificate background and template for an event.
     Expects a background image file and a template JSON string.
     """
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return jsonify({"erro": "Permissão negada"}), 403
         
     event = _get_or_404(Event, event_id)
@@ -203,7 +203,7 @@ def setup_certificate(event_id):
 @login_required
 def upload_asset(event_id):
     """Uploads an image asset for inline certificate elements."""
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return jsonify({"erro": "Permissão negada"}), 403
 
     event = _get_or_404(Event, event_id)
@@ -231,7 +231,7 @@ def upload_asset(event_id):
 @login_required
 def send_batch(event_id):
     """Triggers the mass generation and queued delivery of certificates."""
-    if current_user.role not in ['admin', 'coordenador']:
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
         return jsonify({"erro": "Permissão negada"}), 403
     event = _get_or_404(Event, event_id)
     if not _can_manage_certificates(event):
