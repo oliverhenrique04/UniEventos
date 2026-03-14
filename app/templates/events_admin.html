@@ -172,9 +172,11 @@
         <div>
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-calendar-check text-primary me-2"></i>Gestão de Eventos</h3>
         </div>
+        {% if user.role != 'gestor' or user.course_id %}
         <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-primary shadow-sm">
             <i class="fa-solid fa-plus me-2"></i> Novo Evento
         </a>
+        {% endif %}
     </div>
 
     <!-- FILTERS -->
@@ -483,6 +485,7 @@
 {% block scripts %}
 <script>
     let EVENTO_SELECIONADO_ID = null;
+    let EVENTO_SELECIONADO_CAN_MANAGE = false;
     const EVENTOS_GESTAO_CACHE = new Map();
     let ATIVIDADES_EVENTO_ATUAL = [];
     let intervaloProjetorGestao = null;
@@ -547,26 +550,30 @@
                     <td><span class="badge bg-light text-dark border">${ev.owner_name || ev.owner || 'Sistema'}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-inline-grid gap-1" style="grid-template-columns: repeat(3, minmax(42px, 1fr)); min-width: 132px;">
+                            ${ev.can_edit ? `
                             <a href="${pathUrl(`/editar_evento/${ev.id}`)}" class="btn btn-sm btn-light border" title="Editar Evento">
                                 <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
-                            </a>
+                            </a>` : `
+                            <button class="btn btn-sm btn-light border" title="Somente consulta" disabled>
+                                <i class="fa-solid fa-pen-to-square text-muted"></i>
+                            </button>`}
                             <button class="btn btn-sm btn-light border" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Registro de Presença">
                                 <i class="fa-solid fa-display text-primary"></i>
                             </button>
                             <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes">
                                 <i class="fa-solid fa-users-viewfinder text-primary"></i>
                             </button>
-                            <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes">
+                            <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
-                            ${['admin', 'coordenador', 'gestor'].includes('{{ user.role }}') ? `
+                            ${ev.can_manage_certificates ? `
                             <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Certificado">
                                 <i class="fa-solid fa-certificate text-warning"></i>
                             </a>` : `
                             <button class="btn btn-sm btn-light border" title="Certificado indisponível" disabled>
                                 <i class="fa-solid fa-certificate text-muted"></i>
                             </button>`}
-                            <button class="btn btn-sm btn-light border text-danger" onclick="confirmarExcluirEvento(${ev.id})">
+                            <button class="btn btn-sm btn-light border text-danger" onclick="confirmarExcluirEvento(${ev.id})" ${ev.can_delete ? '' : 'disabled'}>
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </div>
@@ -702,8 +709,14 @@
         document.getElementById('areaAdicao').classList.add('d-none'); // Reset view
 
         const ev = EVENTOS_GESTAO_CACHE.get(eventId);
+        EVENTO_SELECIONADO_CAN_MANAGE = !!(ev && ev.can_manage_participants);
         if (ev && Array.isArray(ev.atividades)) {
             ATIVIDADES_EVENTO_ATUAL = ev.atividades;
+        }
+
+        const btnMostrarAdicao = document.querySelector('#modalParticipantes .modal-header .btn-primary');
+        if (btnMostrarAdicao) {
+            btnMostrarAdicao.style.display = EVENTO_SELECIONADO_CAN_MANAGE ? '' : 'none';
         }
         
         const selAtv = document.getElementById('addPartAtividade');
@@ -733,6 +746,11 @@
     }
 
     function abrirModalNotificacao(id, nome) {
+        const ev = EVENTOS_GESTAO_CACHE.get(id);
+        if (!ev || !ev.can_manage_participants) {
+            Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
+            return;
+        }
         EVENTO_SELECIONADO_ID = id;
         document.getElementById('notifEventName').innerText = nome;
         document.getElementById('notifAssunto').value = '';
@@ -765,6 +783,10 @@
     }
 
     function mostrarAreaAdicao() {
+        if (!EVENTO_SELECIONADO_CAN_MANAGE) {
+            Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
+            return;
+        }
         const area = document.getElementById('areaAdicao');
         area.classList.toggle('d-none');
         document.getElementById('addPartSearch').value = '';
@@ -814,6 +836,10 @@
     }
 
     async function executarInscricaoManual() {
+        if (!EVENTO_SELECIONADO_CAN_MANAGE) {
+            Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
+            return;
+        }
         const activityId = document.getElementById('addPartAtividade').value;
 
         if (!USUARIO_SELECIONADO_CPF || !activityId) {
@@ -838,6 +864,10 @@
     }
 
     async function removerInscricao(enrollmentId) {
+        if (!EVENTO_SELECIONADO_CAN_MANAGE) {
+            Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
+            return;
+        }
         const confirm = await Swal.fire({
             title: 'Remover Participante?',
             text: "O aluno será desvinculado desta atividade.",
@@ -878,9 +908,13 @@
         }
 
         data.items.forEach(p => {
-            const toggleBtn = p.presente 
-                ? `<button onclick="alternarPresenca(${p.id}, false)" class="btn btn-xs btn-success rounded-pill px-3"><i class="fa-solid fa-check me-1"></i> Validado</button>`
-                : `<button onclick="alternarPresenca(${p.id}, true)" class="btn btn-xs btn-outline-secondary rounded-pill px-3"><i class="fa-solid fa-clock me-1"></i> Pendente</button>`;
+            const toggleBtn = EVENTO_SELECIONADO_CAN_MANAGE
+                ? (p.presente
+                    ? `<button onclick="alternarPresenca(${p.id}, false)" class="btn btn-xs btn-success rounded-pill px-3"><i class="fa-solid fa-check me-1"></i> Validado</button>`
+                    : `<button onclick="alternarPresenca(${p.id}, true)" class="btn btn-xs btn-outline-secondary rounded-pill px-3"><i class="fa-solid fa-clock me-1"></i> Pendente</button>`)
+                : (p.presente
+                    ? `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3"><i class="fa-solid fa-check me-1"></i> Validado</span>`
+                    : `<span class="badge bg-secondary-subtle text-secondary rounded-pill px-3"><i class="fa-solid fa-clock me-1"></i> Pendente</span>`);
 
             let distHtml = '<span class="text-muted x-small">N/A</span>';
             if (p.distancia !== null) {
@@ -901,7 +935,9 @@
                     <td>${toggleBtn}</td>
                     <td>${distHtml}</td>
                     <td class="text-end pe-4">
-                        <button class="btn btn-xs btn-link text-danger p-0" onclick="removerInscricao(${p.id})"><i class="fa-solid fa-user-xmark"></i></button>
+                        ${EVENTO_SELECIONADO_CAN_MANAGE
+                            ? `<button class="btn btn-xs btn-link text-danger p-0" onclick="removerInscricao(${p.id})"><i class="fa-solid fa-user-xmark"></i></button>`
+                            : '<span class="text-muted small">-</span>'}
                     </td>
                 </tr>
             `;
@@ -911,6 +947,10 @@
     }
 
     async function alternarPresenca(enrollmentId, status) {
+        if (!EVENTO_SELECIONADO_CAN_MANAGE) {
+            Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
+            return;
+        }
         const res = await fetch(apiUrl(`/api/alternar_presenca/${enrollmentId}`), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},

@@ -1,14 +1,48 @@
 import json
 from flask import Blueprint, request, jsonify, abort, url_for
 from flask_login import login_required, current_user
-from sqlalchemy import or_, func
-from app.models import Event, Activity, Enrollment, InstitutionalCertificate, InstitutionalCertificateRecipient, db
+from sqlalchemy import or_, func, case
+from app.models import (
+    Event,
+    Activity,
+    Enrollment,
+    Course,
+    User,
+    InstitutionalCertificate,
+    InstitutionalCertificateRecipient,
+    InstitutionalCertificateCategory,
+    db,
+)
 from app.services.event_service import EventService
 from app.serializers import serialize_event
-from datetime import datetime
+from datetime import datetime, timedelta
 
 bp = Blueprint('events', __name__, url_prefix='/api')
 event_service = EventService()
+
+
+def _user_can_manage_event(event):
+    return event_service.can_manage_event(current_user, event)
+
+
+def _user_can_view_event(event):
+    return event_service.can_view_event(current_user, event)
+
+
+def _enforce_role_course_for_creation(data):
+    if current_user.role not in ['coordenador', 'gestor']:
+        return None
+
+    if not current_user.course_id or not current_user.curso:
+        return 'Perfil sem curso vinculado para criar eventos.'
+
+    requested_course = (data.get('curso') or '').strip()
+    if requested_course and requested_course.lower() != str(current_user.curso).lower():
+        return 'Para este perfil, o evento deve estar vinculado ao seu curso.'
+
+    # Force binding to the user course to keep data consistency.
+    data['curso'] = current_user.curso
+    return None
 
 
 def _paginate_items(items, page, per_page):
@@ -43,6 +77,24 @@ def _safe_workload_hours(value):
         return 0
 
 
+def _apply_event_visibility_scope(base_query):
+    """Apply role-based event visibility to analytics/reporting queries."""
+    query = base_query
+    if current_user.role == 'professor':
+        query = query.filter(Event.owner_username == current_user.username)
+    elif current_user.role == 'coordenador':
+        if current_user.course_id:
+            query = query.filter(Event.course_id == current_user.course_id)
+        else:
+            query = query.filter(Event.id == -1)
+    elif current_user.role == 'gestor':
+        # Gestor can consult all events.
+        pass
+    elif current_user.role != 'admin':
+        query = query.filter(Event.id == -1)
+    return query
+
+
 def _get_user_institutional_recipients(user):
     recipient_filters = []
     if user.username:
@@ -75,10 +127,14 @@ def criar_evento():
     Endpoint for creating a new event.
     Only professors and admins can create events.
     """
-    if current_user.role == 'participante':
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
         return jsonify({"erro": "Negado"}), 403
     
     data = request.json
+
+    course_error = _enforce_role_course_for_creation(data)
+    if course_error:
+        return jsonify({"erro": course_error}), 403
     
     # Simple validation for start date
     try:
@@ -111,11 +167,19 @@ def editar_evento():
     
     if not evt_id:
         return jsonify({"erro": "ID do evento é obrigatório"}), 400
+
+    event = event_service.get_event_by_id(evt_id)
+    if not event:
+        return jsonify({"erro": "Evento não encontrado"}), 404
+
+    if not _user_can_manage_event(event):
+        return jsonify({"erro": "Sem permissão para editar este evento"}), 403
+
+    if current_user.role in ['coordenador', 'gestor']:
+        data['curso'] = current_user.curso
     
     try:
-        event, message = event_service.update_event(
-            evt_id, current_user.username, current_user.role, data
-        )
+        event, message = event_service.update_event(evt_id, current_user, data)
         
         if not event:
             status_code = 404 if message == "Evento não encontrado" else 403
@@ -144,7 +208,7 @@ def listar_eventos_admin():
         'data': request.args.get('data')
     }
     
-    pagination = event_service.list_events_paginated(page=page, filters=filters)
+    pagination = event_service.list_events_paginated(current_user, page=page, filters=filters)
     
     return jsonify({
         "items": [serialize_event(e, current_user) for e in pagination.items],
@@ -161,6 +225,12 @@ def notificar_participantes(event_id):
     Only authorized personnel (admin, professor, coordinator) can call this.
     """
     if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+        return jsonify({"erro": "Acesso negado"}), 403
+
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        return jsonify({"erro": "Evento não encontrado"}), 404
+    if not _user_can_manage_event(event):
         return jsonify({"erro": "Acesso negado"}), 403
     
     data = request.json
@@ -181,6 +251,13 @@ def notificar_participantes(event_id):
 def listar_participantes_evento(event_id):
     """Paginated and filtered list of participants in an event, including geofencing distance."""
     from app.utils import haversine_distance
+
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        return jsonify({"erro": "Evento não encontrado"}), 404
+    if not _user_can_view_event(event):
+        return jsonify({"erro": "Acesso negado"}), 403
+
     page = request.args.get('page', 1, type=int)
     filters = {
         'nome': request.args.get('nome'),
@@ -224,6 +301,15 @@ def listar_participantes_evento(event_id):
 @login_required
 def alternar_presenca_manual(enrollment_id):
     """Manually toggles the attendance status of a participant."""
+    enrollment = db.session.get(Enrollment, enrollment_id)
+    if not enrollment:
+        return jsonify({"erro": "Matrícula não encontrada"}), 404
+
+    activity = db.session.get(Activity, enrollment.activity_id)
+    event = db.session.get(Event, activity.event_id) if activity else None
+    if not event or not _user_can_manage_event(event):
+        return jsonify({"erro": "Acesso negado"}), 403
+
     status = request.json.get('presente')
     success, msg = event_service.toggle_attendance_manual(enrollment_id, status)
     if success: return jsonify({"mensagem": msg})
@@ -233,7 +319,7 @@ def alternar_presenca_manual(enrollment_id):
 @login_required
 def deletar_evento(event_id):
     """Removes an event and all its data."""
-    success, msg = event_service.delete_event(event_id, current_user.username, current_user.role)
+    success, msg = event_service.delete_event(event_id, current_user)
     if success: return jsonify({"mensagem": msg})
     return jsonify({"erro": msg}), 403
 
@@ -245,6 +331,12 @@ def remover_inscricao(enrollment_id):
     enrollment = db.session.get(Enrollment, enrollment_id)
     if not enrollment:
         abort(404)
+
+    activity = db.session.get(Activity, enrollment.activity_id)
+    event = db.session.get(Event, activity.event_id) if activity else None
+    if not event or not _user_can_manage_event(event):
+        return jsonify({"erro": "Acesso negado"}), 403
+
     db.session.delete(enrollment)
     db.session.commit()
     return jsonify({"mensagem": "Inscrição removida!"})
@@ -483,3 +575,343 @@ def listar_eventos():
         "pages": pagination.pages,
         "current_page": pagination.page
     })
+
+
+@bp.route('/dashboard/analytics', methods=['GET'])
+@login_required
+def dashboard_analytics():
+    """Return aggregated analytics for admin/coordinator/professor/manager dashboards."""
+    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+        return jsonify({'erro': 'Acesso negado'}), 403
+
+    period_days = request.args.get('period_days', 30, type=int)
+    if period_days not in [7, 30, 90]:
+        period_days = 30
+
+    course_id = request.args.get('course_id', type=int)
+    if course_id is not None and course_id <= 0:
+        course_id = None
+
+    today = datetime.utcnow().date()
+    cutoff_date = today - timedelta(days=period_days)
+    cutoff_datetime = datetime.utcnow() - timedelta(days=period_days)
+
+    scoped_events_query = _apply_event_visibility_scope(Event.query)
+    scoped_events_query = scoped_events_query.filter(Event.data_inicio.isnot(None), Event.data_inicio >= cutoff_date)
+    if course_id:
+        scoped_events_query = scoped_events_query.filter(Event.course_id == course_id)
+
+    event_ids = [event_id for (event_id,) in scoped_events_query.with_entities(Event.id).all()]
+
+    def _empty_payload():
+        return {
+            'summary': {
+                'total_events': 0,
+                'active_events': 0,
+                'closed_events': 0,
+                'total_courses': 0,
+                'total_enrollments': 0,
+                'unique_students': 0,
+                'presence_rate': 0,
+                'pending_certificate_events': 0,
+            },
+            'events_by_course': [],
+            'students_by_course': [],
+            'status_breakdown': [],
+            'certificate_pipeline': {
+                'with_certificate': 0,
+                'without_certificate': 0,
+            },
+            'pending_certificate_events': [],
+            'institutional_summary': {
+                'total_certificates': 0,
+                'draft_certificates': 0,
+                'sent_certificates': 0,
+                'archived_certificates': 0,
+                'total_recipients': 0,
+                'delivered_recipients': 0,
+                'pending_recipients': 0,
+                'delivery_rate': 0,
+            },
+            'institutional_by_category': [],
+            'institutional_pending': [],
+            'applied_filters': {
+                'period_days': period_days,
+                'course_id': course_id,
+                'cutoff_date': cutoff_date.isoformat(),
+            },
+            'generated_at': datetime.utcnow().isoformat(),
+        }
+
+    if not event_ids:
+        payload = _empty_payload()
+    else:
+        scoped_events_query = Event.query.filter(Event.id.in_(event_ids))
+
+        total_events = scoped_events_query.count()
+        active_events = scoped_events_query.filter(Event.status == 'ABERTO').count()
+        closed_events = scoped_events_query.filter(Event.status != 'ABERTO').count()
+        total_courses = (
+            scoped_events_query
+            .with_entities(Event.course_id)
+            .filter(Event.course_id.isnot(None))
+            .distinct()
+            .count()
+        )
+
+        enrollments_query = (
+            Enrollment.query
+            .join(Activity, Enrollment.activity_id == Activity.id)
+            .join(Event, Activity.event_id == Event.id)
+            .filter(Event.id.in_(event_ids))
+        )
+        total_enrollments = enrollments_query.count()
+
+        unique_students = (
+            enrollments_query
+            .with_entities(Enrollment.user_cpf)
+            .filter(Enrollment.user_cpf.isnot(None))
+            .distinct()
+            .count()
+        )
+
+        presences_total = enrollments_query.filter(Enrollment.presente.is_(True)).count()
+        presence_rate = round((presences_total / total_enrollments) * 100, 2) if total_enrollments else 0
+
+        status_rows = (
+            scoped_events_query
+            .with_entities(Event.status, func.count(Event.id))
+            .group_by(Event.status)
+            .all()
+        )
+        status_breakdown = [
+            {'status': status or 'SEM_STATUS', 'count': count}
+            for status, count in status_rows
+        ]
+
+        events_by_course_rows = (
+            db.session.query(
+                Course.nome.label('course_name'),
+                func.count(Event.id).label('events_count')
+            )
+            .select_from(Event)
+            .outerjoin(Course, Event.course_id == Course.id)
+            .filter(Event.id.in_(event_ids))
+            .group_by(Course.nome)
+            .order_by(func.count(Event.id).desc(), Course.nome.asc())
+            .limit(10)
+            .all()
+        )
+        events_by_course = [
+            {'course': (course_name or 'Sem curso'), 'count': int(events_count)}
+            for course_name, events_count in events_by_course_rows
+        ]
+
+        students_by_course_rows = (
+            db.session.query(
+                Course.nome.label('course_name'),
+                func.count(func.distinct(User.cpf)).label('students_count')
+            )
+            .select_from(Enrollment)
+            .join(Activity, Enrollment.activity_id == Activity.id)
+            .join(Event, Activity.event_id == Event.id)
+            .outerjoin(User, User.cpf == Enrollment.user_cpf)
+            .outerjoin(Course, Course.id == User.course_id)
+            .filter(Event.id.in_(event_ids))
+            .group_by(Course.nome)
+            .order_by(func.count(func.distinct(User.cpf)).desc(), Course.nome.asc())
+            .limit(10)
+            .all()
+        )
+        students_by_course = [
+            {'course': (course_name or 'Sem curso'), 'count': int(students_count)}
+            for course_name, students_count in students_by_course_rows
+        ]
+
+        pending_rows = (
+            db.session.query(
+                Event.id,
+                Event.nome,
+                Course.nome.label('course_name'),
+                Event.data_inicio,
+                func.count(Enrollment.id).label('enrollments_count'),
+                func.count(Enrollment.cert_hash).label('cert_generated_count'),
+                func.sum(case((Enrollment.presente.is_(True), 1), else_=0)).label('presence_count'),
+            )
+            .select_from(Event)
+            .outerjoin(Course, Course.id == Event.course_id)
+            .outerjoin(Activity, Activity.event_id == Event.id)
+            .outerjoin(Enrollment, Enrollment.activity_id == Activity.id)
+            .filter(Event.id.in_(event_ids))
+            .group_by(Event.id, Event.nome, Course.nome, Event.data_inicio)
+            .order_by(Event.data_inicio.desc())
+            .all()
+        )
+
+        pending_certificate_events = []
+        with_certificate = 0
+        without_certificate = 0
+        for row in pending_rows:
+            enrollments_count = int(row.enrollments_count or 0)
+            cert_generated_count = int(row.cert_generated_count or 0)
+            presence_count = int(row.presence_count or 0)
+            pending_count = max(enrollments_count - cert_generated_count, 0)
+
+            if enrollments_count > 0 and cert_generated_count > 0:
+                with_certificate += 1
+            if enrollments_count > 0 and cert_generated_count == 0:
+                without_certificate += 1
+
+            if pending_count > 0:
+                pending_certificate_events.append({
+                    'id': row.id,
+                    'name': row.nome,
+                    'course': row.course_name or 'Sem curso',
+                    'start_date': row.data_inicio.isoformat() if row.data_inicio else None,
+                    'enrollments_count': enrollments_count,
+                    'presence_count': presence_count,
+                    'cert_generated_count': cert_generated_count,
+                    'pending_count': pending_count,
+                })
+
+        total_pending_certificate_events = len(pending_certificate_events)
+        pending_certificate_events = sorted(
+            pending_certificate_events,
+            key=lambda item: (item['pending_count'], item['presence_count']),
+            reverse=True,
+        )[:8]
+
+        payload = {
+            'summary': {
+                'total_events': total_events,
+                'active_events': active_events,
+                'closed_events': closed_events,
+                'total_courses': total_courses,
+                'total_enrollments': total_enrollments,
+                'unique_students': unique_students,
+                'presence_rate': presence_rate,
+                'pending_certificate_events': total_pending_certificate_events,
+            },
+            'events_by_course': events_by_course,
+            'students_by_course': students_by_course,
+            'status_breakdown': status_breakdown,
+            'certificate_pipeline': {
+                'with_certificate': with_certificate,
+                'without_certificate': without_certificate,
+            },
+            'pending_certificate_events': pending_certificate_events,
+        }
+
+    institutional_query = InstitutionalCertificate.query
+    if current_user.role not in ['admin', 'gestor']:
+        institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == current_user.username)
+    institutional_query = institutional_query.filter(InstitutionalCertificate.created_at >= cutoff_datetime)
+
+    institutional_ids = [cert_id for (cert_id,) in institutional_query.with_entities(InstitutionalCertificate.id).all()]
+
+    institutional_summary = {
+        'total_certificates': 0,
+        'draft_certificates': 0,
+        'sent_certificates': 0,
+        'archived_certificates': 0,
+        'total_recipients': 0,
+        'delivered_recipients': 0,
+        'pending_recipients': 0,
+        'delivery_rate': 0,
+    }
+    institutional_by_category = []
+    institutional_pending = []
+
+    if institutional_ids:
+        institutional_scoped = InstitutionalCertificate.query.filter(InstitutionalCertificate.id.in_(institutional_ids))
+        institutional_summary['total_certificates'] = institutional_scoped.count()
+        institutional_summary['draft_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'RASCUNHO').count()
+        institutional_summary['sent_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'ENVIADO').count()
+        institutional_summary['archived_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'ARQUIVADO').count()
+
+        recipient_scope = (
+            InstitutionalCertificateRecipient.query
+            .join(InstitutionalCertificate, InstitutionalCertificate.id == InstitutionalCertificateRecipient.certificate_id)
+            .filter(InstitutionalCertificateRecipient.certificate_id.in_(institutional_ids))
+        )
+        if course_id:
+            recipient_scope = (
+                recipient_scope
+                .join(User, User.username == InstitutionalCertificateRecipient.user_username)
+                .filter(User.course_id == course_id)
+            )
+
+        total_recipients = recipient_scope.count()
+        delivered_recipients = recipient_scope.filter(InstitutionalCertificateRecipient.cert_entregue.is_(True)).count()
+        pending_recipients = max(total_recipients - delivered_recipients, 0)
+        delivery_rate = round((delivered_recipients / total_recipients) * 100, 2) if total_recipients else 0
+
+        institutional_summary['total_recipients'] = total_recipients
+        institutional_summary['delivered_recipients'] = delivered_recipients
+        institutional_summary['pending_recipients'] = pending_recipients
+        institutional_summary['delivery_rate'] = delivery_rate
+
+        categories_rows = (
+            db.session.query(
+                InstitutionalCertificateCategory.nome.label('category_name'),
+                func.count(InstitutionalCertificate.id).label('certificates_count')
+            )
+            .select_from(InstitutionalCertificate)
+            .outerjoin(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
+            .filter(InstitutionalCertificate.id.in_(institutional_ids))
+            .group_by(InstitutionalCertificateCategory.nome)
+            .order_by(func.count(InstitutionalCertificate.id).desc())
+            .limit(8)
+            .all()
+        )
+        institutional_by_category = [
+            {'category': ((category_name or '').strip() or 'Sem categoria'), 'count': int(certificates_count)}
+            for category_name, certificates_count in categories_rows
+        ]
+
+        pending_inst_rows = (
+            db.session.query(
+                InstitutionalCertificate.id,
+                InstitutionalCertificate.titulo,
+                InstitutionalCertificateCategory.nome.label('category_name'),
+                func.count(InstitutionalCertificateRecipient.id).label('recipients_count'),
+                func.sum(case((InstitutionalCertificateRecipient.cert_entregue.is_(True), 1), else_=0)).label('delivered_count'),
+            )
+            .select_from(InstitutionalCertificate)
+            .outerjoin(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
+            .outerjoin(InstitutionalCertificateRecipient, InstitutionalCertificateRecipient.certificate_id == InstitutionalCertificate.id)
+            .filter(InstitutionalCertificate.id.in_(institutional_ids))
+            .group_by(InstitutionalCertificate.id, InstitutionalCertificate.titulo, InstitutionalCertificateCategory.nome)
+            .order_by(InstitutionalCertificate.created_at.desc())
+            .all()
+        )
+        for row in pending_inst_rows:
+            recipients_count = int(row.recipients_count or 0)
+            delivered_count = int(row.delivered_count or 0)
+            pending_count = max(recipients_count - delivered_count, 0)
+            if pending_count <= 0:
+                continue
+            institutional_pending.append({
+                'id': row.id,
+                'title': row.titulo,
+                'category': ((row.category_name or '').strip() or 'Sem categoria'),
+                'recipients_count': recipients_count,
+                'delivered_count': delivered_count,
+                'pending_count': pending_count,
+            })
+
+    payload['institutional_summary'] = institutional_summary
+    payload['institutional_by_category'] = institutional_by_category
+    payload['institutional_pending'] = sorted(
+        institutional_pending,
+        key=lambda item: item['pending_count'],
+        reverse=True,
+    )[:8]
+    payload['applied_filters'] = {
+        'period_days': period_days,
+        'course_id': course_id,
+        'cutoff_date': cutoff_date.isoformat(),
+    }
+    payload['generated_at'] = datetime.utcnow().isoformat()
+
+    return jsonify(payload)

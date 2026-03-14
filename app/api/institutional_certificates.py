@@ -32,6 +32,18 @@ def _can_manage_institutional_certificates():
     return current_user.role in ['admin', 'extensao', 'gestor']
 
 
+def _can_view_institutional_certificates():
+    return current_user.role in ['admin', 'extensao', 'gestor']
+
+
+def _can_edit_institutional_certificate(cert):
+    if current_user.role == 'admin':
+        return True
+    if current_user.role == 'extensao':
+        return cert.created_by_username == current_user.username
+    return False
+
+
 def _parse_date_iso(date_str):
     try:
         datetime.strptime(date_str, '%Y-%m-%d')
@@ -179,10 +191,19 @@ def _get_managed_certificate_or_error(certificate_id):
     cert = db.session.get(InstitutionalCertificate, certificate_id)
     if not cert:
         return None, (jsonify({'erro': 'Nao encontrado'}), 404)
-    if not _can_manage_institutional_certificates():
+    if not _can_view_institutional_certificates():
         return None, (jsonify({'erro': 'Permissao negada'}), 403)
-    if current_user.role != 'admin' and cert.created_by_username != current_user.username:
+    if not _can_edit_institutional_certificate(cert):
         return None, (jsonify({'erro': 'Acesso negado'}), 403)
+    return cert, None
+
+
+def _get_viewable_certificate_or_error(certificate_id):
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        return None, (jsonify({'erro': 'Nao encontrado'}), 404)
+    if not _can_view_institutional_certificates():
+        return None, (jsonify({'erro': 'Permissao negada'}), 403)
     return cert, None
 
 
@@ -283,7 +304,7 @@ def search_users_for_recipients(certificate_id):
 @bp.route('', methods=['GET'])
 @login_required
 def list_institutional_certificates():
-    if not _can_manage_institutional_certificates():
+    if not _can_view_institutional_certificates():
         return jsonify({'erro': 'Permissao negada'}), 403
 
     page = request.args.get('page', 1, type=int)
@@ -294,8 +315,6 @@ def list_institutional_certificates():
 
     query = InstitutionalCertificate.query
     query = query.join(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
-    if current_user.role != 'admin':
-        query = query.filter(InstitutionalCertificate.created_by_username == current_user.username)
     if categoria:
         query = query.filter(InstitutionalCertificateCategory.nome.ilike(f'%{categoria}%'))
     if status:
@@ -321,6 +340,7 @@ def list_institutional_certificates():
                 'recipients_count': len(item.recipients),
                 'created_by_username': item.created_by_username,
                 'created_at': item.created_at.isoformat() if item.created_at else None,
+                'can_edit': _can_edit_institutional_certificate(item),
             }
             for item in pagination.items
         ],
@@ -338,7 +358,7 @@ def list_institutional_certificates():
 @bp.route('', methods=['POST'])
 @login_required
 def create_institutional_certificate():
-    if not _can_manage_institutional_certificates():
+    if current_user.role not in ['admin', 'extensao']:
         return jsonify({'erro': 'Permissao negada'}), 403
 
     data = request.get_json(silent=True) or {}
@@ -375,13 +395,9 @@ def create_institutional_certificate():
 @bp.route('/<int:certificate_id>', methods=['GET'])
 @login_required
 def get_institutional_certificate(certificate_id):
-    cert = db.session.get(InstitutionalCertificate, certificate_id)
-    if not cert:
-        return jsonify({'erro': 'Nao encontrado'}), 404
-    if not _can_manage_institutional_certificates():
-        return jsonify({'erro': 'Permissao negada'}), 403
-    if current_user.role != 'admin' and cert.created_by_username != current_user.username:
-        return jsonify({'erro': 'Acesso negado'}), 403
+    cert, error = _get_viewable_certificate_or_error(certificate_id)
+    if error:
+        return error
 
     return jsonify({
         'id': cert.id,
@@ -395,6 +411,7 @@ def get_institutional_certificate(certificate_id):
         'template': json.loads(cert.cert_template_json or '{}'),
         'status': cert.status,
         'created_by_username': cert.created_by_username,
+        'can_edit': _can_edit_institutional_certificate(cert),
     })
 
 
@@ -566,7 +583,7 @@ def delete_institutional_certificate(certificate_id):
 @bp.route('/<int:certificate_id>/recipients', methods=['GET'])
 @login_required
 def list_recipients(certificate_id):
-    cert, error = _get_managed_certificate_or_error(certificate_id)
+    cert, error = _get_viewable_certificate_or_error(certificate_id)
     if error:
         return error
 
@@ -918,7 +935,7 @@ def resend_recipient(certificate_id, recipient_id):
 @bp.route('/<int:certificate_id>/recipients/export_csv', methods=['GET'])
 @login_required
 def export_recipients_csv(certificate_id):
-    cert, error = _get_managed_certificate_or_error(certificate_id)
+    cert, error = _get_viewable_certificate_or_error(certificate_id)
     if error:
         return error
 
@@ -952,7 +969,7 @@ def export_recipients_csv(certificate_id):
 @bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/download', methods=['GET'])
 @login_required
 def download_recipient_pdf(certificate_id, recipient_id):
-    cert, error = _get_managed_certificate_or_error(certificate_id)
+    cert, error = _get_viewable_certificate_or_error(certificate_id)
     if error:
         return error
 
@@ -1038,7 +1055,7 @@ def preview_public_by_hash(cert_hash):
 @bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/preview', methods=['GET'])
 @login_required
 def preview_recipient_pdf(certificate_id, recipient_id):
-    cert, error = _get_managed_certificate_or_error(certificate_id)
+    cert, error = _get_viewable_certificate_or_error(certificate_id)
     if error:
         return error
 

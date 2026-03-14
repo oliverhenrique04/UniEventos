@@ -96,7 +96,7 @@ def designer_certificado_institucional(certificate_id):
 @login_required
 def gerenciar_usuarios():
     """Page for full administrative user management CRUD."""
-    if current_user.role != 'admin':
+    if current_user.role not in ['admin', 'gestor']:
         return "Acesso negado", 403
     return render_template('users_admin.html', user=current_user)
 

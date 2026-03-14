@@ -1,12 +1,14 @@
 from flask import Blueprint, jsonify, send_file, request, current_app
 from flask_login import login_required, current_user
 from app.services.report_service import ReportService
+from app.services.event_service import EventService
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from io import BytesIO
 
 bp = Blueprint('reports', __name__)
 report_service = ReportService()
+event_service = EventService()
 
 @bp.route('/api/relatorio_inscritos/<int:evt_id>', methods=['GET'])
 @login_required
@@ -15,7 +17,7 @@ def relatorio_inscritos(evt_id):
     if not event:
         return jsonify({"erro": "Evento não encontrado"}), 404
         
-    if current_user.role != 'admin' and event.owner_username != current_user.username:
+    if not event_service.can_view_event(current_user, event):
         return jsonify({"erro": "Sem permissão"}), 403
         
     page = request.args.get('page', 1, type=int)
