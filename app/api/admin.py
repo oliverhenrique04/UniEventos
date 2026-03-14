@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path
 import json
 import tempfile
+import time
 
 bp = Blueprint('admin', __name__, url_prefix='/api')
 admin_service = AdminService()
@@ -46,6 +47,23 @@ def _load_job(job_id: str):
         return None
 
 
+def _job_rank(job: dict):
+    if not isinstance(job, dict):
+        return (-1, -1, -1)
+    return (
+        1 if job.get('completed') else 0,
+        int(job.get('processed_rows') or 0),
+        float(job.get('updated_at') or 0),
+    )
+
+
+def _best_job_state(*jobs):
+    valid_jobs = [j for j in jobs if isinstance(j, dict)]
+    if not valid_jobs:
+        return None
+    return max(valid_jobs, key=_job_rank)
+
+
 def _get_active_job_for_user(username: str):
     if not username:
         return None
@@ -64,6 +82,7 @@ def _update_job(job_id, **kwargs):
         job = _IMPORT_JOBS.get(job_id)
         if not job:
             return
+        kwargs['updated_at'] = time.time()
         job.update(kwargs)
         _persist_job(job)
 
@@ -86,6 +105,7 @@ def _append_job_row(job_id, row_result):
             job['errors_count'] += 1
 
         job['rows'].append(row_result)
+        job['updated_at'] = time.time()
         _persist_job(job)
 
 
@@ -333,6 +353,7 @@ def importar_alunos_xlsx_start():
             'completed': False,
             'message': 'Importação iniciada.',
             'created_by': current_user.username,
+            'updated_at': time.time(),
             'total_rows': 0,
             'processed_rows': 0,
             'created': 0,
@@ -365,14 +386,14 @@ def importar_alunos_xlsx_status(job_id):
     per_page = max(min(per_page, 100), 5)
 
     with _IMPORT_JOBS_LOCK:
-        job = _IMPORT_JOBS.get(job_id)
+        memory_job = _IMPORT_JOBS.get(job_id)
+        file_job = _load_job(job_id)
+        job = _best_job_state(memory_job, file_job)
         if not job:
-            loaded = _load_job(job_id)
-            if loaded:
-                _IMPORT_JOBS[job_id] = loaded
-                job = loaded
-            else:
-                return jsonify({'erro': 'Job não encontrado.'}), 404
+            return jsonify({'erro': 'Job não encontrado.'}), 404
+
+        # Keep local cache synchronized with the freshest state to avoid oscillation.
+        _IMPORT_JOBS[job_id] = job
 
         rows = list(job.get('rows', []))
         filtered_rows = _apply_import_rows_filter(rows, filter_field, filter_query)
