@@ -1,21 +1,27 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="page-validate py-5">
+<div class="page-validate">
+    <nav class="navbar navbar-expand-lg sticky-top validation-public-navbar">
+        <div class="container">
+            <a class="navbar-brand fs-4" href="/">
+                <i class="fa-solid fa-ticket me-2"></i>EuroEventos
+            </a>
+
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <span class="text-decoration-none fw-semibold text-slate-600 hover-primary d-none d-sm-inline-flex align-items-center">
+                    <i class="fa-solid fa-globe me-1"></i> Acesso Público
+                </span>
+                <a href="/" class="btn btn-outline-inicio btn-sm">
+                    <i class="fa-solid fa-house me-1"></i> Início
+                </a>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-12 col-md-9 col-lg-7 col-xl-6">
-
-                <!-- Top link -->
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <a href="/" class="back-link text-decoration-none small fw-semibold">
-                        <i class="fa-solid fa-arrow-left me-2"></i>Voltar ao site
-                    </a>
-
-                    <span class="small text-muted d-none d-sm-inline">
-                        EuroEventos • Validação
-                    </span>
-                </div>
 
                 <!-- Main Card -->
                 <div class="card validate-card border-0 shadow-lg overflow-hidden">
@@ -26,7 +32,7 @@
                                 <i class="fa-solid fa-shield"></i>
                             </div>
                             <div class="text-center">
-                                <h1 class="h4 fw-bold mb-1">Validação de Certificados</h1>
+                                <h1 class="h4 fw-bold mb-1">Validação de Autenticidade de Certificados</h1>
                             </div>
                         </div>
                     </div>
@@ -40,8 +46,8 @@
                                 <i class="fa-solid fa-circle-check"></i>
                             </div>
                             <div>
-                                <div class="fw-bold">Documento autêntico</div>
-                                <div class="small text-muted">Emitido e assinado digitalmente.</div>
+                                <div class="fw-bold">Documento Autêntico Verificado</div>
+                                <div class="small text-muted">Emitido e autenticado digitalmente conforme padrões de segurança.</div>
                             </div>
                         </div>
 
@@ -50,8 +56,8 @@
                         <div class="alert alert-warning border-0 rounded-4 mb-4 d-flex align-items-center gap-3">
                             <i class="fa-solid fa-award fs-3"></i>
                             <div class="mb-0">
-                                <div class="fw-bold">Certificado Institucional</div>
-                                <div class="small">Documento não vinculado a evento específico</div>
+                                <div class="fw-bold">Certificado de Natureza Institucional</div>
+                                <div class="small">Documento não vinculado a evento acadêmico específico</div>
                             </div>
                         </div>
                         {% endif %}
@@ -63,20 +69,20 @@
 
                             <div class="details-grid">
                                 <div class="details-row">
-                                    <div class="details-label">Participante</div>
+                                    <div class="details-label">Beneficiário do Certificado</div>
                                     <div class="details-value">{{ nome }}</div>
                                 </div>
 
                                 <div class="details-row">
                                     <div class="details-label">
-                                        {% if certificado_tipo == 'institucional' %}Título{% else %}Evento{% endif %}
+                                        {% if certificado_tipo == 'institucional' %}Denominação{% else %}Evento Acadêmico{% endif %}
                                     </div>
                                     <div class="details-value">{{ evento }}</div>
                                 </div>
                                 
                                 <div class="details-row">
                                     <div class="details-label">
-                                        {% if certificado_tipo == 'institucional' %}Categoria{% else %}Curso{% endif %}
+                                        {% if certificado_tipo == 'institucional' %}Categoria{% else %}Curso de Graduação{% endif %}
                                     </div>
                                     <div class="details-value">{{ curso }}</div>
                                 </div>
@@ -85,13 +91,13 @@
                                     <!-- Show hours only for event certificates -->
                                     {% if certificado_tipo != 'institucional' and horas %}
                                     <div class="col-6">
-                                        <div class="details-label">Carga horária</div>
+                                        <div class="details-label">Carga Horária Total</div>
                                         <div class="details-value text-primary">{{ horas }}h</div>
                                     </div>
                                     {% endif %}
                                     
                                     <div class="{% if certificado_tipo != 'institucional' and horas %}col-6{% else %}col-12{% endif %}">
-                                        <div class="details-label">Data</div>
+                                        <div class="details-label">Data de Emissão</div>
                                         <div class="details-value">{{ data }}</div>
                                     </div>
                                 </div>
@@ -99,7 +105,7 @@
                                 <!-- Show signer only for institutional certificates -->
                                 {% if certificado_tipo == 'institucional' and signatario %}
                                 <div class="details-row mt-3 pt-3 border-top">
-                                    <div class="details-label text-warning"><i class="fa-solid fa-signature me-2"></i>Responsável pelo Envio</div>
+                                    <div class="details-label text-warning"><i class="fa-solid fa-signature me-2"></i>Responsável pela Emissão e Envio</div>
                                     <div class="details-value fw-bold">{{ signatario }}</div>
                                 </div>
                                 {% endif %}
@@ -116,12 +122,12 @@
 
                         <div class="text-center">
                             <div class="hash-badge mb-3">
-                                <span class="hash-badge__label">HASH</span>
+                                <span class="hash-badge__label">Hash de Autenticação</span>
                                 <span class="hash-badge__value">{{ hash }}</span>
                             </div>
 
                             <a href="/validar" class="btn btn-outline-primary w-100 rounded-pill py-3 fw-bold">
-                                <i class="fa-solid fa-rotate-left me-2"></i>Validar outro documento
+                                <i class="fa-solid fa-rotate-left me-2"></i>Realizar Nova Validação de Documento
                             </a>
                         </div>
 
@@ -132,7 +138,7 @@
                             class="alert alert-danger border-0 rounded-4 d-flex align-items-start gap-3 mb-4 shadow-sm">
                             <i class="fa-solid fa-circle-exclamation fs-4 mt-1"></i>
                             <div>
-                                <div class="fw-semibold">Não foi possível validar</div>
+                                <div class="fw-semibold">Não Foi Possível Realizar a Validação</div>
                                 <div class="small">{{ erro }}</div>
                             </div>
                         </div>
@@ -141,7 +147,7 @@
                         <!-- Input State -->
                         <form onsubmit="handleValidation(event)" class="validate-form" novalidate>
                             <div class="mb-3">
-                                <label for="inputHash" class="form-label fw-bold mb-2">Código de autenticação</label>
+                                <label for="inputHash" class="form-label fw-bold mb-2">Código de Autenticação do Documento</label>
 
                                 <div class="input-group input-group-lg">
                                     <span class="input-group-text bg-white border-end-0">
@@ -173,34 +179,35 @@
 
                     </div>
                 </div>
-
-                <!-- Footer -->
-                <div class="text-center mt-4">
-                    <p class="text-muted small mb-0">
-                        Validação pública de certificados.
-                    </p>
-                </div>
-
             </div>
         </div>
     </div>
 </div>
 
 <style>
+    main.py-4 {
+        padding-top: 0 !important;
+    }
+
     /* Page scope */
     .page-validate {
+        padding-top: 0 !important;
+        padding-bottom: 1.5rem;
         background:
             radial-gradient(900px 400px at 20% -10%, rgba(13, 110, 253, .12), transparent 60%),
             radial-gradient(900px 400px at 80% 0%, rgba(13, 110, 253, .10), transparent 55%);
     }
 
-    .back-link {
-        color: rgba(33, 37, 41, .75);
-        transition: color .15s ease;
+    @media (min-width: 768px) {
+        .page-validate {
+            padding-bottom: 3rem;
+        }
     }
 
-    .back-link:hover {
-        color: var(--bs-primary);
+    .validation-public-navbar {
+        top: 0;
+        z-index: 1020;
+        margin-bottom: 1.25rem;
     }
 
     .validate-card {
@@ -373,6 +380,27 @@
     .validate-form .form-control {
         border-radius: 0 999px 999px 0;
         letter-spacing: .18em;
+    }
+
+    .btn-outline-inicio {
+        background-color: transparent;
+        border: 1px solid #044d84 !important;
+        color: #044d84 !important;
+    }
+
+    .btn-outline-inicio i {
+        color: #044d84 !important;
+    }
+
+    /* Efeito Hover */
+    .btn-outline-inicio:hover {
+        background-color: #044d84 !important;
+        color: white !important;
+        border-color: #044d84 !important;
+    }
+
+    .btn-outline-inicio:hover i {
+        color: white !important;
     }
 </style>
 {% endblock %}

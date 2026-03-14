@@ -1,15 +1,89 @@
 {% extends 'base.html' %}
 
+{% block head_styles %}
+<style>
+    .btn-action {
+        padding: 0.6rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-dashboard {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-dashboard:hover {
+        background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+    }
+
+    .event-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .hero-event-date {
+        min-width: 180px;
+        background: linear-gradient(160deg, #044d84 0%, #033e68 100%) !important;
+    }
+
+    .event-actions {
+        gap: 0.5rem;
+    }
+
+    .event-actions .btn {
+        border-radius: 999px;
+    }
+
+    .bg-modal-certificates {
+        background: linear-gradient(135deg, #044d84 0%, #033e68 100%) !important;
+    }
+
+    @media (max-width: 576px) {
+        .event-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .event-actions {
+            flex-direction: column;
+        }
+
+        .event-actions .btn {
+            width: 100%;
+        }
+
+        .hero-event-date {
+            min-width: 100%;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4 fade-in-up">
+<div class="container py-3 py-md-4 fade-in-up">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-5 px-2">
-        <div>
-            <h2 class="fw-bold m-0"><i class="fa-solid fa-award text-primary me-2"></i>Minhas Participações</h2>
-            <p class="text-muted mb-0">Confira os eventos que você já participou e emita seus certificados.</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="/" class="btn btn-light border"><i class="fa-solid fa-house me-1"></i> Dashboard</a>
+    <div class="glass-panel p-3 p-md-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+        <div class="event-header">
+            <div>
+                <h3 class="fw-bold text-gradient m-0"><i class="fa-solid fa-award text-primary me-2"></i>Minhas Participações</h3>
+                <p class="text-muted mb-0 mt-1">Consulte os eventos com participação confirmada e emita seus certificados.</p>
+            </div>
+            <div>
+                <a href="/" class="btn btn-action btn-dashboard shadow-sm"><i class="fa-solid fa-house me-2"></i>Painel Principal</a>
+            </div>
         </div>
     </div>
 
@@ -29,8 +103,8 @@
 <!-- Modal Certificates for Event -->
 <div class="modal fade" id="modalCertificadosEvento" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-dark text-white">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-0 bg-modal-certificates text-white">
                 <h5 class="modal-title fw-bold"><i class="fa-solid fa-certificate me-2"></i>Certificados Disponíveis</h5>
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -60,7 +134,7 @@
                 <div class="col-12 text-center py-5 px-4 glass-panel border-dashed">
                     <i class="fa-solid fa-graduation-cap fa-3x mb-3 text-slate-200"></i>
                     <h4 class="fw-bold">Nenhuma participação confirmada</h4>
-                    <p class="text-muted">Participe de eventos e valide sua presença via QR Code para aparecer aqui.</p>
+                    <p class="text-muted">Participe de eventos e valide sua presença por código QR para aparecer aqui.</p>
                     <a href="/" class="btn btn-primary rounded-pill px-4 mt-2">Ver Próximos Eventos</a>
                 </div>`;
             return;
@@ -70,7 +144,7 @@
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeInUp">
                     <div class="glass-panel p-0 overflow-hidden border-0 shadow-sm bg-white d-flex flex-column flex-md-row">
-                        <div class="p-4 bg-primary text-white d-flex flex-column justify-content-center align-items-center text-center" style="min-width: 180px;">
+                        <div class="p-4 hero-event-date text-white d-flex flex-column justify-content-center align-items-center text-center">
                             <div class="small opacity-75 text-uppercase fw-bold letter-spacing-1 mb-1">DATA</div>
                             <h4 class="fw-bold m-0">${ev.data.split('-').reverse().slice(0,2).join('/')}</h4>
                             <div class="small opacity-75 fw-bold">${ev.data.split('-')[0]}</div>
@@ -84,7 +158,7 @@
                                 ${ev.curso ? `<div class="text-primary small fw-bold mb-3"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</div>` : ''}
                                 <p class="text-muted mb-0 small">Você conquistou <strong>${ev.horas} horas</strong> acadêmicas neste evento.</p>
                             </div>
-                            <div class="d-flex gap-2 mt-4 pt-3 border-top">
+                            <div class="d-flex event-actions mt-4 pt-3 border-top">
                                 ${ev.cert_disponivel ? 
                                 `<button onclick="abrirCertificadosEvento(${ev.id})" class="btn btn-primary rounded-pill px-4 shadow-sm" title="Emitir certificados">
                                     <i class="fa-solid fa-stamp me-2"></i> Emitir Certificados

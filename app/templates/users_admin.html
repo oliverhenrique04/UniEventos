@@ -1,71 +1,278 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="container py-4 fade-in-up">
+{% block head_styles %}
+<style>
+    /* Mobile-first responsive design */
+    .btn-action-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold text-gradient mb-0">Gerenciar Usuários</h2>
-            <p class="text-muted small">Controle total sobre participantes, professores e admins.</p>
+    .btn-action {
+        padding: 0.6rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-action i {
+        font-size: 1rem;
+    }
+
+    .btn-import-csv {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-import-csv:hover {
+        background: linear-gradient(135deg, #0b5fb6 0%, #0a58ca 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+        color: white;
+    }
+
+    .btn-import-xlsx {
+        background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-import-xlsx:hover {
+        background: linear-gradient(135deg, #157347 0%, #146c43 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+        color: white;
+    }
+
+    .btn-permissions {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-permissions:hover {
+        background: linear-gradient(135deg, #6938a9 0%, #5a32a3 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+        color: white;
+    }
+
+    .btn-new-user {
+        background: linear-gradient(135deg, #044d84 0%, #044d84 100%);
+        border: none;
+        color: white;
+        flex: 1;
+    }
+
+    .btn-new-user:hover {
+        background: linear-gradient(135deg, #044d84 0%, #033e68 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+        color: white;
+    }
+
+    /* Classes para padronização dos Headers dos Modais com os Botões */
+
+    .bg-modal-import-csv {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%) !important;
+    }
+
+    .bg-modal-permissions {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%) !important;
+    }
+
+    .bg-modal-new-user {
+        background: linear-gradient(135deg, #044d84 0%, #044d84 100%) !important;
+    }
+    .btn-inscricao-manual {
+        background-color: transparent;
+        border: 1px solid #044d84 !important;
+        color: #044d84 !important;
+    }
+
+    .btn-inscricao-manual i {
+        color: #044d84 !important;
+    }
+
+    /* Efeito Hover */
+    .btn-inscricao-manual:hover {
+        background-color: #044d84 !important;
+        color: white !important;
+        border-color: #044d84 !important;
+    }
+
+    .btn-inscricao-manual:hover i {
+        color: white !important;
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 576px) {
+        .btn-action {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .page-header-mobile {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .page-header-mobile h3 {
+            text-align: center;
+        }
+
+        .glass-panel {
+            border-radius: 1rem;
+        }
+
+        .table-responsive {
+            border-radius: 1rem;
+        }
+    }
+
+    @media (min-width: 577px) and (max-width: 992px) {
+        .btn-action {
+            flex: 1 1 calc(50% - 0.25rem);
+        }
+    }
+
+    @media (min-width: 993px) {
+        .btn-action {
+            flex: 0 0 auto;
+        }
+    }
+
+    /* Table hover effect */
+    .hover-bg-light:hover {
+        background-color: rgba(255, 0, 0, 0.02) !important;
+    }
+
+    /* Mobile table card view for very small screens */
+    @media (max-width: 575px) {
+        .table-responsive {
+            font-size: 0.875rem;
+        }
+
+        .table thead {
+            display: none;
+        }
+
+        .table tbody tr {
+            display: block;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: white;
+        }
+
+        .table tbody tr td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border: none;
+        }
+
+        .table tbody tr td:before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: #6c757d;
+            margin-right: 1rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+    }
+
+    /* Smooth transitions */
+    .btn-action,
+    .table tbody tr,
+    .modal-content {
+        transition: all 0.2s ease-in-out;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3 py-md-4 fade-in-up">
+
+    <div class="page-header-mobile d-flex flex-column flex-lg-row justify-content-between align-items-center mb-4 mb-lg-4">
+        <div class="mb-3 mb-lg-0">
+            <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-users-gear text-primary me-2"></i>Gestão de Usuários</h3>
         </div>
-        <div class="btn-group">
-            <button onclick="abrirModalImportar()" class="btn btn-outline-primary shadow-sm">
+        <div class="btn-action-group">
+            <button onclick="abrirModalImportar()" class="btn btn-action btn-import-csv shadow-sm">
                 <i class="fa-solid fa-file-csv me-2"></i>Importar CSV
             </button>
-            <button onclick="abrirModalImportarXlsx()" class="btn btn-outline-primary shadow-sm">
-                <i class="fa-solid fa-file-excel me-2"></i>Importar XLSX Alunos
+            <button onclick="abrirModalImportarXlsx()" class="btn btn-action btn-import-xlsx shadow-sm">
+                <i class="fa-solid fa-file-excel me-2"></i>Importar XLSX
             </button>
-            <button onclick="abrirModalPermissoes()" class="btn btn-outline-primary shadow-sm">
-                <i class="fa-solid fa-users-gear me-2"></i>Permissões em Lote
+            <button onclick="abrirModalPermissoes()" class="btn btn-action btn-permissions shadow-sm">
+                <i class="fa-solid fa-users-gear me-2"></i>Permissões
             </button>
-            <button onclick="abrirModalNovoUsuario()" class="btn btn-primary shadow-sm">
+            <button onclick="abrirModalNovoUsuario()" class="btn btn-action btn-new-user shadow-sm">
                 <i class="fa-solid fa-plus me-2"></i>Novo Usuário
             </button>
         </div>
     </div>
 
     <!-- FILTERS -->
-    <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary">
-        <h6 class="fw-bold mb-3 text-uppercase small text-muted">Filtros Avançados</h6>
-        <div class="row g-3">
-            <div class="col-md-2">
-                <label class="small fw-bold">RA</label>
+    <div class="glass-panel p-3 p-md-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+        <h6 class="fw-bold mb-3 text-uppercase small text-muted d-flex align-items-center">
+            <i class="fa-solid fa-filter me-2"></i>Filtrar Usuários
+        </h6>
+        <div class="row g-2 g-md-3">
+            <div class="col-12 col-sm-6 col-md-2">
+                <label class="small fw-bold mb-1">RA</label>
                 <input type="text" id="filtRa" class="form-control form-control-sm" placeholder="Buscar RA...">
             </div>
-            <div class="col-md-2">
-                <label class="small fw-bold">CPF</label>
+            <div class="col-12 col-sm-6 col-md-2">
+                <label class="small fw-bold mb-1">CPF</label>
                 <input type="text" id="filtCpf" class="form-control form-control-sm" placeholder="000.000.000-00">
             </div>
-            <div class="col-md-3">
-                <label class="small fw-bold">Nome / E-mail</label>
+            <div class="col-12 col-md-3">
+                <label class="small fw-bold mb-1">Nome / E-mail</label>
                 <input type="text" id="filtBusca" class="form-control form-control-sm" placeholder="Nome ou e-mail...">
             </div>
-            <div class="col-md-3">
-                <label class="small fw-bold">Curso</label>
+            <div class="col-12 col-md-3">
+                <label class="small fw-bold mb-1">Curso</label>
                 <select id="filtCurso" class="form-select form-select-sm">
                     <option value="">-- Todos os Cursos --</option>
                     <!-- Populated via JS -->
                 </select>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button onclick="carregarUsuarios(1)" class="btn btn-primary btn-sm w-100">
-                    <i class="fa-solid fa-magnifying-glass me-1"></i> Filtrar
+            <div class="col-12 col-md-2 d-flex align-items-end">
+                <button onclick="carregarUsuarios(1)" class="btn btn-primary w-100 shadow-sm" style="padding: 0.6rem 1rem; font-weight: 600;">
+                    <i class="fa-solid fa-magnifying-glass me-1"></i> <span class="d-none d-sm-inline">Filtrar</span>
                 </button>
             </div>
         </div>
     </div>
 
     <!-- TABLE -->
-    <div class="glass-panel p-0 overflow-hidden mb-4">
-        <div class="table-responsive">
+    <div class="glass-panel p-0 overflow-hidden mb-4 shadow-sm border">
+        <div class="table-responsive rounded">
             <table class="table table-hover align-middle mb-0">
                 <thead class="bg-light">
                     <tr>
-                        <th class="ps-4">Identificação</th>
-                        <th>RA / CPF</th>
-                        <th>Curso</th>
+                        <th class="ps-3 ps-md-4">Identificação</th>
+                        <th class="d-none d-sm-table-cell">RA / CPF</th>
+                        <th class="d-none d-md-table-cell">Curso</th>
                         <th>Cargo</th>
-                        <th class="text-end pe-4">Ações</th>
+                        <th class="text-end pe-3 pe-md-4">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabelaUsuarios">
@@ -76,61 +283,54 @@
     </div>
 
     <!-- PAGINATION -->
-    <nav>
-        <ul class="pagination justify-content-center" id="paginacao"></ul>
+    <nav aria-label="Paginação">
+        <ul class="pagination justify-content-center pagination-sm" id="paginacao"></ul>
     </nav>
 </div>
 
 <!-- Modal CRUD User -->
 <div class="modal fade" id="modalUsuario" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold" id="modalTitulo">Usuário</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-modal-new-user text-white rounded-top-4">
+                <h5 class="modal-title fw-bold" id="modalTitulo">
+                    <i class="fa-solid fa-user-gear me-2"></i>Usuário
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="formUsuario">
                     <input type="hidden" id="userId">
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="small fw-bold">Login (Username)</label>
-                            <input type="text" id="uUsername" class="form-control" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="small fw-bold">Senha (Opcional)</label>
-                            <input type="password" id="uPassword" class="form-control" placeholder="****">
-                        </div>
+                    <input type="hidden" id="uUsername">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Nome Completo</label>
+                        <input type="text" id="uNome" class="form-control rounded-3" required>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold">Nome Completo</label>
-                        <input type="text" id="uNome" class="form-control" required>
+                        <label class="form-label small fw-bold text-muted">E-mail</label>
+                        <input type="email" id="uEmail" class="form-control rounded-3" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold">E-mail</label>
-                        <input type="email" id="uEmail" class="form-control" required>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="small fw-bold">RA</label>
-                            <input type="text" id="uRa" class="form-control">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label small fw-bold text-muted">RA</label>
+                            <input type="text" id="uRa" class="form-control rounded-3">
                         </div>
-                        <div class="col-6">
-                            <label class="small fw-bold">CPF</label>
-                            <input type="text" id="uCpf" class="form-control" required>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label small fw-bold text-muted">CPF</label>
+                            <input type="text" id="uCpf" class="form-control rounded-3" required>
                         </div>
                     </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-8">
-                            <label class="small fw-bold">Curso</label>
-                            <select id="uCurso" class="form-select">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-sm-8">
+                            <label class="form-label small fw-bold text-muted">Curso</label>
+                            <select id="uCurso" class="form-select rounded-3">
                                 <option value="">-- Selecione --</option>
                                 <!-- Populated via JS -->
                             </select>
                         </div>
-                        <div class="col-4">
-                            <label class="small fw-bold">Perfil</label>
-                            <select id="uRole" class="form-select">
+                        <div class="col-12 col-sm-4">
+                            <label class="form-label small fw-bold text-muted">Perfil</label>
+                            <select id="uRole" class="form-select rounded-3">
                                 <option value="participante">Participante</option>
                                 <option value="professor">Professor</option>
                                 <option value="coordenador">Coordenador</option>
@@ -139,17 +339,28 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-check form-switch bg-light p-2 rounded ps-5">
-                        <input class="form-check-input" type="checkbox" id="uCanCreate">
-                        <label class="form-check-label small fw-bold" for="uCanCreate">Permitir criar eventos</label>
-                        <div class="form-text x-small">Habilita o usuário a criar e gerenciar seus próprios eventos.</div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Senha (Opcional)</label>
+                        <input type="password" id="uPassword" class="form-control rounded-3" placeholder="****">
+                        <div class="form-text">Deixe em branco para manter a senha atual (edição) ou usar o padrão automático (novo usuário).</div>
+                    </div>
+                    <div class="card bg-light border-0 p-3 rounded-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="uCanCreate">
+                            <label class="form-check-label small fw-bold" for="uCanCreate">Permitir criar eventos</label>
+                            <div class="form-text">Habilita o usuário a criar e gerenciar seus próprios eventos.</div>
+                        </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger me-auto d-none" id="btnExcluir" onclick="confirmarExcluir()">Excluir</button>
-                <button onclick="salvarUsuario()" class="btn btn-primary px-4">Salvar Dados</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger rounded-3 me-auto d-none" id="btnExcluir" onclick="confirmarExcluir()">
+                    <i class="fa-solid fa-trash me-1"></i>Excluir
+                </button>
+                <button onclick="salvarUsuario()" class="btn btn-primary rounded-3 px-4">
+                    <i class="fa-solid fa-save me-1"></i>Salvar Dados
+                </button>
             </div>
         </div>
     </div>
@@ -158,18 +369,27 @@
 <!-- Modal Import CSV -->
 <div class="modal fade" id="modalImportCsv" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold">Importar Usuários (CSV)</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-modal-import-csv border-0 bg-primary text-white rounded-top-4">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-solid fa-file-csv me-2"></i>Importar Usuários (CSV)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <p class="small text-muted">Arquivo CSV deve conter cabeçalho: <code>username,email,nome,cpf,role,curso_nome,can_create_events</code></p>
-                <input type="file" id="fileCsv" class="form-control" accept=".csv">
+            <div class="modal-body p-4">
+                <div class="alert alert-info rounded-3 border-0" role="alert">
+                    <i class="fa-solid fa-circle-info me-2"></i>
+                    <strong>Estrutura do CSV:</strong><br>
+                    <code class="small mt-1 d-block bg-white p-2 rounded-3">username,email,nome,cpf,role,curso_nome,can_create_events</code>
+                </div>
+                <label class="form-label small fw-bold text-muted">Selecione o arquivo CSV</label>
+                <input type="file" id="fileCsv" class="form-control rounded-3" accept=".csv">
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button onclick="enviarCsv()" class="btn btn-primary px-4">Importar</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button onclick="enviarCsv()" class="btn btn-primary rounded-3 px-4">
+                    <i class="fa-solid fa-upload me-1"></i>Importar
+                </button>
             </div>
         </div>
     </div>
@@ -178,86 +398,134 @@
 <!-- Modal Import XLSX -->
 <div class="modal fade" id="modalImportXlsx" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold">Importar Alunos (XLSX)</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-success text-white rounded-top-4">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-solid fa-file-excel me-2"></i>Importar Alunos (XLSX)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="glass-panel p-3 border-top border-2 border-primary mb-3">
-                    <p class="small text-muted mb-2">Estrutura esperada: ALUNO_NOME, CURSO, EMAIL, CPF e RA.</p>
-                    <div class="row g-2 align-items-center">
-                        <div class="col-md-9">
-                            <input type="file" id="fileXlsx" class="form-control" accept=".xlsx">
+            <div class="modal-body p-4">
+                <div class="card border-0 shadow-sm rounded-3 mb-4">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="alert alert-success border-0 rounded-3 mb-3" role="alert">
+                            <i class="fa-solid fa-circle-check me-2"></i>
+                            <strong>Estrutura esperada:</strong> ALUNO_NOME, CURSO, EMAIL, CPF e RA.
                         </div>
-                        <div class="col-md-3 d-grid">
-                            <button id="btnStartImportXlsx" onclick="enviarXlsx()" class="btn btn-primary">
-                                <i class="fa-solid fa-upload me-2"></i>Iniciar Importação
-                            </button>
+                        <div class="row g-3 align-items-center">
+                            <div class="col-12 col-md-9">
+                                <label class="form-label small fw-bold text-muted">Selecione o arquivo Excel</label>
+                                <input type="file" id="fileXlsx" class="form-control form-control-lg rounded-3" accept=".xlsx">
+                            </div>
+                            <div class="col-12 col-md-3 d-grid">
+                                <button id="btnStartImportXlsx" onclick="enviarXlsx()" class="btn btn-success btn-lg rounded-3 shadow-sm">
+                                    <i class="fa-solid fa-upload me-2"></i>Iniciar Importação
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="row g-2 mb-3" id="importResumoCards">
-                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Total</div><div class="fw-bold" id="impTotal">0</div></div></div>
-                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Processadas</div><div class="fw-bold" id="impProcessadas">0</div></div></div>
-                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Criadas</div><div class="fw-bold text-success" id="impCriadas">0</div></div></div>
-                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Atualizadas</div><div class="fw-bold text-primary" id="impAtualizadas">0</div></div></div>
-                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Sem alteração</div><div class="fw-bold text-secondary" id="impInalteradas">0</div></div></div>
-                    <div class="col-6 col-md-2"><div class="bg-light rounded p-2 text-center"><div class="x-small text-muted">Erros</div><div class="fw-bold text-danger" id="impErros">0</div></div></div>
+                <!-- Stats Cards -->
+                <div class="row g-2 mb-4" id="importResumoCards">
+                    <div class="col-6 col-md-2">
+                        <div class="card border-0 shadow-sm rounded-3 p-3 text-center h-100 bg-primary bg-opacity-10">
+                            <div class="small text-muted fw-bold text-uppercase">Total</div>
+                            <div class="display-6 fw-bold text-primary" id="impTotal">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card border-0 shadow-sm rounded-3 p-3 text-center h-100 bg-info bg-opacity-10">
+                            <div class="small text-muted fw-bold text-uppercase">Processadas</div>
+                            <div class="display-6 fw-bold text-info" id="impProcessadas">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card border-0 shadow-sm rounded-3 p-3 text-center h-100 bg-success bg-opacity-10">
+                            <div class="small text-muted fw-bold text-uppercase">Criadas</div>
+                            <div class="display-6 fw-bold text-success" id="impCriadas">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card border-0 shadow-sm rounded-3 p-3 text-center h-100 bg-warning bg-opacity-10">
+                            <div class="small text-muted fw-bold text-uppercase">Atualizadas</div>
+                            <div class="display-6 fw-bold text-warning" id="impAtualizadas">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card border-0 shadow-sm rounded-3 p-3 text-center h-100 bg-secondary bg-opacity-10">
+                            <div class="small text-muted fw-bold text-uppercase">Sem alteração</div>
+                            <div class="display-6 fw-bold text-secondary" id="impInalteradas">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card border-0 shadow-sm rounded-3 p-3 text-center h-100 bg-danger bg-opacity-10">
+                            <div class="small text-muted fw-bold text-uppercase">Erros</div>
+                            <div class="display-6 fw-bold text-danger" id="impErros">0</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="small mb-2"><span class="badge bg-info text-dark" id="impStatusBadge">Aguardando arquivo</span> <span class="text-muted" id="impStatusMessage"></span></div>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-info rounded-3 px-3 py-2" id="impStatusBadge">Aguardando arquivo</span>
+                    <span class="text-muted small" id="impStatusMessage"></span>
+                </div>
 
-                <div class="row g-2 align-items-end mb-2">
-                    <div class="col-md-3">
-                        <label class="small fw-bold">Filtrar por</label>
-                        <select id="impFilterField" class="form-select form-select-sm" onchange="aplicarFiltroImportacao()">
-                            <option value="all">Todos os campos</option>
-                            <option value="row_number">Linha</option>
-                            <option value="nome">Aluno</option>
-                            <option value="cpf">CPF</option>
-                            <option value="curso">Curso</option>
-                            <option value="ra">RA</option>
-                            <option value="status">Status</option>
-                            <option value="message">Mensagem</option>
-                        </select>
-                    </div>
-                    <div class="col-md-7">
-                        <label class="small fw-bold">Busca</label>
-                        <input type="text" id="impFilterQuery" class="form-control form-control-sm" placeholder="Digite para filtrar a tabela..." oninput="aplicarFiltroImportacao()">
-                    </div>
-                    <div class="col-md-2 d-grid">
-                        <button class="btn btn-light btn-sm border" onclick="limparFiltroImportacao()">
-                            <i class="fa-solid fa-eraser me-1"></i>Limpar
-                        </button>
+                <!-- Filters -->
+                <div class="card border-0 shadow-sm rounded-3 mb-3">
+                    <div class="card-body p-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-12 col-md-3">
+                                <label class="form-label small fw-bold text-muted">Filtrar por</label>
+                                <select id="impFilterField" class="form-select form-select-sm rounded-3" onchange="aplicarFiltroImportacao()">
+                                    <option value="all">Todos os campos</option>
+                                    <option value="row_number">Linha</option>
+                                    <option value="nome">Aluno</option>
+                                    <option value="cpf">CPF</option>
+                                    <option value="curso">Curso</option>
+                                    <option value="ra">RA</option>
+                                    <option value="status">Status</option>
+                                    <option value="message">Mensagem</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <label class="form-label small fw-bold text-muted">Busca</label>
+                                <input type="text" id="impFilterQuery" class="form-control form-control-sm rounded-3" placeholder="Digite para filtrar..." oninput="aplicarFiltroImportacao()">
+                            </div>
+                            <div class="col-12 col-md-4 d-grid">
+                                <button class="btn btn-light btn-sm rounded-3 border" onclick="limparFiltroImportacao()">
+                                    <i class="fa-solid fa-eraser me-1"></i>Limpar Filtro
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="table-responsive border rounded">
+                <!-- Results Table -->
+                <div class="table-responsive rounded-3 border shadow-sm">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-3">Linha</th>
+                                <th class="ps-3 rounded-start-3">Linha</th>
                                 <th>Aluno</th>
                                 <th>CPF</th>
                                 <th>Curso</th>
                                 <th>RA</th>
                                 <th>Status</th>
-                                <th class="pe-3">Mensagem</th>
+                                <th class="pe-3 rounded-end-3">Mensagem</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaImportXlsx">
-                            <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma linha processada.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-5">Nenhuma linha processada.</td></tr>
                         </tbody>
                     </table>
                 </div>
-                <nav class="mt-2">
+                <nav class="mt-3">
                     <ul class="pagination pagination-sm justify-content-end mb-0" id="paginacaoImportXlsx"></ul>
                 </nav>
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
@@ -266,27 +534,39 @@
 <!-- Modal Bulk Permissions -->
 <div class="modal fade" id="modalBulkPermissions" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold">Permissões em Lote</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-modal-permissions border-0 text-white rounded-top-4">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-solid fa-users-gear me-2"></i>Permissões em Lote
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <p class="small text-muted">Atualizar permissão de criação de eventos para todos os <strong>professores</strong> de um curso.</p>
-                <div class="mb-3">
-                    <label class="small fw-bold">Selecione o Curso</label>
-                    <select id="bulkCurso" class="form-select">
-                        <option value="">-- Selecione --</option>
+            <div class="modal-body p-4">
+                <div class="alert alert-info border-0 rounded-3 mb-4" role="alert">
+                    <i class="fa-solid fa-circle-info me-2"></i>
+                    <strong>Atenção:</strong> Esta ação atualizará a permissão de criação de eventos para todos os <strong>professores</strong> do curso selecionado.
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted">Selecione o Curso</label>
+                    <select id="bulkCurso" class="form-select form-select-lg rounded-3">
+                        <option value="">-- Selecione o Curso --</option>
                     </select>
                 </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="bulkCanCreate">
-                    <label class="form-check-label small fw-bold" for="bulkCanCreate">Permitir criar eventos</label>
+                <div class="card bg-light border-0 p-4 rounded-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input fs-6" type="checkbox" id="bulkCanCreate">
+                        <label class="form-check-label fw-bold" for="bulkCanCreate">
+                            <i class="fa-solid fa-star text-warning me-2"></i>Permitir criar eventos
+                        </label>
+                        <div class="form-text mt-2">Habilita os professores selecionados a criar e gerenciar seus próprios eventos.</div>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button onclick="aplicarPermissoesLote()" class="btn btn-primary px-4">Aplicar</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button onclick="aplicarPermissoesLote()" class="btn btn-primary rounded-3 px-4">
+                    <i class="fa-solid fa-check me-1"></i>Aplicar Permissões
+                </button>
             </div>
         </div>
     </div>
@@ -295,32 +575,39 @@
 <!-- Modal Manual Enrollment -->
 <div class="modal fade" id="modalInscricaoManual" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold">Inscrição Manual em Atividade</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-modal-new-user border-0 text-white rounded-top-4">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-solid fa-user-plus me-2"></i>Inscrição Manual em Atividade
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <p class="small text-muted">Inscreva o participante <strong><span id="labelNomeUser"></span></strong> em uma atividade específica.</p>
+            <div class="modal-body p-4">
+                <div class="alert alert-success border-0 rounded-3 mb-4" role="alert">
+                    <i class="fa-solid fa-circle-info me-2"></i>
+                    Inscreva o participante <strong><span id="labelNomeUser"></span></strong> em uma atividade específica.
+                </div>
                 <input type="hidden" id="insCpf">
                 
-                <div class="mb-3">
-                    <label class="small fw-bold text-muted">Selecione o Evento</label>
-                    <select id="selEvento" class="form-select" onchange="carregarAtividadesDoEvento(this.value)">
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted">Selecione o Evento</label>
+                    <select id="selEvento" class="form-select form-select-lg rounded-3" onchange="carregarAtividadesDoEvento(this.value)">
                         <option value="">-- Selecione o Evento --</option>
                     </select>
                 </div>
                 
                 <div class="mb-3">
-                    <label class="small fw-bold text-muted">Selecione a Atividade</label>
-                    <select id="selAtividade" class="form-select" disabled>
+                    <label class="form-label small fw-bold text-muted">Selecione a Atividade</label>
+                    <select id="selAtividade" class="form-select form-select-lg rounded-3" disabled>
                         <option value="">-- Selecione a Atividade --</option>
                     </select>
                 </div>
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
-                <button onclick="realizarInscricaoManual()" class="btn btn-primary px-4">Confirmar Inscrição</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Fechar</button>
+                <button onclick="realizarInscricaoManual()" class="btn btn-success rounded-3 px-4">
+                    <i class="fa-solid fa-check me-1"></i>Confirmar Inscrição
+                </button>
             </div>
         </div>
     </div>
@@ -343,6 +630,15 @@
         carregarUsuarios(1);
         carregarEventosParaInscricao();
 
+        const cpfInput = document.getElementById('uCpf');
+        if (cpfInput) {
+            cpfInput.addEventListener('input', () => {
+                if (!MODO_EDICAO) {
+                    document.getElementById('uUsername').value = gerarUsernamePorCpf(cpfInput.value);
+                }
+            });
+        }
+
         const importModalEl = document.getElementById('modalImportXlsx');
         importModalEl.addEventListener('hidden.bs.modal', () => {
             if (IMPORT_POLL_TIMER) {
@@ -351,6 +647,10 @@
             }
         });
     });
+
+    function gerarUsernamePorCpf(cpf) {
+        return String(cpf || '').replace(/\D/g, '');
+    }
 
     async function carregarCursosSelect() {
         const res = await fetch('/api/courses/');
@@ -398,36 +698,40 @@
         data.items.forEach(u => {
             let roleBadge = '';
             switch(u.role) {
-                case 'admin': roleBadge = '<span class="badge bg-danger">Admin</span>'; break;
-                case 'professor': roleBadge = '<span class="badge bg-warning text-dark">Professor</span>'; break;
-                case 'coordenador': roleBadge = '<span class="badge bg-primary">Coordenador</span>'; break;
-                case 'extensao': roleBadge = '<span class="badge bg-info text-dark">Extensão</span>'; break;
-                default: roleBadge = '<span class="badge bg-success bg-slate-200 text-slate-700">Participante</span>';
+                case 'admin': roleBadge = '<span class="badge bg-danger rounded-2 px-2 py-1">Admin</span>'; break;
+                case 'professor': roleBadge = '<span class="badge bg-warning text-dark rounded-2 px-2 py-1">Professor</span>'; break;
+                case 'coordenador': roleBadge = '<span class="badge bg-primary rounded-2 px-2 py-1">Coordenador</span>'; break;
+                case 'extensao': roleBadge = '<span class="badge bg-info text-dark rounded-2 px-2 py-1">Extensão</span>'; break;
+                default: roleBadge = '<span class="badge bg-success bg-opacity-75 rounded-2 px-2 py-1">Participante</span>';
             }
 
             if(u.can_create_events) {
-                roleBadge += ' <span class="badge bg-info text-dark" title="Pode criar eventos"><i class="fa-solid fa-star"></i></span>';
+                roleBadge += ' <span class="badge bg-info text-dark rounded-2 px-2 py-1" title="Pode criar eventos"><i class="fa-solid fa-star"></i></span>';
             }
 
             tbody.innerHTML += `
-                <tr class="animate__animated animate__fadeIn">
-                    <td class="ps-4">
-                        <div class="fw-bold text-dark">${u.nome}</div>
-                        <div class="text-muted x-small">${u.email}</div>
+                <tr class="animate__animated animate__fadeIn hover-bg-light">
+                    <td class="ps-3 ps-md-4">
+                        <div class="d-flex align-items-center">
+                            <div>
+                                <div class="fw-bold text-dark">${u.nome}</div>
+                                <div class="text-muted small">${u.email}</div>
+                            </div>
+                        </div>
                     </td>
-                    <td>
-                        <div class="text-dark small">RA: ${u.ra || 'N/A'}</div>
-                        <div class="text-muted x-small">CPF: ${u.cpf}</div>
+                    <td class="d-none d-sm-table-cell">
+                        <div class="text-dark small"><i class="fa-solid fa-hashtag text-muted me-1"></i>${u.ra || 'N/A'}</div>
+                        <div class="text-muted small"><i class="fa-solid fa-id-card text-muted me-1"></i>${u.cpf}</div>
                     </td>
-                    <td><small>${u.curso || 'Não informado'}</small></td>
+                    <td class="d-none d-md-table-cell"><span class="badge bg-light text-dark border rounded-2 px-2 py-1">${u.curso || 'Não informado'}</span></td>
                     <td>${roleBadge}</td>
-                    <td class="text-end pe-4">
-                        <div class="btn-group">
-                            <button class="btn btn-xs btn-outline-primary" onclick="abrirInscricaoManual('${u.cpf}', '${u.nome}')" title="Inscrever Manualmente">
+                    <td class="text-end pe-3 pe-md-4">
+                        <div class="btn-group shadow-sm" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-start-3 border-end-0" onclick="abrirInscricaoManual('${u.cpf}', '${u.nome}')" title="Inscrever Manualmente">
                                 <i class="fa-solid fa-user-plus"></i>
                             </button>
-                            <button class="btn btn-xs btn-light border" onclick="abrirModalEditarUsuario(${JSON.stringify(u).replace(/"/g, '&quot;')})" title="Editar">
-                                <i class="fa-solid fa-pen"></i>
+                            <button type="button" class="btn btn-sm btn-inscricao-manual rounded-end-3 border-start-0" onclick="abrirModalEditarUsuario(${JSON.stringify(u).replace(/"/g, '&quot;')})" title="Editar">
+                                <i class="fa-solid fa-pen text-primary"></i>
                             </button>
                         </div>
                     </td>
@@ -486,7 +790,7 @@
         document.getElementById('userId').value = '';
         document.getElementById('modalTitulo').innerText = 'Novo Usuário';
         document.getElementById('btnExcluir').classList.add('d-none');
-        document.getElementById('uUsername').disabled = false;
+        document.getElementById('uUsername').value = '';
         new bootstrap.Modal(document.getElementById('modalUsuario')).show();
     }
 
@@ -494,7 +798,6 @@
         MODO_EDICAO = true;
         document.getElementById('userId').value = u.username;
         document.getElementById('uUsername').value = u.username;
-        document.getElementById('uUsername').disabled = true;
         document.getElementById('uNome').value = u.nome;
         document.getElementById('uEmail').value = u.email;
         document.getElementById('uRa').value = u.ra || '';
@@ -508,18 +811,26 @@
     }
 
     async function salvarUsuario() {
+        const cpf = document.getElementById('uCpf').value;
+        const usernameGerado = gerarUsernamePorCpf(cpf);
+
         const data = {
-            username: document.getElementById('uUsername').value,
+            username: MODO_EDICAO ? document.getElementById('uUsername').value : usernameGerado,
             password: document.getElementById('uPassword').value,
             nome: document.getElementById('uNome').value,
             email: document.getElementById('uEmail').value,
             ra: document.getElementById('uRa').value,
-            cpf: document.getElementById('uCpf').value,
+            cpf: cpf,
             curso: document.getElementById('uCurso').value,
             role: document.getElementById('uRole').value,
             can_create_events: document.getElementById('uCanCreate').checked,
             username_alvo: document.getElementById('userId').value
         };
+
+        if (!MODO_EDICAO && !data.username) {
+            Swal.fire('Atenção', 'Informe um CPF válido para gerar o identificador interno.', 'warning');
+            return;
+        }
 
         const url = MODO_EDICAO ? '/api/editar_usuario' : '/api/criar_usuario';
         const res = await fetch(url, {

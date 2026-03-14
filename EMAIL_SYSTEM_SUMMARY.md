@@ -4,11 +4,11 @@
 
 ### 1. **Templates de E-mail Criados**
 
-| Template | Arquivo | Uso |
-|----------|---------|-----|
-| **Boas-vindas** | `welcome.html` | Novo usuário se cadastra |
-| **Inscrição Confirmada** | `enrollment_confirmation.html` | Usuário se inscreve em evento |
-| **Certificado de Evento** | `certificate_ready.html` | Certificado de evento disponível |
+| Template                      | Arquivo                                | Uso                                                |
+| ----------------------------- | -------------------------------------- | -------------------------------------------------- |
+| **Boas-vindas**               | `welcome.html`                         | Novo usuário se cadastra                           |
+| **Inscrição Confirmada**      | `enrollment_confirmation.html`         | Usuário se inscreve em evento                      |
+| **Certificado de Evento**     | `certificate_ready.html`               | Certificado de evento disponível                   |
 | **Certificado Institucional** | `institutional_certificate_ready.html` | Certificado institucional (não vinculado a evento) |
 
 ### 2. **Serviço de Templates**
@@ -16,6 +16,7 @@
 Arquivo: `app/services/email_template_service.py`
 
 Métodos disponíveis:
+
 - `render_welcome_email()` - E-mail de boas-vindas
 - `render_enrollment_confirmation()` - Confirmação de inscrição
 - `render_certificate_ready()` - Certificado de evento
@@ -23,25 +24,27 @@ Métodos disponíveis:
 
 ### 3. **Diferenças: Certificado Institucional vs Evento**
 
-| Característica | Certificado de Evento | Certificado Institucional |
-|----------------|----------------------|---------------------------|
-| **Vínculo** | Vinculado a evento específico | Não vinculado a evento |
-| **Carga Horária** | ✅ Incluída | ❌ Não aplicável |
-| **Categoria** | Tipo de evento (curso, workshop) | Categoria institucional (reconhecimento, premiação) |
-| **Signatário** | Não incluído | ✅ Nome do signatário/autoridade |
-| **CPF** | Não incluído | ✅ CPF do destinatário |
-| **Cor do Destaque** | Verde (`#f0fff4`) | Amarelo (`#fef3c7`) |
-| **Validação** | Via número do certificado | Via número + institucional |
+| Característica      | Certificado de Evento            | Certificado Institucional                           |
+| ------------------- | -------------------------------- | --------------------------------------------------- |
+| **Vínculo**         | Vinculado a evento específico    | Não vinculado a evento                              |
+| **Carga Horária**   | ✅ Incluída                      | ❌ Não aplicável                                    |
+| **Categoria**       | Tipo de evento (curso, workshop) | Categoria institucional (reconhecimento, premiação) |
+| **Signatário**      | Não incluído                     | ✅ Nome do signatário/autoridade                    |
+| **CPF**             | Não incluído                     | ✅ CPF do destinatário                              |
+| **Cor do Destaque** | Verde (`#f0fff4`)                | Amarelo (`#fef3c7`)                                 |
+| **Validação**       | Via número do certificado        | Via número + institucional                          |
 
 ### 4. **Configuração RabbitMQ**
 
 **Worker:** `worker.py`
+
 - ✅ Carrega variáveis de ambiente do `.env`
 - ✅ Configura Dead Letter Queue (DLQ) para falhas
 - ✅ Processamento assíncrono com fair dispatch
 - ✅ Logging completo
 
 **NotificationService:** `app/services/notification_service.py`
+
 - ✅ Publica mensagens na fila `email_queue`
 - ✅ Não declara filas (worker faz isso)
 - ✅ Mensagens persistentes (`delivery_mode=2`)
@@ -49,6 +52,7 @@ Métodos disponíveis:
 ### 5. **Configuração SMTP**
 
 Arquivo: `.env`
+
 ```bash
 SMTP_SERVER=smtp.office365.com
 SMTP_PORT=587
@@ -62,11 +66,13 @@ DEFAULT_SENDER=automacao.nuted.euro@unieuro.edu.br
 Arquivo: `test_email_templates.py`
 
 Executar testes:
+
 ```bash
 python test_email_templates.py
 ```
 
 Resultados esperados:
+
 - ✅ Welcome email sent to queue!
 - ✅ Institutional certificate email sent to queue!
 
@@ -149,6 +155,7 @@ notification_service.send_email_task(
 ## 📁 Arquivos Modificados/Criados
 
 ### Criados:
+
 - ✅ `app/templates/emails/base.html`
 - ✅ `app/templates/emails/welcome.html`
 - ✅ `app/templates/emails/enrollment_confirmation.html`
@@ -159,6 +166,7 @@ notification_service.send_email_task(
 - ✅ `EMAIL_TEMPLATES.md`
 
 ### Modificados:
+
 - ✅ `worker.py` - Adicionado dotenv, logging, DLQ support
 - ✅ `app/services/notification_service.py` - Removida declaração de fila
 - ✅ `.env` - Adicionadas configurações SMTP e RabbitMQ
@@ -166,7 +174,7 @@ notification_service.send_email_task(
 
 ## 🎯 Próximos Passos (Opcional)
 
-- [ ] Integrar com a API de certificados institucionais
+- [ ] Integrar com a API de certificados Acadêmicos
 - [ ] Adicionar anexo PDF do certificado ao e-mail
 - [ ] Criar template de lembrete de evento
 - [ ] Criar template de recuperação de senha
@@ -176,6 +184,7 @@ notification_service.send_email_task(
 ## 📞 Suporte
 
 Para dúvidas ou problemas:
+
 - **E-mail:** automacao.nuted.euro@unieuro.edu.br
 - **RabbitMQ UI:** https://nuted-ia.dev/rabbitmq/ (guest/guest)
 

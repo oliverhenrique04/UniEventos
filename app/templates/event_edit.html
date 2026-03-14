@@ -131,15 +131,15 @@
 
                         <div class="mb-4">
                             <label class="form-label fw-bold text-slate-700 d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                                <span>Localização do Check-in</span>
-                                <small class="text-primary fw-normal">Clique no mapa para marcar ou use GPS</small>
+                                <span>Local de Registro de Presença</span>
+                                <small class="text-primary fw-normal">Selecione no mapa ou utilize geolocalização</small>
                             </label>
                             <div class="d-flex flex-wrap gap-2 mb-2">
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="btnUseMyLocation" onclick="usarMinhaLocalizacao()">
-                                    <i class="fa-solid fa-location-crosshairs me-1"></i> Usar minha localização
+                                    <i class="fa-solid fa-location-crosshairs me-1"></i> Utilizar Minha Localização Atual
                                 </button>
                                 <button type="button" class="btn btn-sm btn-light border" onclick="limparLocalizacao()">
-                                    <i class="fa-solid fa-eraser me-1"></i> Limpar localização
+                                    <i class="fa-solid fa-eraser me-1"></i> Remover Localização
                                 </button>
                             </div>
                             <div id="map" class="mb-2 shadow-sm"></div>
@@ -154,12 +154,12 @@
                                 {% if event.latitude %}
                                     Localização: {{ "%.4f"|format(event.latitude) }}, {{ "%.4f"|format(event.longitude) }}
                                 {% else %}
-                                    Nenhuma localização marcada (opcional).
+                                    Nenhuma localização registrada (opcional).
                                 {% endif %}
                             </div>
                             <div class="small text-primary mt-1">
                                 <i class="fa-solid fa-ruler-combined me-1"></i>
-                                O check-in considera presença dentro do raio de <strong>{{ config.CHECKIN_RADIUS_METERS|default(500) }} metros</strong> do ponto marcado.
+                                O registro de presença é válido apenas quando realizado dentro do raio de <strong>{{ config.CHECKIN_RADIUS_METERS|default(500) }} metros</strong> do ponto registrado.
                             </div>
                         </div>
                         
@@ -188,19 +188,19 @@
                 <div class="step-card">
                     <div class="step-header">
                         <div class="step-number">2</div>
-                        <h5 class="fw-bold m-0">Cronograma e Atividades</h5>
+                        <h5 class="fw-bold m-0">Programação e Atividades</h5>
                     </div>
                     <div class="p-4">
                         <div class="type-selector mb-5">
                             <div class="type-option {% if event.tipo == 'PADRAO' %}active{% endif %}" id="optStandard" onclick="setEventType('PADRAO')">
                                 <i class="fa-solid fa-layer-group"></i>
-                                <h6 class="fw-bold mb-1">Evento Padrão</h6>
-                                <p class="text-muted small m-0">Múltiplas oficinas, palestras e minicursos.</p>
+                                <h6 class="fw-bold mb-1">Evento Convencional</h6>
+                                <p class="text-muted small m-0">Múltiplas atividades: oficinas, palestras e minicursos.</p>
                             </div>
                             <div class="type-option {% if event.tipo == 'RAPIDO' %}active{% endif %}" id="optFast" onclick="setEventType('RAPIDO')">
                                 <i class="fa-solid fa-bolt"></i>
-                                <h6 class="fw-bold mb-1">Evento Rápido</h6>
-                                <p class="text-muted small m-0">Check-in único. Ideal para aulas ou reuniões.</p>
+                                <h6 class="fw-bold mb-1">Evento Simplificado</h6>
+                                <p class="text-muted small m-0">Registro de presença único. Recomendado para aulas ou reuniões.</p>
                             </div>
                         </div>
 
@@ -219,7 +219,7 @@
                         <div id="containerRapido" class="{% if event.tipo == 'PADRAO' %}d-none{% endif %}">
                             <div class="alert alert-info border-0 rounded-4">
                                 <i class="fa-solid fa-circle-info me-2"></i>
-                                Para <strong>Eventos Rápidos</strong>, o sistema mantém automaticamente uma atividade de check-in única. A carga horária definida abaixo será utilizada para certificação dos participantes presentes.
+                                Para <strong>Eventos Rápidos</strong>, o sistema mantém automaticamente uma atividade única de registro de presença. A carga horária definida abaixo será utilizada para certificação dos participantes presentes.
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6">

@@ -170,8 +170,7 @@
 <div class="container py-4 fade-in-up">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h3 class="fw-bold m-0"><i class="fa-solid fa-calendar-check text-primary me-2"></i>Gestão de Eventos</h3>
-            <p class="text-muted mb-0">Controle administrativo de eventos, inscrições e validação de presença.</p>
+            <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-calendar-check text-primary me-2"></i>Gestão de Eventos</h3>
         </div>
         <a href="/criar_evento" class="btn btn-primary shadow-sm">
             <i class="fa-solid fa-plus me-2"></i> Novo Evento
@@ -414,7 +413,7 @@
                                         <div class="timer-text" id="timerDisplayGestao">30s</div>
                                     </div>
                                     <div class="text-start">
-                                        <h5 class="fw-bold m-0 text-white tracking-tight">QR Code Dinâmico</h5>
+                                        <h5 class="fw-bold m-0 text-white tracking-tight">Código QR Dinâmico</h5>
                                         <p class="text-white-50 x-small mb-0">Atualização de segurança ativada</p>
                                     </div>
                                 </div>
@@ -469,7 +468,7 @@
                         <i class="fa-solid fa-display fa-4x text-primary opacity-75"></i>
                     </div>
                     <h3 class="fw-bold text-white mb-3">Modo de Projeção Ativo</h3>
-                    <p class="text-white-50 mb-4">Escolha uma atividade no seletor superior para exibir o QR Code de check-in para os participantes.</p>
+                    <p class="text-white-50 mb-4">Escolha uma atividade no seletor superior para exibir o código QR de registro de presença para os participantes.</p>
                     <div class="d-md-none bg-white bg-opacity-10 p-3 rounded-4">
                         <i class="fa-solid fa-arrow-up text-primary me-2"></i> <small class="fw-bold">Use o seletor acima</small>
                     </div>
@@ -551,7 +550,7 @@
                             <a href="/editar_evento/${ev.id}" class="btn btn-sm btn-light border" title="Editar Evento">
                                 <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
                             </a>
-                            <button class="btn btn-sm btn-light border" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Check-in">
+                            <button class="btn btn-sm btn-light border" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Registro de Presença">
                                 <i class="fa-solid fa-display text-primary"></i>
                             </button>
                             <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes">

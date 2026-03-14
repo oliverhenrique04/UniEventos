@@ -225,11 +225,11 @@
         <div class="col-lg-12">
             <div class="d-flex align-items-center justify-content-between mb-4 px-2 flex-wrap gap-2">
                 <h4 class="m-0">
-                    <i class="fa-solid fa-calendar-days text-primary me-2"></i>Meus Eventos
+                    <i class="fa-solid fa-calendar-days text-primary me-2"></i>Eventos sob Minha Coordenação
                 </h4>
                 <div class="d-flex gap-2">
                     <a href="/criar_evento" class="btn btn-sm btn-primary shadow-sm">
-                        <i class="fa-solid fa-plus me-1"></i> Criar Completo
+                        <i class="fa-solid fa-plus me-1"></i> Criar Evento
                     </a>
                     <div class="dropdown">
                         <button class="btn btn-sm btn-light border dropdown-toggle" type="button"
@@ -260,11 +260,11 @@
         <div class="col-lg-8">
             <div class="glass-panel bg-white p-4 p-md-5 shadow-sm border-top border-4 border-primary">
                 <h4 class="fw-bold mb-2">
-                    <i class="fa-solid fa-certificate text-primary me-2"></i>Certificados Institucionais
+                    <i class="fa-solid fa-certificate text-primary me-2"></i>Certificados Acadêmicos
                 </h4>
-                <p class="text-muted mb-4">Gerencie certificados de monitoria, representacao, iniciacao cientifica e outras acoes de extensao.</p>
+                <p class="text-muted mb-4">Gerencie certificados de monitoria, representação, iniciação científica e outras ações de extensão.</p>
                 <a href="/certificados_institucionais" class="btn btn-primary btn-lg">
-                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar gestao institucional
+                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar Gestão Institucional
                 </a>
             </div>
         </div>
@@ -280,20 +280,20 @@
                     <div class="bg-indigo-50 d-inline-flex p-4 rounded-circle mb-3">
                         <i class="fa-solid fa-qrcode fa-3x text-primary"></i>
                     </div>
-                    <h2 class="fw-bold">Check-in Digital</h2>
-                    <p class="text-muted">Aponte sua câmera para o QR Code para confirmar sua presença.</p>
+                    <h2 class="fw-bold">Registro de Presença Digital</h2>
+                    <p class="text-muted">Direcione a câmera do dispositivo ao código QR para confirmar sua presença.</p>
                 </div>
                 
                 <div id="scanControl">
                     <button onclick="iniciarScanner()" class="btn btn-primary btn-lg w-100 rounded-pill py-3 shadow-lg">
-                        <i class="fa-solid fa-camera me-2"></i> Abrir Scanner
+                        <i class="fa-solid fa-camera me-2"></i> Iniciar Leitura do Código
                     </button>
                 </div>
                 
                 <div id="areaCamera" class="mt-4 rounded-4 shadow-lg bg-dark overflow-hidden animate__animated animate__fadeIn" style="display:none;">
                     <div id="reader"></div>
                     <button onclick="pararScanner()" class="btn btn-dark w-100 rounded-0 py-3 text-danger fw-bold border-top border-secondary">
-                        <i class="fa-solid fa-circle-xmark me-2"></i> Cancelar
+                        <i class="fa-solid fa-circle-xmark me-2"></i> Interromper
                     </button>
                 </div>
                 
@@ -303,7 +303,7 @@
             <!-- Filters Section -->
             <div class="glass-panel p-3 p-md-4 bg-white shadow-sm border-top border-2 border-info text-start">
                 <h6 class="fw-bold mb-3 text-uppercase small text-muted">
-                    <i class="fa-solid fa-magnifying-glass me-2"></i>Encontrar Eventos
+                    <i class="fa-solid fa-magnifying-glass me-2"></i>Localizar Eventos
                 </h6>
 
                 <div class="row g-2">
@@ -327,7 +327,7 @@
     <div class="row">
         <div class="col-12 px-0 px-md-4">
             <h4 class="fw-bold mb-4 px-2">
-                <i class="fa-solid fa-bolt text-warning me-2"></i>Eventos Disponíveis
+                <i class="fa-solid fa-bolt text-warning me-2"></i>Eventos em Aberto para Inscrição
             </h4>
 
             <div id="listaEventosAluno" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"></div>
@@ -458,7 +458,7 @@
                                         <div class="timer-text" id="timerDisplay">30s</div>
                                     </div>
                                     <div class="text-start">
-                                        <h5 class="fw-bold m-0 text-white tracking-tight">QR Code Dinâmico</h5>
+                                        <h5 class="fw-bold m-0 text-white tracking-tight">Código QR Dinâmico</h5>
                                         <p class="text-white-50 x-small mb-0">Atualização de segurança ativada</p>
                                     </div>
                                 </div>
@@ -498,7 +498,7 @@
 
                                     <div class="mt-5 pt-5 border-top border-white border-opacity-10">
                                         <div class="d-flex align-items-center gap-3">
-                                            <img src="https://nuted.unieuro.edu.br/selo/static/file/logo_nuted.png" alt="NUTED" style="height: 40px; filter: brightness(0) invert(1); opacity: 0.5;">
+                                            <img src="{{ url_for('static', filename='file/logo_nuted.png') }}" alt="NUTED" style="height: 40px; filter: brightness(0) invert(1); opacity: 0.5;">
                                             <div class="vr bg-white opacity-20" style="height: 30px;"></div>
                                             <small class="text-white-50 font-monospace" style="font-size: 0.65rem;">EuroEventos v1.0 <br> © 2026 Institucional</small>
                                         </div>
@@ -515,7 +515,7 @@
                         <i class="fa-solid fa-display fa-4x text-primary opacity-75"></i>
                     </div>
                     <h3 class="fw-bold text-white mb-3">Modo de Projeção Ativo</h3>
-                    <p class="text-white-50 mb-4">Escolha uma atividade no seletor superior para exibir o QR Code de check-in para os participantes.</p>
+                    <p class="text-white-50 mb-4">Escolha uma atividade no seletor superior para exibir o código QR de registro de presença para os participantes.</p>
                     <div class="d-md-none bg-white bg-opacity-10 p-3 rounded-4">
                         <i class="fa-solid fa-arrow-up text-primary me-2"></i> <small class="fw-bold">Use o seletor acima</small>
                     </div>

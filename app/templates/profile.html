@@ -1,8 +1,125 @@
 {% extends 'base.html' %}
 
+{% block head_styles %}
+<style>
+    .profile-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
+
+    .btn-action {
+        padding: 0.6rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-profile-edit {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-profile-edit:hover {
+        background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+    }
+
+    .btn-profile-password {
+        background: linear-gradient(135deg, #f59f00 0%, #e67700 100%);
+        border: none;
+        color: #1f2937;
+    }
+
+    .btn-profile-password:hover {
+        background: linear-gradient(135deg, #f08c00 0%, #d9480f 100%);
+        color: #111827;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(245, 159, 0, 0.3);
+    }
+
+    .profile-tabs-wrap {
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 1rem;
+        padding: 0.35rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+
+    .profile-tabs-wrap .nav-link {
+        border-radius: 0.75rem;
+        color: #475569;
+    }
+
+    .profile-tabs-wrap .nav-link.active {
+        background: #044d84;
+        color: #fff;
+    }
+
+    .bg-modal-profile {
+        background: linear-gradient(135deg, #044d84 0%, #033e68 100%) !important;
+    }
+
+    .bg-modal-password {
+        background: linear-gradient(135deg, #f59f00 0%, #d97706 100%) !important;
+    }
+
+    .profile-stat-card {
+        min-height: 100%;
+    }
+
+    @media (max-width: 576px) {
+        .profile-actions .btn-action {
+            width: 100%;
+        }
+
+        .profile-stat-card .fs-4 {
+            font-size: 1.35rem !important;
+        }
+
+        #tabela-atividades thead {
+            display: none;
+        }
+
+        #tabela-atividades tr {
+            display: block;
+            padding: 0.85rem;
+            margin-bottom: 0.75rem;
+            background: #fff;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        }
+
+        #tabela-atividades td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 0;
+            padding: 0.4rem 0;
+        }
+
+        #tabela-atividades td:before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: #6c757d;
+            margin-right: 0.75rem;
+            font-size: 0.78rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4 fade-in-up">
-    <!-- Header Perfil com Estatísticas -->
+<div class="container py-3 py-md-4 fade-in-up">
+    <!-- Header do Perfil do Usuário com Estatísticas -->
     <div class="glass-panel p-4 mb-5 border-top border-2 border-primary bg-white shadow-sm">
         <div class="row align-items-center">
             <div class="col-md-auto text-center mb-3 mb-md-0">
@@ -20,24 +137,24 @@
                     <i class="fa-solid fa-book-open me-1"></i> {{ user.curso or 'Curso não informado' }}
                 </div>
             </div>
-            <div class="col-md-6 mt-6 mt-md-0">
+            <div class="col-md-6 mt-6 mt-md-0 mt-2">
                 <div class="row text-center g-2">
                     <div class="col-4">
-                        <div class="p-2 bg-light rounded-4">
+                        <div class="p-2 bg-light rounded-4 border profile-stat-card">
                             <div class="fw-bold text-primary fs-4" id="stat-hours">0</div>
-                            <div class="text-muted x-small text-uppercase fw-bold">Horas Totais</div>
+                            <div class="text-muted x-small text-uppercase fw-bold" style="font-size: x-small;">Carga Horária Total</div>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="p-2 bg-light rounded-4">
+                        <div class="p-2 bg-light rounded-4 border profile-stat-card">
                             <div class="fw-bold text-primary fs-4" id="stat-events">0</div>
-                            <div class="text-muted x-small text-uppercase fw-bold">Eventos</div>
+                            <div class="text-muted x-small text-uppercase fw-bold" style="font-size: x-small;">Eventos Participados</div>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="p-2 bg-light rounded-4">
+                        <div class="p-2 bg-light rounded-4 border profile-stat-card">
                             <div class="fw-bold text-primary fs-4" id="stat-institutional-certs">0</div>
-                            <div class="text-muted x-small text-uppercase fw-bold">Inst.</div>
+                            <div class="text-muted x-small text-uppercase fw-bold" style="font-size: x-small;">Acadêmicos</div>
                         </div>
                     </div>
                 </div>
@@ -45,30 +162,30 @@
         </div>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 justify-content-end mb-4">
-        <button class="btn btn-outline-primary" onclick="abrirModalPerfilDados()">
-            <i class="fa-solid fa-user-pen me-2"></i>Atualizar dados
+    <div class="profile-actions mb-4">
+        <button class="btn btn-action btn-profile-edit shadow-sm" onclick="abrirModalPerfilDados()">
+            <i class="fa-solid fa-user-pen me-2"></i>Atualizar Dados Cadastrais
         </button>
-        <button class="btn btn-outline-warning" onclick="abrirModalSenha()">
-            <i class="fa-solid fa-key me-2"></i>Modificar senha
+        <button class="btn btn-action btn-profile-password shadow-sm" onclick="abrirModalSenha()">
+            <i class="fa-solid fa-key me-2"></i>Alterar Senha de Acesso
         </button>
     </div>
 
     <!-- Navegação por Abas -->
-    <ul class="nav nav-pills nav-fill mb-4 bg-white p-1 rounded-4 shadow-sm border" id="profileTabs" role="tablist">
+    <ul class="nav nav-pills nav-fill mb-4 profile-tabs-wrap" id="profileTabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-eventos" onclick="carregarHistorico('events', 1)">
-                <i class="fa-solid fa-calendar-day me-2"></i>Agenda
+                <i class="fa-solid fa-calendar-day me-2"></i>Histórico de Eventos
             </button>
         </li>
         <li class="nav-item">
             <button class="nav-link rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-atividades" onclick="carregarHistorico('activities', 1)">
-                <i class="fa-solid fa-timeline me-2"></i>Linha do Tempo
+                <i class="fa-solid fa-timeline me-2"></i>Cronologia de Atividades
             </button>
         </li>
         <li class="nav-item">
             <button class="nav-link rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-certificados" onclick="carregarHistorico('certificates', 1)">
-                <i class="fa-solid fa-award me-2"></i>Meus Certificados
+                <i class="fa-solid fa-award me-2"></i>Certificados Emitidos
             </button>
         </li>
     </ul>
@@ -111,42 +228,42 @@
 
 <div class="modal fade" id="modalPerfilDados" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold">Atualizar dados do perfil</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-modal-profile text-white rounded-top-4">
+                <h5 class="modal-title fw-bold">Atualização dos Dados Cadastrais do Perfil</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="formPerfilDados" onsubmit="salvarPerfil(event)">
                     <div class="mb-3">
-                        <label class="small fw-bold">Usuário (login)</label>
-                        <input type="text" class="form-control bg-light" value="{{ user.username }}" disabled>
+                        <label class="small fw-bold">Nome de Usuário (identificador de acesso)</label>
+                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.username }}" disabled>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold">Nome</label>
-                        <input type="text" id="perfilNome" class="form-control" value="{{ user.nome }}" required>
+                        <label class="small fw-bold">Nome Completo</label>
+                        <input type="text" id="perfilNome" class="form-control rounded-3" value="{{ user.nome }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">E-mail</label>
-                        <input type="email" id="perfilEmail" class="form-control" value="{{ user.email or '' }}" required>
+                        <input type="email" id="perfilEmail" class="form-control rounded-3" value="{{ user.email or '' }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">CPF</label>
-                        <input type="text" class="form-control bg-light" value="{{ user.cpf or '-' }}" disabled>
+                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.cpf or '-' }}" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">RA</label>
-                        <input type="text" class="form-control bg-light" value="{{ user.ra or '-' }}" disabled>
+                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.ra or '-' }}" disabled>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold">Curso</label>
-                        <input type="text" class="form-control bg-light" value="{{ user.curso or '-' }}" disabled>
+                        <label class="small fw-bold">Curso de Graduação</label>
+                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.curso or '-' }}" disabled>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-primary" form="formPerfilDados" type="submit">Salvar dados</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary rounded-3" form="formPerfilDados" type="submit">Salvar Alterações Cadastrais</button>
             </div>
         </div>
     </div>
@@ -154,12 +271,12 @@
 
 <div class="modal fade" id="modalPerfilSenha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-light">
-                <h5 class="modal-title fw-bold">Modificar senha</h5>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-modal-password text-dark rounded-top-4">
+                <h5 class="modal-title fw-bold">Alterar Senha de Acesso</h5>
                 <button class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="formPerfilSenha" onsubmit="alterarSenha(event)">
                     <div class="mb-3">
                         <label class="small fw-bold">Senha atual</label>
@@ -190,9 +307,9 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-warning text-dark" form="formPerfilSenha" type="submit">Atualizar senha</button>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
+                <button class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-warning text-dark rounded-3" form="formPerfilSenha" type="submit">Atualizar senha</button>
             </div>
         </div>
     </div>
@@ -296,11 +413,11 @@
             
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn">
-                    <td class="ps-4 fw-bold text-dark">${atv.atv_nome}</td>
-                    <td><small class="text-muted">${atv.event_nome}</small></td>
-                    <td><small>${formatIsoDate(atv.data)}</small></td>
-                    <td><span class="badge bg-light text-dark border">${horas}</span></td>
-                    <td class="text-end pe-4">${status}</td>
+                    <td class="ps-4 fw-bold text-dark" data-label="Atividade">${atv.atv_nome}</td>
+                    <td data-label="Evento"><small class="text-muted">${atv.event_nome}</small></td>
+                    <td data-label="Data"><small>${formatIsoDate(atv.data)}</small></td>
+                    <td data-label="Horas"><span class="badge bg-light text-dark border">${horas}</span></td>
+                    <td class="text-end pe-4" data-label="Status">${status}</td>
                 </tr>`;
         });
         renderPaginacao(data.current_page, data.pages, 'pag-atividades', (p) => carregarHistorico('activities', p));

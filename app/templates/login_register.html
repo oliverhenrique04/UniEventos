@@ -116,16 +116,17 @@
 {% block content %}
     <div class="card card-custom p-4 p-md-5 mx-3 animate__animated animate__zoomIn">
         <div class="text-center mb-4">
-            <i class="fa-solid fa-graduation-cap logo-icon"></i>
-            <h3 class="fw-bold text-dark m-0">EuroEventos</h3>
+            <img src="{{ url_for('static', filename='file/logo_unieuro.png') }}" alt="Logo Unieuro"
+                style="height: 100px; width: auto;">
+            <h3 class="fw-bold text-dark m-0 mt-2">EuroEventos</h3>
         </div>
         
         <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
             <li class="nav-item">
-                <button class="nav-link active" id="pills-login-tab" data-bs-toggle="pill" data-bs-target="#pills-login">Entrar</button>
+                <button class="nav-link active" id="pills-login-tab" data-bs-toggle="pill" data-bs-target="#pills-login">Acessar Sistema</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" id="pills-register-tab" data-bs-toggle="pill" data-bs-target="#pills-register">Criar Conta</button>
+                <button class="nav-link" id="pills-register-tab" data-bs-toggle="pill" data-bs-target="#pills-register">Realizar Cadastro</button>
             </li>
         </ul>
         
@@ -139,7 +140,7 @@
                     </div>
                     <div class="form-floating mb-4 password-wrapper">
                         <input type="password" class="form-control" id="loginPass" placeholder="Senha" required>
-                        <label>Senha</label>
+                        <label>Senha de Acesso</label>
                         <button
                             type="button"
                             class="password-toggle"
@@ -151,19 +152,19 @@
                         </button>
                     </div>
                     <button type="submit" class="btn btn-primary w-100 mb-3">
-                        Acessar Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
+                        Autenticar <i class="fa-solid fa-arrow-right ms-2"></i>
                     </button>
                     {% if moodle_login_enabled %}
                     <button type="button" class="btn btn-outline-secondary w-100 mb-2" onclick="entrarComAva()">
-                        Entrar com o AVA
+                        Acessar via AVA
                     </button>
                     <div class="text-center mb-3">
-                        <small class="text-muted">O acesso por AVA está disponível exclusivamente para a comunidade acadêmica do Unieuro.</small>
+                        <small class="text-muted">O acesso mediante AVA encontra-se disponível exclusivamente para a comunidade acadêmica do Unieuro.</small>
                     </div>
                     {% endif %}
                     <div class="auth-support text-center mt-2">
                         <button type="button" class="forgot-link" onclick="abrirRecuperacaoSenha(event)">
-                            <i class="fa-solid fa-key me-1"></i> Esqueceu sua senha?
+                            <i class="fa-solid fa-key me-1"></i> Recuperação de Senha
                         </button>
                     </div>
                 </form>
@@ -174,11 +175,11 @@
                 <form onsubmit="fazerCadastro(event)">
                     <div class="form-floating mb-2">
                         <input type="text" class="form-control" id="regNome" placeholder="Nome Completo" required>
-                        <label>Nome Completo</label>
+                        <label>Nome Completo do Usuário</label>
                     </div>
                     <div class="form-floating mb-2">
                         <input type="email" class="form-control" id="regEmail" placeholder="Email" required>
-                        <label>Email (Para notificações)</label>
+                        <label>E-mail (para notificações)</label>
                     </div>
                     <div class="form-floating mb-2">
                         <input type="text" class="form-control" id="regCpf" placeholder="CPF" required>
@@ -186,7 +187,7 @@
                     </div>
                     <div class="form-floating mb-4 password-wrapper">
                         <input type="password" class="form-control" id="regPass" placeholder="Senha" required>
-                        <label>Senha</label>
+                        <label>Senha de Acesso</label>
                         <button
                             type="button"
                             class="password-toggle"
@@ -198,7 +199,7 @@
                         </button>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
-                        Criar Conta
+                        Realizar Cadastro
                     </button>
                 </form>
             </div>
