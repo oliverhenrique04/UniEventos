@@ -132,6 +132,14 @@
                     <button type="submit" class="btn btn-primary w-100 mb-3">
                         Acessar Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
                     </button>
+                    {% if moodle_login_enabled %}
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-2" onclick="entrarComAva()">
+                        Entrar com o AVA
+                    </button>
+                    <div class="text-center mb-3">
+                        <small class="text-muted">Disponivel apenas para a comunidade academica UniEuro</small>
+                    </div>
+                    {% endif %}
                     <div class="text-center">
                         <a href="#" class="text-decoration-none small text-muted" onclick="abrirRecuperacaoSenha(event)">Esqueceu a senha?</a>
                     </div>
@@ -224,6 +232,10 @@
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
+        }
+
+        function entrarComAva() {
+            window.location.href = '/api/ava';
         }
 
         async function fazerCadastro(e) {

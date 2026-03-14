@@ -51,6 +51,12 @@ class Config:
     RABBITMQ_URL = os.environ.get('RABBITMQ_URL') or 'amqp://guest:guest@localhost:5672/'
     BASE_URL = os.environ.get('BASE_URL') or 'http://localhost:5000'
     CHECKIN_RADIUS_METERS = int(os.environ.get('CHECKIN_RADIUS_METERS', '500'))
+    MOODLE_LOGIN_ENABLED = os.environ.get('MOODLE_LOGIN_ENABLED', 'false').lower() == 'true'
+    MOODLE_LOGIN_URL = os.environ.get('MOODLE_LOGIN_URL', '')
+    MOODLE_TOOL_CONSUMER_KEY = os.environ.get('MOODLE_TOOL_CONSUMER_KEY', '')
+    MOODLE_TOOL_SHARED_SECRET = os.environ.get('MOODLE_TOOL_SHARED_SECRET', '')
+    MOODLE_ALLOWED_EMAIL_DOMAIN = os.environ.get('MOODLE_ALLOWED_EMAIL_DOMAIN', 'unieuro.edu.br').lower()
+    MOODLE_CPF_FIELD = os.environ.get('MOODLE_CPF_FIELD', 'custom_cpf')
 
 
 class TestConfig(Config):

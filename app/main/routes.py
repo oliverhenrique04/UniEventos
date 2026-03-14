@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, abort
+from flask import Blueprint, render_template, redirect, url_for, abort, current_app
 from flask_login import current_user, login_required
 from datetime import datetime
 from app.extensions import db
@@ -9,7 +9,11 @@ bp = Blueprint('main', __name__)
 @bp.route('/')
 def index():
     if not current_user.is_authenticated:
-        return render_template('login_register.html')
+        return render_template(
+            'login_register.html',
+            moodle_login_enabled=current_app.config.get('MOODLE_LOGIN_ENABLED', False),
+            moodle_login_url=current_app.config.get('MOODLE_LOGIN_URL', ''),
+        )
     return render_template('dashboard.html', user=current_user)
 
 @bp.route('/logout')

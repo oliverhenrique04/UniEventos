@@ -37,6 +37,39 @@ class AuthService:
             return user
         return None
 
+    def authenticate_or_provision_from_moodle(self, cpf, nome=None, email=None):
+        """Finds or creates a participant user based on CPF from Moodle launch."""
+        normalized_cpf = normalize_cpf(cpf)
+        if not normalized_cpf or len(normalized_cpf) != 11:
+            return None
+
+        user = self.user_repo.get_by_cpf(normalized_cpf)
+        normalized_email = (email or '').strip().lower() or None
+        normalized_nome = (nome or '').strip() or 'Comunidade Academica UniEuro'
+
+        if user:
+            updated = False
+            if normalized_nome and (user.nome or '').strip() != normalized_nome:
+                user.nome = normalized_nome
+                updated = True
+            if normalized_email and (user.email or '').strip().lower() != normalized_email:
+                user.email = normalized_email
+                updated = True
+            if updated:
+                db.session.commit()
+            return user
+
+        user = User(
+            username=normalized_cpf,
+            email=normalized_email,
+            role='participante',
+            nome=normalized_nome,
+            cpf=normalized_cpf,
+        )
+        # Fallback password for first access; users can change it later if needed.
+        user.set_password(normalized_cpf)
+        return self.user_repo.save(user)
+
     def register_user(self, data):
         """
         Registers a new user in the system.
