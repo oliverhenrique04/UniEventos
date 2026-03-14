@@ -321,9 +321,8 @@ def resend_single(enrollment_id):
 
     # Generate and Queue
     pdf_path = cert_service.generate_pdf(event, user, [cert_activity] if cert_activity else [], cert_hours, enrollment=enrollment)
-    base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
-        validation_url = build_absolute_app_url(f"/validar/{enrollment.cert_hash}") if enrollment.cert_hash else ''
-        download_url = build_absolute_app_url(f"/api/certificates/download_public/{enrollment.cert_hash}") if enrollment.cert_hash else ''
+    validation_url = build_absolute_app_url(f"/validar/{enrollment.cert_hash}") if enrollment.cert_hash else ''
+    download_url = build_absolute_app_url(f"/api/certificates/download_public/{enrollment.cert_hash}") if enrollment.cert_hash else ''
     event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
     cert_service.notifier.send_email_task(
         to_email=target_email,
