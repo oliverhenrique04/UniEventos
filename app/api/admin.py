@@ -6,11 +6,44 @@ from threading import Thread, Lock
 from math import ceil
 from uuid import uuid4
 from io import BytesIO
+from pathlib import Path
+import json
+import tempfile
 
 bp = Blueprint('admin', __name__, url_prefix='/api')
 admin_service = AdminService()
 _IMPORT_JOBS = {}
 _IMPORT_JOBS_LOCK = Lock()
+
+
+def _jobs_store_dir() -> Path:
+    path = Path(tempfile.gettempdir()) / 'unieventos_import_jobs'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _job_file_path(job_id: str) -> Path:
+    return _jobs_store_dir() / f'{job_id}.json'
+
+
+def _persist_job(job: dict):
+    job_id = job.get('job_id')
+    if not job_id:
+        return
+    file_path = _job_file_path(job_id)
+    temp_path = file_path.with_suffix('.json.tmp')
+    temp_path.write_text(json.dumps(job, ensure_ascii=False), encoding='utf-8')
+    temp_path.replace(file_path)
+
+
+def _load_job(job_id: str):
+    file_path = _job_file_path(job_id)
+    if not file_path.exists():
+        return None
+    try:
+        return json.loads(file_path.read_text(encoding='utf-8'))
+    except Exception:
+        return None
 
 
 def _update_job(job_id, **kwargs):
@@ -19,6 +52,7 @@ def _update_job(job_id, **kwargs):
         if not job:
             return
         job.update(kwargs)
+        _persist_job(job)
 
 
 def _append_job_row(job_id, row_result):
@@ -39,6 +73,7 @@ def _append_job_row(job_id, row_result):
             job['errors_count'] += 1
 
         job['rows'].append(row_result)
+        _persist_job(job)
 
 
 def _run_xlsx_import_job(job_id, file_content, app_obj):
@@ -284,6 +319,7 @@ def importar_alunos_xlsx_start():
             'ignored_columns': [],
             'rows': [],
         }
+        _persist_job(_IMPORT_JOBS[job_id])
 
     app_obj = current_app._get_current_object()
     worker = Thread(target=_run_xlsx_import_job, args=(job_id, file_content, app_obj), daemon=True)
@@ -308,7 +344,12 @@ def importar_alunos_xlsx_status(job_id):
     with _IMPORT_JOBS_LOCK:
         job = _IMPORT_JOBS.get(job_id)
         if not job:
-            return jsonify({'erro': 'Job não encontrado.'}), 404
+            loaded = _load_job(job_id)
+            if loaded:
+                _IMPORT_JOBS[job_id] = loaded
+                job = loaded
+            else:
+                return jsonify({'erro': 'Job não encontrado.'}), 404
 
         rows = list(job.get('rows', []))
         filtered_rows = _apply_import_rows_filter(rows, filter_field, filter_query)
