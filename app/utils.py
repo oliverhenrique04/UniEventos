@@ -3,9 +3,39 @@ import hashlib
 import hmac
 from math import radians, cos, sin, asin, sqrt
 from flask import current_app
+from urllib.parse import urlparse, urlunparse
 
 import unicodedata
 import re
+
+
+def _join_url_paths(*parts):
+    """Joins URL path chunks preserving a single leading slash."""
+    chunks = [str(p or '').strip('/') for p in parts if str(p or '').strip('/')]
+    return f"/{'/'.join(chunks)}" if chunks else '/'
+
+
+def build_absolute_app_url(path):
+    """Builds an absolute URL using BASE_URL + optional BASE_PATH for subpath deploys."""
+    raw_path = str(path or '').strip()
+    normalized_path = raw_path if raw_path.startswith('/') else f"/{raw_path}"
+
+    base_url = (current_app.config.get('BASE_URL') or '').strip()
+    if not base_url:
+        return normalized_path
+
+    parsed = urlparse(base_url)
+    base_path = parsed.path or ''
+    configured_base_path = (current_app.config.get('BASE_PATH') or '').strip()
+    configured_base_path = configured_base_path if configured_base_path.startswith('/') else f"/{configured_base_path}" if configured_base_path else ''
+    configured_base_path = configured_base_path.rstrip('/')
+
+    merged_base_path = base_path.rstrip('/')
+    if configured_base_path and not merged_base_path.endswith(configured_base_path):
+        merged_base_path = _join_url_paths(merged_base_path, configured_base_path)
+
+    final_path = _join_url_paths(merged_base_path, normalized_path)
+    return urlunparse((parsed.scheme, parsed.netloc, final_path, '', '', ''))
 
 
 def normalize_cpf(value):

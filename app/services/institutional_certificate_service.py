@@ -5,6 +5,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from flask import current_app
+from app.utils import build_absolute_app_url
 
 from app.services.certificate_service import CertificateService
 from app.services.notification_service import NotificationService
@@ -117,7 +118,6 @@ class InstitutionalCertificateService:
             return False
 
         subject = f"Certificado Institucional - {certificate.titulo}"
-        base_url = current_app.config.get('BASE_URL', '').rstrip('/')
         return self.notifier.send_email_task(
             to_email=recipient.email,
             subject=subject,
@@ -130,9 +130,9 @@ class InstitutionalCertificateService:
                 'certificate_number': recipient.cert_hash,
                 'signer_name': certificate.signer_name,
                 'recipient_cpf': recipient.cpf,
-                'download_url': f"{base_url}/api/institutional_certificates/download_public/{recipient.cert_hash}",
-                'preview_url': f"{base_url}/api/institutional_certificates/preview_public/{recipient.cert_hash}",
-                'validation_url': f"{base_url}/validar/{recipient.cert_hash}",
+                'download_url': build_absolute_app_url(f"/api/institutional_certificates/download_public/{recipient.cert_hash}"),
+                'preview_url': build_absolute_app_url(f"/api/institutional_certificates/preview_public/{recipient.cert_hash}"),
+                'validation_url': build_absolute_app_url(f"/validar/{recipient.cert_hash}"),
             },
             attachment_path=attachment_path,
         )

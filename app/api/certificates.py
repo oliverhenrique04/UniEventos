@@ -8,6 +8,7 @@ import re
 
 from app.models import Event, Enrollment, User, Activity
 from app.extensions import db
+from app.utils import build_absolute_app_url
 
 ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
 MAX_DESIGN_IMAGE_SIZE = 8 * 1024 * 1024
@@ -321,8 +322,8 @@ def resend_single(enrollment_id):
     # Generate and Queue
     pdf_path = cert_service.generate_pdf(event, user, [cert_activity] if cert_activity else [], cert_hours, enrollment=enrollment)
     base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
-    validation_url = f"{base_url}/validar/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else ''
-    download_url = f"{base_url}/api/certificates/download_public/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else ''
+        validation_url = build_absolute_app_url(f"/validar/{enrollment.cert_hash}") if enrollment.cert_hash else ''
+        download_url = build_absolute_app_url(f"/api/certificates/download_public/{enrollment.cert_hash}") if enrollment.cert_hash else ''
     event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
     cert_service.notifier.send_email_task(
         to_email=target_email,
@@ -335,7 +336,7 @@ def resend_single(enrollment_id):
             'course_hours': cert_hours,
             'certificate_number': enrollment.cert_hash,
             'certificate_download_url': download_url,
-            'view_certificate_url': f"{base_url}/api/certificates/preview_public/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else '',
+            'view_certificate_url': build_absolute_app_url(f"/api/certificates/preview_public/{enrollment.cert_hash}") if enrollment.cert_hash else '',
             'my_certificates_url': validation_url,
         },
         attachment_path=pdf_path

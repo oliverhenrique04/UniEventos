@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, send_file, current_app, url_for
 from flask_login import login_required, current_user
 from app.models import Activity, Enrollment, db
-from app.utils import gerar_hash_dinamico, validar_hash_dinamico
+from app.utils import gerar_hash_dinamico, validar_hash_dinamico, build_absolute_app_url
 from app.services.event_service import EventService
 import qrcode
 from io import BytesIO
@@ -38,8 +38,7 @@ def qrcode_atividade(atv_id):
             
         token = gerar_hash_dinamico(atv_id)
         # Generate a direct URL for scanning
-        base_url = current_app.config.get('BASE_URL', 'http://localhost:5000')
-        conteudo = f"{base_url}/confirmar_presenca/{atv_id}/{token}"
+        conteudo = build_absolute_app_url(f"/confirmar_presenca/{atv_id}/{token}")
         
         qr = qrcode.QRCode(box_size=20, border=1)
         qr.add_data(conteudo)

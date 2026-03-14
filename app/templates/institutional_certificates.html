@@ -1320,7 +1320,7 @@ function abrirPreviewDestinatario(recipientId, recipientNome = '') {
         subtitle.textContent = safeNome ? `Destinatario: ${safeNome}` : '';
     }
     if (iframe) {
-        iframe.src = `/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/preview?t=${Date.now()}`;
+        iframe.src = apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/recipients/${recipientId}/preview?t=${Date.now()}`);
     }
     if (!previewDestinatarioModalInstance) {
         previewDestinatarioModalInstance = new bootstrap.Modal(document.getElementById('modalPreviewDestinatario'));

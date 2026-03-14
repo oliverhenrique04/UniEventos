@@ -50,6 +50,7 @@ class Config:
     }
     RABBITMQ_URL = os.environ.get('RABBITMQ_URL') or 'amqp://guest:guest@localhost:5672/'
     BASE_URL = os.environ.get('BASE_URL') or 'http://localhost:5000'
+    BASE_PATH = (os.environ.get('BASE_PATH') or '').strip()
     CHECKIN_RADIUS_METERS = int(os.environ.get('CHECKIN_RADIUS_METERS', '500'))
     MOODLE_LOGIN_ENABLED = os.environ.get('MOODLE_LOGIN_ENABLED', 'false').lower() == 'true'
     MOODLE_LOGIN_URL = os.environ.get('MOODLE_LOGIN_URL', '')

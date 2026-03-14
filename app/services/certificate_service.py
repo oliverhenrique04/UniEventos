@@ -11,6 +11,7 @@ from app.repositories.activity_repository import ActivityRepository
 from app.services.notification_service import NotificationService
 from app.extensions import db
 from flask import current_app
+from app.utils import build_absolute_app_url
 
 class CertificateService:
     """Service for managing, generating and distributing academic certificates."""
@@ -233,7 +234,7 @@ class CertificateService:
             db.session.commit()
         
         cert_hash = enrollment.cert_hash if enrollment else "VALID-SAMPLE-HASH"
-        validation_url = f"{current_app.config.get('BASE_URL', 'http://localhost:5000')}/validar/{cert_hash}"
+        validation_url = build_absolute_app_url(f"/validar/{cert_hash}")
 
         filename = f"cert_{event.id}_{user.cpf}.pdf"
         filepath = os.path.join(current_app.root_path, 'static', 'certificates', 'generated', filename)
@@ -386,8 +387,6 @@ class CertificateService:
         event = self.event_repo.get_by_id(event_id)
         if not event:
             return False, "Evento não encontrado"
-        base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
-
         count = 0
         for atv in event.activities:
             for enroll in atv.enrollments:
@@ -403,8 +402,8 @@ class CertificateService:
                 cert_hours = atv.carga_horaria or 0
                 pdf_path = self.generate_pdf(event, user, [atv], cert_hours, enrollment=enroll)
                 cert_hash = enroll.cert_hash
-                validation_url = f"{base_url}/validar/{cert_hash}" if base_url and cert_hash else ''
-                download_url = f"{base_url}/api/certificates/download_public/{cert_hash}" if base_url and cert_hash else ''
+                validation_url = build_absolute_app_url(f"/validar/{cert_hash}") if cert_hash else ''
+                download_url = build_absolute_app_url(f"/api/certificates/download_public/{cert_hash}") if cert_hash else ''
                 event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
                 activity_suffix = f" - {atv.nome}" if getattr(event, 'tipo', None) == 'PADRAO' else ''
 
@@ -419,7 +418,7 @@ class CertificateService:
                         'course_hours': cert_hours,
                         'certificate_number': cert_hash,
                         'certificate_download_url': download_url,
-                        'view_certificate_url': f"{base_url}/api/certificates/preview_public/{cert_hash}" if base_url and cert_hash else '',
+                        'view_certificate_url': build_absolute_app_url(f"/api/certificates/preview_public/{cert_hash}") if cert_hash else '',
                         'my_certificates_url': validation_url,
                     },
                     attachment_path=pdf_path

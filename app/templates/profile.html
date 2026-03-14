@@ -436,7 +436,7 @@
             const subtitulo = isInstitutional ? (cert.category || 'Institucional') : (cert.event_nome || 'Evento');
             const dataReferencia = formatIsoDate(cert.data);
             const horas = cert.horas ? `${cert.horas} Horas` : '-';
-            const downloadUrl = cert.download_url || (cert.enrollment_id ? `/api/certificates/download/${cert.enrollment_id}` : '#');
+            const downloadUrl = cert.download_url || (cert.enrollment_id ? apiUrl(`/api/certificates/download/${cert.enrollment_id}`) : '#');
             const previewUrl = cert.preview_url || null;
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
