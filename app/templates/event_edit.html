@@ -143,6 +143,11 @@
                                 </button>
                             </div>
                             <div id="map" class="mb-2 shadow-sm"></div>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span id="checkinRadiusBadge" class="badge rounded-pill text-bg-primary px-3 py-2">
+                                    <i class="fa-solid fa-circle-dot me-1"></i> Raio ativo: {{ config.CHECKIN_RADIUS_METERS|default(500) }} m
+                                </span>
+                            </div>
                             <input type="hidden" id="evLat" value="{{ event.latitude or '' }}">
                             <input type="hidden" id="evLon" value="{{ event.longitude or '' }}">
                             <div id="locationStatus" class="small text-muted"><i class="fa-solid fa-location-dot me-1"></i> 
@@ -151,6 +156,10 @@
                                 {% else %}
                                     Nenhuma localização marcada (opcional).
                                 {% endif %}
+                            </div>
+                            <div class="small text-primary mt-1">
+                                <i class="fa-solid fa-ruler-combined me-1"></i>
+                                O check-in considera presença dentro do raio de <strong>{{ config.CHECKIN_RADIUS_METERS|default(500) }} metros</strong> do ponto marcado.
                             </div>
                         </div>
                         
@@ -240,7 +249,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     let currentType = '{{ event.tipo }}';
-    let map, marker;
+    const CHECKIN_RADIUS_METERS = Number("{{ config.CHECKIN_RADIUS_METERS|default(500) }}") || 500;
+    let map, marker, checkinCircle;
     const initialActivities = [
         {% for atv in event.activities %}
         {
@@ -256,10 +266,27 @@
         {% endfor %}
     ];
 
+    function refreshRadiusBadge() {
+        const badge = document.getElementById('checkinRadiusBadge');
+        if (!badge) return;
+        badge.innerHTML = `<i class="fa-solid fa-circle-dot me-1"></i> Raio ativo: ${CHECKIN_RADIUS_METERS} m`;
+    }
+
     function setSelectedLocation(lat, lng, sourceLabel = 'Localização marcada') {
         if (marker) map.removeLayer(marker);
+        if (checkinCircle) map.removeLayer(checkinCircle);
+
         marker = L.marker([lat, lng]).addTo(map);
-        map.setView([lat, lng], 17);
+        checkinCircle = L.circle([lat, lng], {
+            radius: CHECKIN_RADIUS_METERS,
+            color: '#2563eb',
+            weight: 2,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.12,
+            dashArray: '8 6'
+        }).addTo(map);
+
+        map.fitBounds(checkinCircle.getBounds(), { padding: [28, 28] });
 
         document.getElementById('evLat').value = lat;
         document.getElementById('evLon').value = lng;
@@ -270,6 +297,10 @@
         if (marker) {
             map.removeLayer(marker);
             marker = null;
+        }
+        if (checkinCircle) {
+            map.removeLayer(checkinCircle);
+            checkinCircle = null;
         }
         document.getElementById('evLat').value = '';
         document.getElementById('evLon').value = '';
@@ -311,6 +342,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarCursosSelect();
+        refreshRadiusBadge();
 
         const lat = parseFloat("{{ event.latitude or -15.836 }}");
         const lon = parseFloat("{{ event.longitude or -48.019 }}");
@@ -321,7 +353,7 @@
         }).addTo(map);
 
         if ("{{ event.latitude }}") {
-            marker = L.marker([lat, lon]).addTo(map);
+            setSelectedLocation(lat, lon, 'Localização carregada');
         }
 
         map.on('click', function(e) {

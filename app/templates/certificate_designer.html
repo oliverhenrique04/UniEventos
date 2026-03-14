@@ -461,6 +461,10 @@
                         {% else %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{NOME}}', event)">{{NOME}} — Nome</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EVENTO}}', event)">{{EVENTO}} — Evento</a></li>
+                        {% if event.tipo == 'PADRAO' %}
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{ATIVIDADE}}', event)">{{ATIVIDADE}} — Atividade</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{PALESTRANTE}}', event)">{{PALESTRANTE}} — Palestrante</a></li>
+                        {% endif %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">{{HORAS}} — Horas</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">{{DATA}} — Data</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">{{CPF}} — CPF</a></li>
@@ -570,6 +574,16 @@
                         <div class="fw-bold text-primary small">{{ '{{EVENTO}}' }}</div>
                         <div class="text-muted x-small">Título do Evento</div>
                     </div>
+                    {% if event.tipo == 'PADRAO' %}
+                    <div class="variable-guide-item" onclick="injectVar('{{ATIVIDADE}}')">
+                        <div class="fw-bold text-primary small">{{ '{{ATIVIDADE}}' }}</div>
+                        <div class="text-muted x-small">Nome da Atividade</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{PALESTRANTE}}')">
+                        <div class="fw-bold text-primary small">{{ '{{PALESTRANTE}}' }}</div>
+                        <div class="text-muted x-small">Nome do Palestrante</div>
+                    </div>
+                    {% endif %}
                     <div class="variable-guide-item" onclick="injectVar('{{HORAS}}')">
                         <div class="fw-bold text-primary small">{{ '{{HORAS}}' }}</div>
                         <div class="text-muted x-small">Carga Horária</div>
@@ -675,6 +689,10 @@
                     {% else %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{NOME}}' }}')">{{ '{{NOME}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{EVENTO}}' }}')">{{ '{{EVENTO}}' }}</button>
+                    {% if event.tipo == 'PADRAO' %}
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{ATIVIDADE}}' }}')">{{ '{{ATIVIDADE}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{PALESTRANTE}}' }}')">{{ '{{PALESTRANTE}}' }}</button>
+                    {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HORAS}}' }}')">{{ '{{HORAS}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA}}' }}')">{{ '{{DATA}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{CPF}}' }}')">{{ '{{CPF}}' }}</button>
@@ -722,6 +740,8 @@
     const TAG_NOME = "{{ '{{NOME}}' }}";
     const TAG_CPF = "{{ '{{CPF}}' }}";
     const TAG_EVENTO = "{{ '{{EVENTO}}' }}";
+    const TAG_ATIVIDADE = "{{ '{{ATIVIDADE}}' }}";
+    const TAG_PALESTRANTE = "{{ '{{PALESTRANTE}}' }}";
     const TAG_HORAS = "{{ '{{HORAS}}' }}";
     const TAG_DATA = "{{ '{{DATA}}' }}";
     const TAG_RECIPIENT_NAME = "{{ '{{RECIPIENT_NAME}}' }}";
@@ -972,6 +992,8 @@
         ].filter(Boolean);
         const name = nomes[Math.floor(Math.random() * nomes.length)];
         const evento = eventos[Math.floor(Math.random() * eventos.length)];
+        const atividade = ['Palestra Magna', 'Mesa Redonda', 'Oficina Prática', 'Minicurso'].sort(() => Math.random() - 0.5)[0];
+        const palestrante = ['Profa. Maria Souza', 'Dr. Carlos Lima', 'Msc. Fernanda Alves', 'Prof. João Costa'].sort(() => Math.random() - 0.5)[0];
         const horas = `${8 + Math.floor(Math.random() * 33)} horas`;
         const cpfNum = `${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}-${Math.floor(10 + Math.random() * 90)}`;
         const data = new Date().toLocaleDateString('pt-BR');
@@ -980,6 +1002,8 @@
         const baseData = {
             [TAG_NOME]: name,
             [TAG_EVENTO]: evento,
+            [TAG_ATIVIDADE]: atividade,
+            [TAG_PALESTRANTE]: palestrante,
             [TAG_HORAS]: horas,
             [TAG_DATA]: data,
             [TAG_CPF]: cpfNum,
@@ -1020,6 +1044,8 @@
                 [TAG_NOME, tags[TAG_NOME]],
                 [TAG_CPF, tags[TAG_CPF]],
                 [TAG_EVENTO, tags[TAG_EVENTO]],
+                {% if event.tipo == 'PADRAO' %}[TAG_ATIVIDADE, tags[TAG_ATIVIDADE]],{% endif %}
+                {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTE, tags[TAG_PALESTRANTE]],{% endif %}
                 [TAG_HORAS, tags[TAG_HORAS]],
                 [TAG_DATA, tags[TAG_DATA]],
                 [HASH_TAG, tags[HASH_TAG]]
@@ -2101,6 +2127,8 @@
                     { label: '{{NOME}}', ok: allText.includes('{{NOME}}') },
                     { label: '{{CPF}}', ok: allText.includes('{{CPF}}') },
                     { label: '{{EVENTO}}', ok: allText.includes('{{EVENTO}}') },
+                    {% if event.tipo == 'PADRAO' %}{ label: '{{ATIVIDADE}}', ok: allText.includes('{{ATIVIDADE}}') },{% endif %}
+                    {% if event.tipo == 'PADRAO' %}{ label: '{{PALESTRANTE}}', ok: allText.includes('{{PALESTRANTE}}') },{% endif %}
                     { label: '{{HORAS}}', ok: allText.includes('{{HORAS}}') },
                     { label: '{{DATA}}', ok: allText.includes('{{DATA}}') },
                 ]),

@@ -83,8 +83,9 @@ def validar_presenca():
             return jsonify({"erro": "Localização necessária para confirmar presença"}), 403
         
         from app.utils import haversine_distance
+        checkin_radius = int(current_app.config.get('CHECKIN_RADIUS_METERS', 500))
         dist = haversine_distance(user_lat, user_lon, activity.latitude, activity.longitude)
-        if dist > 500: # 500 meters radius
+        if dist > checkin_radius:
             return jsonify({"erro": f"Você está muito longe do local do evento ({int(dist)}m)"}), 403
 
     success, message, enrollment = event_service.confirm_attendance(

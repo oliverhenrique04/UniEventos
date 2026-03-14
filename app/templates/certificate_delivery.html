@@ -32,6 +32,7 @@
                 <thead class="bg-light">
                     <tr>
                         <th class="ps-4">Participante</th>
+                        <th>Atividade</th>
                         <th>Status de Entrega</th>
                         <th>E-mail de Destino</th>
                         <th>Último Envio</th>
@@ -102,7 +103,7 @@
             tbody.innerHTML = '';
 
             if (data.items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Nenhum participante com presença confirmada.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Nenhum participante com presença confirmada.</td></tr>';
                 return;
             }
 
@@ -116,6 +117,10 @@
                         <td class="ps-4">
                             <div class="fw-bold text-dark">${item.nome}</div>
                             <div class="text-muted x-small">CPF: ${item.cpf}</div>
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-slate-800">${item.atividade || '-'}</div>
+                            <div class="text-muted x-small">Palestrante: ${item.palestrante || '-'}</div>
                         </td>
                         <td>${statusBadge}</td>
                         <td>

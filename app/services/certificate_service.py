@@ -250,9 +250,17 @@ class CertificateService:
         elements = self._parse_template_elements(event)
         
         # 3. Draw Elements
+        activity_name = ''
+        speaker_name = ''
+        if enrollment and getattr(enrollment, 'activity', None):
+            activity_name = enrollment.activity.nome or ''
+            speaker_name = enrollment.activity.palestrante or ''
+
         tags = {
             '{{NOME}}': user.nome.upper(),
             '{{EVENTO}}': event.nome,
+            '{{ATIVIDADE}}': activity_name,
+            '{{PALESTRANTE}}': speaker_name,
             '{{HORAS}}': str(total_hours),
             '{{DATA}}': event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else "",
             '{{CPF}}': user.cpf,
@@ -379,64 +387,48 @@ class CertificateService:
         if not event:
             return False, "Evento não encontrado"
         base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
-            
-        # Group by user to sum hours across activities of the same event
-        # Note: In a 'PADRAO' event, a user might be in multiple activities.
-        # We need the enrollment record to store the hash. Usually there's one enrollment per activity.
-        # Let's use the first enrollment found to store the 'Event Certificate Hash'.
-        
-        user_stats = {} # cpf -> {user, total_hours, first_enrollment}
-        
-        for atv in event.activities:
-            for enroll in atv.enrollments:
-                if enroll.presente:
-                    if enroll.user_cpf not in user_stats:
-                        user = self.user_repo.get_by_cpf(enroll.user_cpf)
-                        if user:
-                            user_stats[enroll.user_cpf] = {
-                                'user': user,
-                                'hours': 0,
-                                'enrollment': enroll
-                            }
-                    if enroll.user_cpf in user_stats:
-                        user_stats[enroll.user_cpf]['hours'] += (atv.carga_horaria or 0)
 
         count = 0
-        for cpf, data in user_stats.items():
-            user = data['user']
-            if not user.email: continue
-                
-            # Generate PDF passing the enrollment to generate/store hash
-            pdf_path = self.generate_pdf(event, user, [], data['hours'], enrollment=data['enrollment'])
-            cert_hash = data['enrollment'].cert_hash
-            validation_url = f"{base_url}/validar/{cert_hash}" if base_url and cert_hash else ''
-            download_url = f"{base_url}/api/certificates/download_public/{cert_hash}" if base_url and cert_hash else ''
-            event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
-            
-            # Queue Email
-            self.notifier.send_email_task(
-                to_email=user.email,
-                subject=f"Seu Certificado: {event.nome}",
-                template_name='certificate_ready.html',
-                template_data={
-                    'user_name': user.nome,
-                    'event_name': event.nome,
-                    'event_date': event_date,
-                    'course_hours': data['hours'],
-                    'certificate_number': cert_hash,
-                    'certificate_download_url': download_url,
-                    'view_certificate_url': f"{base_url}/api/certificates/preview_public/{cert_hash}" if base_url and cert_hash else '',
-                    'my_certificates_url': validation_url,
-                },
-                attachment_path=pdf_path
-            )
-            
-            # Update tracking
-            data['enrollment'].cert_data_envio = datetime.now()
-            data['enrollment'].cert_entregue = True
-            db.session.commit()
-            
-            count += 1
+        for atv in event.activities:
+            for enroll in atv.enrollments:
+                if not enroll.presente:
+                    continue
+
+                user = self.user_repo.get_by_cpf(enroll.user_cpf)
+                if not user or not user.email:
+                    continue
+
+                # Standard events issue one certificate per activity/enrollment.
+                # Fast events still have a single default activity and behave naturally.
+                cert_hours = atv.carga_horaria or 0
+                pdf_path = self.generate_pdf(event, user, [atv], cert_hours, enrollment=enroll)
+                cert_hash = enroll.cert_hash
+                validation_url = f"{base_url}/validar/{cert_hash}" if base_url and cert_hash else ''
+                download_url = f"{base_url}/api/certificates/download_public/{cert_hash}" if base_url and cert_hash else ''
+                event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
+                activity_suffix = f" - {atv.nome}" if getattr(event, 'tipo', None) == 'PADRAO' else ''
+
+                self.notifier.send_email_task(
+                    to_email=user.email,
+                    subject=f"Seu Certificado: {event.nome}{activity_suffix}",
+                    template_name='certificate_ready.html',
+                    template_data={
+                        'user_name': user.nome,
+                        'event_name': event.nome,
+                        'event_date': event_date,
+                        'course_hours': cert_hours,
+                        'certificate_number': cert_hash,
+                        'certificate_download_url': download_url,
+                        'view_certificate_url': f"{base_url}/api/certificates/preview_public/{cert_hash}" if base_url and cert_hash else '',
+                        'my_certificates_url': validation_url,
+                    },
+                    attachment_path=pdf_path
+                )
+
+                enroll.cert_data_envio = datetime.now()
+                enroll.cert_entregue = True
+                db.session.commit()
+                count += 1
             
         return True, f"{count} certificados colocados na fila de envio."
 

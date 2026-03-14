@@ -116,6 +116,40 @@ def _event_from_enrollment(enrollment):
         return None
     return db.session.get(Event, activity.event_id)
 
+
+def _certificate_context_for_enrollment(event, enrollment, user):
+    """Returns certificate hours/activity context.
+
+    For PADRAO events, certificates are activity-specific (per enrollment).
+    For other event types, hours can be aggregated across present activities.
+    """
+    activity = db.session.get(Activity, enrollment.activity_id) if enrollment else None
+    activity_name = activity.nome if activity else ''
+
+    if getattr(event, 'tipo', None) == 'PADRAO' and activity is not None:
+        return {
+            'hours': activity.carga_horaria or 0,
+            'activity': activity,
+            'activity_name': activity_name,
+        }
+
+    total_hours = 0
+    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
+        Activity.event_id == event.id,
+        Enrollment.user_cpf == user.cpf,
+        Enrollment.presente == True,
+    ).all()
+    for p in presences:
+        atv = db.session.get(Activity, p.activity_id)
+        if atv:
+            total_hours += (atv.carga_horaria or 0)
+
+    return {
+        'hours': total_hours,
+        'activity': activity,
+        'activity_name': activity_name,
+    }
+
 @bp.route('/setup/<int:event_id>', methods=['POST'])
 @login_required
 def setup_certificate(event_id):
@@ -225,10 +259,13 @@ def list_delivery(event_id):
     res = []
     for e in pagination.items:
         user = User.query.filter_by(cpf=e.user_cpf).first()
+        activity = db.session.get(Activity, e.activity_id)
         res.append({
             "enrollment_id": e.id,
             "nome": e.nome,
             "cpf": e.user_cpf,
+            "atividade": activity.nome if activity else "-",
+            "palestrante": (activity.palestrante if activity and activity.palestrante else "-"),
             "email_original": user.email if user else "N/A",
             "email_atual": e.cert_email_alternativo or (user.email if user else ""),
             "entregue": e.cert_entregue,
@@ -273,35 +310,29 @@ def resend_single(enrollment_id):
     
     if not user: return jsonify({"erro": "Usuário não encontrado"}), 404
     
-    # Calculate total hours
-    total_hours = 0
-    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
-        Activity.event_id == event.id,
-        Enrollment.user_cpf == user.cpf,
-        Enrollment.presente == True,
-    ).all()
-    for p in presences:
-        atv = db.session.get(Activity, p.activity_id)
-        if atv: total_hours += (atv.carga_horaria or 0)
+    cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
+    cert_hours = cert_ctx['hours']
+    cert_activity = cert_ctx['activity']
+    activity_suffix = f" - {cert_ctx['activity_name']}" if getattr(event, 'tipo', None) == 'PADRAO' and cert_ctx['activity_name'] else ''
 
     target_email = enrollment.cert_email_alternativo or user.email
     if not target_email: return jsonify({"erro": "E-mail não definido"}), 400
 
     # Generate and Queue
-    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    pdf_path = cert_service.generate_pdf(event, user, [cert_activity] if cert_activity else [], cert_hours, enrollment=enrollment)
     base_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
     validation_url = f"{base_url}/validar/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else ''
     download_url = f"{base_url}/api/certificates/download_public/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else ''
     event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
     cert_service.notifier.send_email_task(
         to_email=target_email,
-        subject=f"Reenvio de Certificado: {event.nome}",
+        subject=f"Reenvio de Certificado: {event.nome}{activity_suffix}",
         template_name='certificate_ready.html',
         template_data={
             'user_name': user.nome,
             'event_name': event.nome,
             'event_date': event_date,
-            'course_hours': total_hours,
+            'course_hours': cert_hours,
             'certificate_number': enrollment.cert_hash,
             'certificate_download_url': download_url,
             'view_certificate_url': f"{base_url}/api/certificates/preview_public/{enrollment.cert_hash}" if base_url and enrollment.cert_hash else '',
@@ -333,19 +364,10 @@ def download_public(cert_hash):
     if not user:
         return "Usuário não encontrado", 404
 
-    total_hours = 0
-    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
-        Activity.event_id == event.id,
-        Enrollment.user_cpf == user.cpf,
-        Enrollment.presente == True,
-    ).all()
-    for p in presences:
-        atv = db.session.get(Activity, p.activity_id)
-        if atv:
-            total_hours += (atv.carga_horaria or 0)
+    cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
 
     from flask import send_file
-    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    pdf_path = cert_service.generate_pdf(event, user, [cert_ctx['activity']] if cert_ctx['activity'] else [], cert_ctx['hours'], enrollment=enrollment)
     filename = f"Certificado_{user.nome.replace(' ', '_')}.pdf"
     return send_file(pdf_path, as_attachment=True, download_name=filename)
 
@@ -365,19 +387,10 @@ def preview_public(cert_hash):
     if not user:
         return "Usuário não encontrado", 404
 
-    total_hours = 0
-    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
-        Activity.event_id == event.id,
-        Enrollment.user_cpf == user.cpf,
-        Enrollment.presente == True,
-    ).all()
-    for p in presences:
-        atv = db.session.get(Activity, p.activity_id)
-        if atv:
-            total_hours += (atv.carga_horaria or 0)
+    cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
 
     from flask import send_file
-    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    pdf_path = cert_service.generate_pdf(event, user, [cert_ctx['activity']] if cert_ctx['activity'] else [], cert_ctx['hours'], enrollment=enrollment)
     response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
@@ -395,17 +408,9 @@ def download_single(enrollment_id):
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
     if not user: return "Usuário não encontrado", 404
-    total_hours = 0
-    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
-        Activity.event_id == event.id,
-        Enrollment.user_cpf == user.cpf,
-        Enrollment.presente == True,
-    ).all()
-    for p in presences:
-        atv = db.session.get(Activity, p.activity_id)
-        if atv: total_hours += (atv.carga_horaria or 0)
+    cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
     from flask import send_file
-    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    pdf_path = cert_service.generate_pdf(event, user, [cert_ctx['activity']] if cert_ctx['activity'] else [], cert_ctx['hours'], enrollment=enrollment)
     return send_file(pdf_path, as_attachment=True, download_name=f"Certificado_{user.nome.replace(' ', '_')}.pdf")
 
 @bp.route('/preview/<int:enrollment_id>')
@@ -421,18 +426,10 @@ def preview_single(enrollment_id):
     
     if not user: return "Usuário não encontrado", 404
     
-    total_hours = 0
-    presences = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
-        Activity.event_id == event.id,
-        Enrollment.user_cpf == user.cpf,
-        Enrollment.presente == True,
-    ).all()
-    for p in presences:
-        atv = db.session.get(Activity, p.activity_id)
-        if atv: total_hours += (atv.carga_horaria or 0)
+    cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
 
     from flask import send_file
-    pdf_path = cert_service.generate_pdf(event, user, [], total_hours, enrollment=enrollment)
+    pdf_path = cert_service.generate_pdf(event, user, [cert_ctx['activity']] if cert_ctx['activity'] else [], cert_ctx['hours'], enrollment=enrollment)
 
     # Force fresh render in browser preview to avoid stale cached PDFs.
     response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)

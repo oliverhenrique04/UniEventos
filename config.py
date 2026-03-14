@@ -35,7 +35,7 @@ def _build_postgres_uri():
     port = os.environ.get('DB_PORT', '5432')
     database = os.environ.get('DB_NAME', 'euro_eventos')
     username = quote_plus(os.environ.get('DB_USER', 'postgres'))
-    password = quote_plus(os.environ.get('DB_PASSWORD', '106293'))
+    password = quote_plus(os.environ.get('DB_PASSWORD', 'change-me'))
 
     return f'postgresql+psycopg://{username}:{password}@{host}:{port}/{database}'
 
@@ -50,6 +50,7 @@ class Config:
     }
     RABBITMQ_URL = os.environ.get('RABBITMQ_URL') or 'amqp://guest:guest@localhost:5672/'
     BASE_URL = os.environ.get('BASE_URL') or 'http://localhost:5000'
+    CHECKIN_RADIUS_METERS = int(os.environ.get('CHECKIN_RADIUS_METERS', '500'))
 
 
 class TestConfig(Config):
