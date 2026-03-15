@@ -1064,12 +1064,13 @@
 {% block content %}
 <div class="container fade-in-up">
     {% set can_access_events_dashboard = user.role in ['admin', 'coordenador', 'gestor', 'extensao'] or user.can_create_events %}
+    {% set show_events_management = can_access_events_dashboard and has_event_management_records|default(false) %}
     {% set can_access_analytics_dashboard = user.role in ['admin', 'coordenador', 'gestor'] %}
     {% set can_access_academics_dashboard = user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
 
-    {% if can_access_events_dashboard or can_access_analytics_dashboard or can_access_academics_dashboard %}
+    {% if show_events_management or can_access_analytics_dashboard or can_access_academics_dashboard %}
     <div class="row g-4 mb-4">
-        {% if can_access_events_dashboard %}
+        {% if show_events_management %}
         <div class="col-12 col-lg-4">
             <div class="glass-panel role-scope-card p-4 shadow-sm">
                 <span class="role-scope-badge mb-3">
@@ -1168,7 +1169,7 @@
     </div>
     {% endif %}
 
-    {% if can_access_events_dashboard %}
+    {% if show_events_management %}
     <div class="row g-4">
 
         {# Painel analítico movido para a página dedicada /analitico. #}

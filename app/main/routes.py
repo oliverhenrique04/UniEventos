@@ -15,7 +15,20 @@ def index():
             moodle_login_enabled=current_app.config.get('MOODLE_LOGIN_ENABLED', False),
             moodle_login_url=current_app.config.get('MOODLE_LOGIN_URL', ''),
         )
-    return render_template('dashboard.html', user=current_user)
+
+    has_event_management_records = False
+    if EventService.can_access_event_management(current_user):
+        has_event_management_records = (
+            EventService()
+            .get_events_for_user_paginated(current_user, page=1, per_page=1)
+            .total > 0
+        )
+
+    return render_template(
+        'dashboard.html',
+        user=current_user,
+        has_event_management_records=has_event_management_records,
+    )
 
 @bp.route('/logout')
 def logout():

@@ -674,6 +674,25 @@ def test_dashboard_page_no_longer_renders_management_analytics(client, app, admi
     assert 'Painel Analítico de Gestão' not in participante_html
 
 
+def test_dashboard_hides_event_management_when_user_has_no_visible_records(client, admin_user):
+    _login_admin(client)
+
+    html = client.get('/').get_data(as_text=True)
+
+    assert 'id="dashboard-eventos"' not in html
+    assert '<h4 class="fw-bold mb-2">Gestão de Eventos</h4>' not in html
+
+
+def test_dashboard_keeps_event_management_when_visible_records_exist(client, app, admin_user):
+    _seed_dashboard_analytics_data(app)
+    _login_admin(client)
+
+    html = client.get('/').get_data(as_text=True)
+
+    assert 'id="dashboard-eventos"' in html
+    assert '<h4 class="fw-bold mb-2">Gestão de Eventos</h4>' in html
+
+
 def test_analytics_page_visibility_by_role(client, app, admin_user):
     seeded = _seed_dashboard_analytics_data(app)
 
