@@ -1105,6 +1105,37 @@
         return `${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
     }
 
+    const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+
+    function parseApiDate(value) {
+        if (!value) return null;
+        if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+        const raw = String(value).trim();
+        if (!raw) return null;
+
+        const hasTimezoneInfo = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+        const normalized = hasTimezoneInfo ? raw : `${raw}Z`;
+        const dt = new Date(normalized);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function formatDateBrasilia(value) {
+        const dt = parseApiDate(value);
+        if (!dt) return '-';
+        return dt.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIMEZONE });
+    }
+
+    function formatTimeBrasilia(value) {
+        const dt = parseApiDate(value);
+        if (!dt) return '--:--';
+        return dt.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: BRASILIA_TIMEZONE
+        });
+    }
+
     function getAnalyticsGoalsStorageKey() {
         return `gestor-dashboard-goals:${currentUsername || 'anonymous'}`;
     }
@@ -1298,7 +1329,7 @@
         }
 
         tbody.innerHTML = items.map(item => {
-            const data = item.start_date ? new Date(item.start_date).toLocaleDateString('pt-BR') : '-';
+            const data = formatDateBrasilia(item.start_date);
             return `
                 <tr>
                     <td>
@@ -1357,8 +1388,7 @@
             return;
         }
 
-        const dt = new Date(isoDate);
-        el.innerHTML = `<i class="fa-regular fa-clock"></i>Atualizado às ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        el.innerHTML = `<i class="fa-regular fa-clock"></i>Atualizado às ${formatTimeBrasilia(isoDate)} (BRT)`;
     }
 
     async function carregarDashboardGestorAnalytics(forceRefresh = false) {
