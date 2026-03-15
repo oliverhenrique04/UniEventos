@@ -58,7 +58,7 @@
                         <i class="fa-solid fa-chart-line me-1"></i> Analítico
                     </a>
                     {% endif %}
-                    {% if user.role in ['admin', 'extensao', 'gestor'] %}
+                    {% if user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
                     <a href="{{ url_for('main.certificados_institucionais_page') }}" class="text-decoration-none fw-semibold text-slate-600 hover-primary me-lg-3">
                         <i class="fa-solid fa-certificate me-1"></i> Acadêmicos
                     </a>

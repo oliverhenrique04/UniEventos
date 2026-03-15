@@ -213,6 +213,8 @@ class EventService:
             return False
         if user.role == 'admin':
             return True
+        if user.role == 'coordenador':
+            return EventService.is_same_course_event(user, event)
         return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
 
     @staticmethod

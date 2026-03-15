@@ -991,21 +991,29 @@
     </div>
     {% endif %}
 
-    {% if user.role in ['extensao'] %}
+    {% if user.role in ['extensao', 'coordenador'] %}
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="glass-panel bg-white p-4 p-md-5 shadow-sm border-top border-4 border-primary">
                 <h4 class="fw-bold mb-2">
                     <i class="fa-solid fa-certificate text-primary me-2"></i>Certificados Acadêmicos
                 </h4>
-                <p class="text-muted mb-4">Gerencie certificados de monitoria, representação, iniciação científica e também os certificados vinculados aos eventos.</p>
+                <p class="text-muted mb-4">
+                    {% if user.role == 'coordenador' %}
+                    Consulte em modo somente leitura os certificados acadêmicos vinculados aos usuários do seu curso.
+                    {% else %}
+                    Gerencie certificados de monitoria, representação, iniciação científica e também os certificados vinculados aos eventos.
+                    {% endif %}
+                </p>
                 <div class="d-flex flex-column flex-md-row gap-2">
                     <a href="{{ url_for('main.certificados_institucionais_page') }}" class="btn btn-primary btn-lg">
-                        <i class="fa-solid fa-arrow-right me-2"></i>Acessar Gestão Institucional
+                        <i class="fa-solid fa-arrow-right me-2"></i>{% if user.role == 'coordenador' %}Acessar Consulta Institucional{% else %}Acessar Gestão Institucional{% endif %}
                     </a>
+                    {% if user.role == 'extensao' %}
                     <a href="{{ url_for('main.gerenciar_eventos') }}" class="btn btn-outline-primary btn-lg">
                         <i class="fa-solid fa-certificate me-2"></i>Certificados de Eventos
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>

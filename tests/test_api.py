@@ -1870,6 +1870,143 @@ def test_institutional_certificates_allow_extensao_edit_but_only_delete_own_reco
         assert deleted_own_cert is None
 
 
+def test_institutional_certificates_allow_coordinator_read_only_only_for_own_course(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    with app.app_context():
+        cert_eng_a = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_a_username']).first()
+        cert_eng_b = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_b_username']).first()
+        cert_dir = InstitutionalCertificate.query.filter_by(created_by_username='prof_dir').first()
+        assert cert_eng_a is not None
+        assert cert_eng_b is not None
+        assert cert_dir is not None
+
+        eng_recipient = InstitutionalCertificateRecipient.query.filter_by(
+            certificate_id=cert_eng_a.id,
+            user_username='student_eng_a',
+        ).first()
+        mixed_recipient = InstitutionalCertificateRecipient.query.filter_by(
+            certificate_id=cert_eng_a.id,
+            user_username='student_dir',
+        ).first()
+        assert eng_recipient is not None
+        assert mixed_recipient is not None
+
+        cert_eng_a_id = cert_eng_a.id
+        cert_eng_b_id = cert_eng_b.id
+        cert_dir_id = cert_dir.id
+        eng_recipient_id = eng_recipient.id
+        mixed_recipient_id = mixed_recipient.id
+
+    _login_user(client, seeded['coord_username'])
+
+    page_res = client.get('/certificados_institucionais')
+    list_res = client.get('/api/institutional_certificates')
+    detail_allowed_res = client.get(f'/api/institutional_certificates/{cert_eng_a_id}')
+    detail_denied_res = client.get(f'/api/institutional_certificates/{cert_dir_id}')
+    recipients_res = client.get(f'/api/institutional_certificates/{cert_eng_a_id}/recipients')
+    export_res = client.get(f'/api/institutional_certificates/{cert_eng_a_id}/recipients/export_csv')
+    designer_res = client.get(f'/designer_certificado_institucional/{cert_eng_a_id}')
+    denied_designer_res = client.get(f'/designer_certificado_institucional/{cert_dir_id}')
+    preview_layout_res = client.post(f'/api/institutional_certificates/{cert_eng_a_id}/preview_layout', json={
+        'template': {
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': [
+                {
+                    'id': 'txt1',
+                    'type': 'text',
+                    'text': 'Certificamos {{RECIPIENT_NAME}} em {{CURSO_USUARIO}}.',
+                    'x': 50,
+                    'y': 50,
+                    'w': 70,
+                    'h': 15,
+                    'font': 22,
+                    'color': '#111111',
+                    'align': 'center',
+                    'font_family': 'Helvetica',
+                    'visible': True,
+                }
+            ],
+        },
+        'preview_data': {
+            '{{RECIPIENT_NAME}}': 'Aluno Eng A',
+            '{{CERTIFICATE_TITLE}}': 'Certificado Engenharia A',
+            '{{CATEGORY}}': 'Extensao',
+            '{{CARGA_HORARIA}}': '4',
+            '{{CURSO_USUARIO}}': 'Engenharia',
+            '{{EMISSION_DATE}}': '15/03/2026',
+            '{{SIGNER}}': 'Coord. Eng A',
+            '{{CPF}}': '20030040057',
+            '{{HASH}}': 'COORDENGPREVIEW',
+        },
+    })
+    update_res = client.put(f'/api/institutional_certificates/{cert_eng_a_id}', json={})
+    preview_allowed_res = client.get(
+        f'/api/institutional_certificates/{cert_eng_a_id}/recipients/{eng_recipient_id}/preview'
+    )
+    preview_denied_res = client.get(
+        f'/api/institutional_certificates/{cert_eng_a_id}/recipients/{mixed_recipient_id}/preview'
+    )
+
+    assert page_res.status_code == 200
+
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    assert payload['total'] == 2
+    assert {item['id'] for item in payload['items']} == {cert_eng_a_id, cert_eng_b_id}
+    assert all(item['can_edit'] is False for item in payload['items'])
+    assert all(item['can_delete'] is False for item in payload['items'])
+    assert all(item['can_view_designer'] is True for item in payload['items'])
+    recipients_count_by_id = {item['id']: item['recipients_count'] for item in payload['items']}
+    assert recipients_count_by_id[cert_eng_a_id] == 1
+    assert recipients_count_by_id[cert_eng_b_id] == 1
+
+    assert detail_allowed_res.status_code == 200
+    detail_payload = detail_allowed_res.get_json()
+    assert detail_payload['can_edit'] is False
+    assert detail_payload['can_delete'] is False
+    assert detail_payload['can_view_designer'] is True
+    assert detail_payload['recipients_count'] == 1
+
+    assert detail_denied_res.status_code == 403
+
+    assert recipients_res.status_code == 200
+    recipients_payload = recipients_res.get_json()
+    assert recipients_payload['total'] == 1
+    assert [item['user_username'] for item in recipients_payload['items']] == ['student_eng_a']
+
+    assert export_res.status_code == 200
+    export_text = export_res.data.decode('utf-8')
+    assert 'eng_a@test.local' in export_text
+    assert 'dir_mix@test.local' not in export_text
+
+    assert designer_res.status_code == 200
+    assert denied_designer_res.status_code == 403
+    assert preview_layout_res.status_code == 200
+    assert preview_layout_res.mimetype == 'application/pdf'
+    assert update_res.status_code == 403
+
+    assert preview_allowed_res.status_code == 200
+    assert preview_allowed_res.mimetype == 'application/pdf'
+    assert preview_denied_res.status_code == 404
+
+
+def test_institutional_certificates_return_empty_list_for_coordinator_without_course(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['coord_no_course_username'])
+
+    page_res = client.get('/certificados_institucionais')
+    list_res = client.get('/api/institutional_certificates')
+
+    assert page_res.status_code == 200
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    assert payload['total'] == 0
+    assert payload['items'] == []
+
+
 def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
     event_id = _create_event_for_certs(app)
 

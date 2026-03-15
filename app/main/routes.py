@@ -87,7 +87,7 @@ def gerenciar_entregas(event_id):
 @login_required
 def certificados_institucionais_page():
     """Page for extension profile to manage institutional certificates."""
-    if current_user.role not in ['admin', 'extensao', 'gestor']:
+    if current_user.role not in ['admin', 'extensao', 'gestor', 'coordenador']:
         return "Acesso negado", 403
     return render_template('institutional_certificates.html', user=current_user)
 
@@ -96,16 +96,17 @@ def certificados_institucionais_page():
 @login_required
 def designer_certificado_institucional(certificate_id):
     """Page for visually designing institutional certificates."""
-    if current_user.role not in ['admin', 'extensao', 'gestor']:
+    if current_user.role not in ['admin', 'extensao', 'gestor', 'coordenador']:
         return "Acesso negado", 403
 
+    from app.api import institutional_certificates as institutional_certificates_api
     from app.models import InstitutionalCertificate
     from app.services.certificate_service import CertificateService
     cert = db.session.get(InstitutionalCertificate, certificate_id)
     if not cert:
         abort(404)
 
-    if current_user.role not in ['admin', 'extensao'] and cert.created_by_username != current_user.username:
+    if not institutional_certificates_api._can_view_institutional_certificate_designer(cert):
         return "Acesso negado", 403
 
     return render_template(
@@ -113,7 +114,7 @@ def designer_certificado_institucional(certificate_id):
         user=current_user,
         event=cert,
         designer_mode='institutional',
-        can_manage_certificates=True,
+        can_manage_certificates=institutional_certificates_api._can_edit_institutional_certificate(cert),
         fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='institutional'),
     )
 

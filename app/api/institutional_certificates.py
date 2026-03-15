@@ -40,7 +40,7 @@ def _can_manage_institutional_certificates():
 
 
 def _can_view_institutional_certificates():
-    return current_user.role in ['admin', 'extensao', 'gestor']
+    return current_user.role in ['admin', 'extensao', 'gestor', 'coordenador']
 
 
 def _can_edit_institutional_certificate(cert):
@@ -57,6 +57,81 @@ def _can_delete_institutional_certificate(cert):
     if current_user.role in ['extensao', 'gestor']:
         return cert.created_by_username == current_user.username
     return False
+
+
+def _coordinator_course_id():
+    if current_user.role != 'coordenador':
+        return None
+    return getattr(current_user, 'course_id', None)
+
+
+def _build_coordinator_visible_certificate_ids_query():
+    course_id = _coordinator_course_id()
+    if not course_id:
+        return None
+    return (
+        db.session.query(InstitutionalCertificateRecipient.certificate_id)
+        .join(User, InstitutionalCertificateRecipient.user_username == User.username)
+        .filter(User.course_id == course_id)
+        .distinct()
+    )
+
+
+def _apply_institutional_certificate_view_scope(query):
+    if current_user.role != 'coordenador':
+        return query
+
+    visible_ids = _build_coordinator_visible_certificate_ids_query()
+    if visible_ids is None:
+        return query.filter(InstitutionalCertificate.id.is_(None))
+    return query.filter(InstitutionalCertificate.id.in_(visible_ids))
+
+
+def _apply_institutional_recipient_view_scope(query):
+    if current_user.role != 'coordenador':
+        return query
+
+    course_id = _coordinator_course_id()
+    if not course_id:
+        return query.filter(InstitutionalCertificateRecipient.id.is_(None))
+    return query.join(User, InstitutionalCertificateRecipient.user_username == User.username).filter(
+        User.course_id == course_id
+    )
+
+
+def _can_view_institutional_certificate(cert):
+    if not cert:
+        return False
+    if current_user.role in ['admin', 'extensao', 'gestor']:
+        return True
+    if current_user.role != 'coordenador':
+        return False
+
+    course_id = _coordinator_course_id()
+    if not course_id:
+        return False
+
+    return db.session.query(InstitutionalCertificateRecipient.id).join(
+        User,
+        InstitutionalCertificateRecipient.user_username == User.username,
+    ).filter(
+        InstitutionalCertificateRecipient.certificate_id == cert.id,
+        User.course_id == course_id,
+    ).first() is not None
+
+
+def _can_view_institutional_certificate_designer(cert):
+    if _can_edit_institutional_certificate(cert):
+        return True
+    if current_user.role == 'coordenador':
+        return _can_view_institutional_certificate(cert)
+    return False
+
+
+def _count_visible_recipients(certificate_id):
+    return _apply_institutional_recipient_view_scope(
+        InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
+    ).count()
 
 
 def _parse_date_iso(date_str):
@@ -250,7 +325,35 @@ def _get_viewable_certificate_or_error(certificate_id):
         return None, (jsonify({'erro': 'Nao encontrado'}), 404)
     if not _can_view_institutional_certificates():
         return None, (jsonify({'erro': 'Permissao negada'}), 403)
+    if not _can_view_institutional_certificate(cert):
+        return None, (jsonify({'erro': 'Acesso negado'}), 403)
     return cert, None
+
+
+def _get_designer_viewable_certificate_or_error(certificate_id):
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        return None, (jsonify({'erro': 'Nao encontrado'}), 404)
+    if not _can_view_institutional_certificates():
+        return None, (jsonify({'erro': 'Permissao negada'}), 403)
+    if not _can_view_institutional_certificate_designer(cert):
+        return None, (jsonify({'erro': 'Acesso negado'}), 403)
+    return cert, None
+
+
+def _get_viewable_recipient_or_error(certificate_id, recipient_id):
+    cert, error = _get_viewable_certificate_or_error(certificate_id)
+    if error:
+        return None, None, error
+
+    recipient = _apply_institutional_recipient_view_scope(
+        InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
+    ).filter(
+        InstitutionalCertificateRecipient.id == recipient_id
+    ).first()
+    if not recipient:
+        return cert, None, (jsonify({'erro': 'Destinatario nao encontrado'}), 404)
+    return cert, recipient, None
 
 
 def _get_active_send_job(certificate_id, created_by):
@@ -484,6 +587,7 @@ def list_institutional_certificates():
 
     query = InstitutionalCertificate.query
     query = query.join(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
+    query = _apply_institutional_certificate_view_scope(query)
     if categoria:
         query = query.filter(InstitutionalCertificateCategory.nome.ilike(f'%{categoria}%'))
     if status:
@@ -506,12 +610,13 @@ def list_institutional_certificates():
                 'category_id': item.category_id,
                 'data_emissao': item.data_emissao,
                 'status': item.status,
-                'recipients_count': len(item.recipients),
+                'recipients_count': _count_visible_recipients(item.id),
                 'created_by_username': item.created_by_username,
                 'created_by_name': item.creator.nome if item.creator else None,
                 'created_at': item.created_at.isoformat() if item.created_at else None,
                 'can_edit': _can_edit_institutional_certificate(item),
                 'can_delete': _can_delete_institutional_certificate(item),
+                'can_view_designer': _can_view_institutional_certificate_designer(item),
             }
             for item in pagination.items
         ],
@@ -598,8 +703,10 @@ def get_institutional_certificate(certificate_id):
         'status': cert.status,
         'created_by_username': cert.created_by_username,
         'created_by_name': cert.creator.nome if cert.creator else None,
+        'recipients_count': _count_visible_recipients(cert.id),
         'can_edit': _can_edit_institutional_certificate(cert),
         'can_delete': _can_delete_institutional_certificate(cert),
+        'can_view_designer': _can_view_institutional_certificate_designer(cert),
     })
 
 
@@ -684,7 +791,7 @@ def setup_institutional_certificate(certificate_id):
 @bp.route('/<int:certificate_id>/preview_layout', methods=['POST'])
 @login_required
 def preview_layout(certificate_id):
-    cert, error = _get_managed_certificate_or_error(certificate_id)
+    cert, error = _get_designer_viewable_certificate_or_error(certificate_id)
     if error:
         return error
 
@@ -824,7 +931,9 @@ def list_recipients(certificate_id):
     sort_dir = (request.args.get('sort_dir') or 'desc').strip().lower()
     descending = sort_dir != 'asc'
 
-    query = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
+    query = _apply_institutional_recipient_view_scope(
+        InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
+    )
     if query_text:
         like_term = f'%{query_text}%'
         query = query.filter(or_(
@@ -1169,7 +1278,9 @@ def export_recipients_csv(certificate_id):
     if error:
         return error
 
-    recipients = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id).all()
+    recipients = _apply_institutional_recipient_view_scope(
+        InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
+    ).all()
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -1199,16 +1310,9 @@ def export_recipients_csv(certificate_id):
 @bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/download', methods=['GET'])
 @login_required
 def download_recipient_pdf(certificate_id, recipient_id):
-    cert, error = _get_viewable_certificate_or_error(certificate_id)
+    cert, recipient, error = _get_viewable_recipient_or_error(certificate_id, recipient_id)
     if error:
         return error
-
-    recipient = InstitutionalCertificateRecipient.query.filter_by(
-        id=recipient_id,
-        certificate_id=certificate_id,
-    ).first()
-    if not recipient:
-        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
 
     profile = _recipient_effective_profile(recipient)
     if not recipient.cert_hash:
@@ -1281,16 +1385,9 @@ def preview_public_by_hash(cert_hash):
 @bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/preview', methods=['GET'])
 @login_required
 def preview_recipient_pdf(certificate_id, recipient_id):
-    cert, error = _get_viewable_certificate_or_error(certificate_id)
+    cert, recipient, error = _get_viewable_recipient_or_error(certificate_id, recipient_id)
     if error:
         return error
-
-    recipient = InstitutionalCertificateRecipient.query.filter_by(
-        id=recipient_id,
-        certificate_id=certificate_id,
-    ).first()
-    if not recipient:
-        return jsonify({'erro': 'Destinatario nao encontrado'}), 404
 
     profile = _recipient_effective_profile(recipient)
     if not recipient.cert_hash:

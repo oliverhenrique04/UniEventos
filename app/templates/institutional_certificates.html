@@ -785,7 +785,9 @@ async function carregarCertificadosInstitucionais(page = 1) {
                            ${item.can_delete
                                 ? `<button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir"><i class="fa-solid fa-trash-can text-danger"></i></button>`
                                 : `<button class="btn btn-sm btn-light border" title="Somente o autor pode excluir" disabled><i class="fa-solid fa-trash-can text-muted"></i></button>`}`
-                        : `<button class="btn btn-sm btn-light border" title="Somente consulta" disabled><i class="fa-solid fa-lock text-muted"></i></button>`}
+                        : `${item.can_view_designer
+                                ? `<button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Visualizar layout"><i class="fa-regular fa-eye text-warning"></i></button>`
+                                : `<button class="btn btn-sm btn-light border" title="Somente consulta" disabled><i class="fa-solid fa-lock text-muted"></i></button>`}`}
                 </div>
             </td>
         </tr>
