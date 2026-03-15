@@ -81,7 +81,9 @@ def baixar_certificado(evt_id, cpf):
         texto = f"• {item.nome}"
         if item.carga_horaria > 0: texto += f" ({item.carga_horaria}h)"
         if item.data_atv: texto += f" - {item.data_atv}"
-        if item.palestrante: texto += f" | {item.palestrante}"
+        speaker_label = getattr(item, 'palestrantes_label', '') or getattr(item, 'palestrante', '')
+        if speaker_label:
+            texto += f" | {speaker_label}"
         p.drawString(90, y, texto)
         y -= 15
         

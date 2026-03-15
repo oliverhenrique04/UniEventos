@@ -27,7 +27,7 @@ def serialize_user(user):
         'can_create_events': user.can_create_events,
     }
 
-def serialize_activity(activity, current_user=None):
+def serialize_activity(activity, current_user=None, include_private=False):
     """Serializes an Activity object to a dictionary, optionally checking enrollment."""
     total_inscritos = len(activity.enrollments)
     inscrito = False
@@ -38,12 +38,18 @@ def serialize_activity(activity, current_user=None):
                 inscrito = True
                 break
     
+    speakers_payload = activity.get_speakers_payload(include_emails=include_private)
+    primary_speaker_name = activity.primary_speaker_name
+    primary_speaker_email = activity.primary_speaker_email if include_private else None
+
     return {
         'id': activity.id,
         'event_id': activity.event_id,
         'nome': activity.nome,
-        'palestrante': activity.palestrante,
-        'email_palestrante': activity.email_palestrante,
+        'palestrante': primary_speaker_name,
+        'email_palestrante': primary_speaker_email,
+        'palestrantes': speakers_payload,
+        'palestrantes_label': activity.palestrantes_label,
         'local': activity.local,
         'descricao': activity.descricao,
         'data_atv': _fmt_date(activity.data_atv),
@@ -103,6 +109,8 @@ def serialize_event(event, current_user=None):
             can_manage_participants = True
             can_manage_certificates = True
 
+    include_private_speaker_data = can_edit or can_manage_participants or can_manage_certificates
+
     return {
         'id': event.id,
         'owner': event.owner_username,
@@ -120,7 +128,7 @@ def serialize_event(event, current_user=None):
         'status': event.status,
         'total_inscritos': total_inscritos,
         'total_presentes': total_presentes,
-        'atividades': [serialize_activity(a, current_user) for a in sorted_activities],
+        'atividades': [serialize_activity(a, current_user, include_private=include_private_speaker_data) for a in sorted_activities],
         'can_edit': can_edit,
         'can_delete': can_delete,
         'can_manage_participants': can_manage_participants,

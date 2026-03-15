@@ -482,6 +482,7 @@
                         {% if event.tipo == 'PADRAO' %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{ATIVIDADE}}', event)">{{ATIVIDADE}} — Atividade</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{PALESTRANTE}}', event)">{{PALESTRANTE}} — Palestrante</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{PALESTRANTES}}', event)">{{PALESTRANTES}} — Palestrantes</a></li>
                         {% endif %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">{{HORAS}} — Horas</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">{{DATA}} — Data</a></li>
@@ -600,7 +601,11 @@
                     </div>
                     <div class="variable-guide-item" onclick="injectVar('{{PALESTRANTE}}')">
                         <div class="fw-bold text-primary small">{{ '{{PALESTRANTE}}' }}</div>
-                        <div class="text-muted x-small">Nome do Palestrante</div>
+                        <div class="text-muted x-small">Primeiro palestrante da atividade</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{PALESTRANTES}}')">
+                        <div class="fw-bold text-primary small">{{ '{{PALESTRANTES}}' }}</div>
+                        <div class="text-muted x-small">Todos os palestrantes da atividade</div>
                     </div>
                     {% endif %}
                     <div class="variable-guide-item" onclick="injectVar('{{HORAS}}')">
@@ -715,6 +720,7 @@
                     {% if event.tipo == 'PADRAO' %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{ATIVIDADE}}' }}')">{{ '{{ATIVIDADE}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{PALESTRANTE}}' }}')">{{ '{{PALESTRANTE}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{PALESTRANTES}}' }}')">{{ '{{PALESTRANTES}}' }}</button>
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HORAS}}' }}')">{{ '{{HORAS}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA}}' }}')">{{ '{{DATA}}' }}</button>
@@ -775,6 +781,7 @@
     const TAG_EVENTO = "{{ '{{EVENTO}}' }}";
     const TAG_ATIVIDADE = "{{ '{{ATIVIDADE}}' }}";
     const TAG_PALESTRANTE = "{{ '{{PALESTRANTE}}' }}";
+    const TAG_PALESTRANTES = "{{ '{{PALESTRANTES}}' }}";
     const TAG_HORAS = "{{ '{{HORAS}}' }}";
     const TAG_DATA = "{{ '{{DATA}}' }}";
     const TAG_DATA_REALIZACAO = "{{ '{{DATA_REALIZACAO}}' }}";
@@ -1205,7 +1212,10 @@
         const name = nomes[Math.floor(Math.random() * nomes.length)];
         const evento = eventos[Math.floor(Math.random() * eventos.length)];
         const atividade = ['Palestra Magna', 'Mesa Redonda', 'Oficina Prática', 'Minicurso'].sort(() => Math.random() - 0.5)[0];
-        const palestrante = ['Profa. Fulana', 'Dr. Fulano', 'Msc. Ciclana', 'Prof. Fulano'].sort(() => Math.random() - 0.5)[0];
+        const speakersPool = ['Profa. Fulana', 'Dr. Fulano', 'Msc. Ciclana', 'Prof. Fulano'];
+        const speakerCount = 1 + Math.floor(Math.random() * Math.min(3, speakersPool.length));
+        const palestrantes = [...speakersPool].sort(() => Math.random() - 0.5).slice(0, speakerCount);
+        const palestrante = palestrantes[0];
         const horas = `${8 + Math.floor(Math.random() * 33)} horas`;
         const cpfNum = `${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}-${Math.floor(10 + Math.random() * 90)}`;
         const data = todayDateLabel;
@@ -1217,6 +1227,7 @@
             [TAG_EVENTO]: evento,
             [TAG_ATIVIDADE]: atividade,
             [TAG_PALESTRANTE]: palestrante,
+            [TAG_PALESTRANTES]: palestrantes.join(', '),
             [TAG_HORAS]: horas,
             [TAG_DATA]: data,
             [TAG_DATA_REALIZACAO]: dataRealizacao,
@@ -1260,6 +1271,7 @@
                 [TAG_EVENTO, tags[TAG_EVENTO]],
                 {% if event.tipo == 'PADRAO' %}[TAG_ATIVIDADE, tags[TAG_ATIVIDADE]],{% endif %}
                 {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTE, tags[TAG_PALESTRANTE]],{% endif %}
+                {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTES, tags[TAG_PALESTRANTES]],{% endif %}
                 [TAG_HORAS, tags[TAG_HORAS]],
                 [TAG_DATA, tags[TAG_DATA]],
                 [TAG_DATA_REALIZACAO, tags[TAG_DATA_REALIZACAO]],
@@ -2357,7 +2369,8 @@
                 { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento/atividade.' },
                 { label: '{{ "{{DATA_REALIZACAO}}" }}', description: 'Data de realização do evento.' },
                 {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },{% endif %}
-                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Nome do palestrante ou responsável pela atividade.' },{% endif %}
+                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Primeiro palestrante ou responsável principal da atividade.' },{% endif %}
+                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTES}}" }}', description: 'Lista completa de palestrantes da atividade.' },{% endif %}
                 { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
                 { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' },
             ];

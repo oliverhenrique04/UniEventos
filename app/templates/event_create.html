@@ -385,6 +385,93 @@
         }
     }
 
+    function escapeAttr(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;');
+    }
+
+    function normalizeSpeakersPayload(activity = {}) {
+        const canonical = Array.isArray(activity.palestrantes) ? activity.palestrantes : [];
+        const normalized = canonical
+            .map((speaker, index) => ({
+                nome: String(speaker?.nome ?? '').trim(),
+                email: String(speaker?.email ?? '').trim(),
+                ordem: Number.isFinite(Number(speaker?.ordem)) ? Number(speaker.ordem) : index
+            }))
+            .filter((speaker) => speaker.nome || speaker.email)
+            .sort((a, b) => a.ordem - b.ordem);
+
+        if (normalized.length > 0) {
+            return normalized;
+        }
+
+        const legacyName = String(activity.palestrante ?? '').trim();
+        const legacyEmail = String(activity.email_palestrante ?? '').trim();
+        if (legacyName || legacyEmail) {
+            return [{ nome: legacyName, email: legacyEmail, ordem: 0 }];
+        }
+
+        return [{ nome: '', email: '', ordem: 0 }];
+    }
+
+    function buildSpeakerRowHtml(speaker = {}, canRemove = true) {
+        return `
+            <div class="speaker-row border rounded-3 p-3 bg-white">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="small fw-bold text-muted mb-1">Nome do palestrante</label>
+                        <input type="text" class="form-control form-control-sm atv-speaker-name" value="${escapeAttr(speaker.nome || '')}" placeholder="Ex: Profa. Maria Silva">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="small fw-bold text-muted mb-1">E-mail do palestrante</label>
+                        <input type="email" class="form-control form-control-sm atv-speaker-email" value="${escapeAttr(speaker.email || '')}" placeholder="nome@exemplo.com">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSpeakerRow(this)" ${canRemove ? '' : 'disabled'}>
+                            <i class="fa-solid fa-trash-can me-1"></i>Remover
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function addSpeakerRow(buttonOrContainer, speaker = {}) {
+        const container = buttonOrContainer?.classList?.contains('speaker-items')
+            ? buttonOrContainer
+            : buttonOrContainer.closest('.speakers-box').querySelector('.speaker-items');
+        if (!container) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = buildSpeakerRowHtml(speaker, true);
+        container.appendChild(wrapper.firstElementChild);
+    }
+
+    function removeSpeakerRow(button) {
+        const container = button.closest('.speaker-items');
+        const row = button.closest('.speaker-row');
+        if (!container || !row) return;
+        row.remove();
+    }
+
+    function collectSpeakers(row) {
+        const speakers = [];
+        row.querySelectorAll('.speaker-row').forEach((speakerRow, index) => {
+            const nome = speakerRow.querySelector('.atv-speaker-name')?.value?.trim() || '';
+            const email = speakerRow.querySelector('.atv-speaker-email')?.value?.trim() || '';
+            if (!nome && !email) return;
+            speakers.push({
+                nome,
+                email,
+                ordem: index
+            });
+        });
+        return speakers;
+    }
+
     function addAtvRow() {
         const id = 'atv_' + Date.now();
         const div = document.createElement('div');
@@ -402,14 +489,6 @@
                 <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Horas</label>
                     <input type="number" class="form-control atv-horas" placeholder="0" min="0" required>
-                </div>
-                <div class="col-md-4">
-                    <label class="small fw-bold text-muted mb-1">Palestrante / Facilitador</label>
-                    <input type="text" class="form-control atv-palestrante" placeholder="Nome do responsável">
-                </div>
-                <div class="col-md-4">
-                    <label class="small fw-bold text-muted mb-1">E-mail do Palestrante</label>
-                    <input type="email" class="form-control atv-email-palestrante" placeholder="nome@exemplo.com">
                 </div>
                 <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Local / Link</label>
@@ -431,6 +510,22 @@
                 <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Hora</label>
                     <input type="time" class="form-control atv-hora">
+                </div>
+                <div class="col-12">
+                    <div class="speakers-box border rounded-4 p-3 bg-light-subtle">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div>
+                                <label class="small fw-bold text-muted mb-0">Palestrantes / Facilitadores</label>
+                                <div class="x-small text-muted">Opcional. Adicione zero, um ou mais palestrantes para esta atividade.</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addSpeakerRow(this)">
+                                <i class="fa-solid fa-user-plus me-1"></i>Adicionar palestrante
+                            </button>
+                        </div>
+                        <div class="speaker-items d-grid gap-2">
+                            ${buildSpeakerRowHtml({}, true)}
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -458,8 +553,7 @@
             document.querySelectorAll('.activity-row').forEach(row => {
                 activities.push({
                     nome: row.querySelector('.atv-nome').value,
-                    palestrante: row.querySelector('.atv-palestrante').value,
-                    email_palestrante: row.querySelector('.atv-email-palestrante').value,
+                    palestrantes: collectSpeakers(row),
                     local: row.querySelector('.atv-local').value,
                     horas: row.querySelector('.atv-horas').value,
                     vagas: row.querySelector('.atv-unlim').checked ? -1 : row.querySelector('.atv-vagas').value,
@@ -512,4 +606,3 @@
     };
 </script>
 {% endblock %}
-

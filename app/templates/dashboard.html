@@ -2163,7 +2163,93 @@
     // --------------------------
     // ATIVIDADES (CRIAR / EDITAR)
     // --------------------------
-    function addAtividade(containerId) {
+    function escapeAttr(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;');
+    }
+
+    function normalizeActivitySpeakers(activity = {}) {
+        const canonical = Array.isArray(activity.palestrantes) ? activity.palestrantes : [];
+        const normalized = canonical
+            .map((speaker, index) => ({
+                nome: String(speaker?.nome ?? '').trim(),
+                email: String(speaker?.email ?? '').trim(),
+                ordem: Number.isFinite(Number(speaker?.ordem)) ? Number(speaker.ordem) : index
+            }))
+            .filter((speaker) => speaker.nome || speaker.email)
+            .sort((a, b) => a.ordem - b.ordem);
+
+        if (normalized.length > 0) {
+            return normalized;
+        }
+
+        const legacyName = String(activity.palestrante ?? '').trim();
+        const legacyEmail = String(activity.email_palestrante ?? '').trim();
+        if (legacyName || legacyEmail) {
+            return [{ nome: legacyName, email: legacyEmail, ordem: 0 }];
+        }
+
+        return [{ nome: '', email: '', ordem: 0 }];
+    }
+
+    function buildSpeakerCardRow(speaker = {}) {
+        return `
+            <div class="speaker-row border rounded-3 p-2 bg-white">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="small text-muted mb-1">Nome</label>
+                        <input type="text" class="form-control form-control-sm atv-speaker-name" value="${escapeAttr(speaker.nome || '')}" placeholder="Nome do palestrante">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="small text-muted mb-1">E-mail</label>
+                        <input type="email" class="form-control form-control-sm atv-speaker-email" value="${escapeAttr(speaker.email || '')}" placeholder="nome@exemplo.com">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSpeakerCardRow(this)">
+                            <i class="fa-solid fa-trash-can me-1"></i>Remover
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function addSpeakerCardRow(buttonOrContainer, speaker = {}) {
+        const container = buttonOrContainer?.classList?.contains('speaker-items')
+            ? buttonOrContainer
+            : buttonOrContainer.closest('.speakers-box').querySelector('.speaker-items');
+        if (!container) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = buildSpeakerCardRow(speaker);
+        container.appendChild(wrapper.firstElementChild);
+    }
+
+    function removeSpeakerCardRow(button) {
+        const row = button.closest('.speaker-row');
+        if (row) row.remove();
+    }
+
+    function collectSpeakerCardData(card) {
+        const speakers = [];
+        card.querySelectorAll('.speaker-row').forEach((row, index) => {
+            const nome = row.querySelector('.atv-speaker-name')?.value?.trim() || '';
+            const email = row.querySelector('.atv-speaker-email')?.value?.trim() || '';
+            if (!nome && !email) return;
+            speakers.push({
+                nome,
+                email,
+                ordem: index
+            });
+        });
+        return speakers;
+    }
+
+    function addAtividade(containerId, data = {}) {
+        const speakers = normalizeActivitySpeakers(data);
         const div = document.createElement('div');
         div.className = 'card border-0 shadow-sm mb-2 position-relative';
         div.style.background = '#f8f9fa';
@@ -2188,20 +2274,40 @@
 
         <div class="input-group input-group-sm mb-2">
           <span class="input-group-text bg-white"><i class="fa-solid fa-users"></i></span>
-          <input type="number" class="form-control atv-vagas" placeholder="Vagas">
+          <input type="number" class="form-control atv-vagas" value="${data.vagas > 0 ? data.vagas : ''}" placeholder="Vagas">
           <div class="input-group-text bg-white">
-            <input class="form-check-input mt-0 atv-unlim" type="checkbox" onchange="toggleAtvVagas(this)">
+            <input class="form-check-input mt-0 atv-unlim" type="checkbox" ${data.vagas === -1 ? 'checked' : ''} onchange="toggleAtvVagas(this)">
             <small class="ms-1">Ilimitado</small>
           </div>
         </div>
 
-        <input type="text" class="form-control form-control-sm mb-2 atv-local" placeholder="Local / Sala">
-        <input type="text" class="form-control form-control-sm mb-2 atv-palestrante" placeholder="Palestrante">
-        <input type="email" class="form-control form-control-sm mb-2 atv-email-palestrante" placeholder="E-mail do palestrante">
-        <textarea class="form-control form-control-sm atv-desc" placeholder="Breve descrição" rows="1"></textarea>
+        <input type="text" class="form-control form-control-sm mb-2 atv-local" value="${escapeAttr(data.local || '')}" placeholder="Local / Sala">
+        <div class="speakers-box border rounded-3 p-2 bg-light-subtle mb-2">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <div>
+              <div class="small fw-bold text-muted">Palestrantes</div>
+              <div class="x-small text-muted">Opcional. Adicione zero, um ou mais palestrantes.</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addSpeakerCardRow(this)">
+              <i class="fa-solid fa-user-plus me-1"></i>Adicionar
+            </button>
+          </div>
+          <div class="speaker-items d-grid gap-2">
+            ${speakers.map((speaker) => buildSpeakerCardRow(speaker)).join('')}
+          </div>
+        </div>
+        <textarea class="form-control form-control-sm atv-desc" placeholder="Breve descrição" rows="1">${escapeAttr(data.descricao || '')}</textarea>
       </div>
     `;
         document.getElementById(containerId).appendChild(div);
+        const checkbox = div.querySelector('.atv-unlim');
+        if (checkbox?.checked) {
+            toggleAtvVagas(checkbox);
+        }
+        div.querySelector('.atv-nome').value = data.nome || '';
+        div.querySelector('.atv-horas').value = data.horas ?? data.carga_horaria ?? '';
+        div.querySelector('.atv-data').value = data.data_atv || '';
+        div.querySelector('.atv-hora').value = data.hora_atv || '';
     }
 
     function toggleAtvVagas(cb) {
@@ -2221,8 +2327,7 @@
                 data_atv: el.querySelector('.atv-data').value,
                 hora_atv: el.querySelector('.atv-hora').value,
                 local: el.querySelector('.atv-local').value,
-                palestrante: el.querySelector('.atv-palestrante').value,
-                email_palestrante: el.querySelector('.atv-email-palestrante').value,
+                palestrantes: collectSpeakerCardData(el),
                 descricao: el.querySelector('.atv-desc').value
             });
         });
@@ -2603,7 +2708,7 @@
                 <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
                   <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.carga_horaria}h</span>
                   <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${a.local || 'Auditório'}</span>
-                  ${a.palestrante ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${a.palestrante}</span>` : ''}
+                  ${(a.palestrantes_label || a.palestrante) ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${a.palestrantes_label || a.palestrante}</span>` : ''}
                 </div>
               </div>
               ${vagasStatus}
@@ -2917,30 +3022,7 @@
         container.innerHTML = '';
 
         (ev.atividades || []).forEach(a => {
-            addAtividade('containerAtividadesEdit');
-            const card = container.lastElementChild;
-
-            card.querySelector('.atv-nome').value = a.nome || '';
-            card.querySelector('.atv-horas').value = a.carga_horaria || '';
-            const checkUnlim = card.querySelector('.atv-unlim');
-            const inputVagas = card.querySelector('.atv-vagas');
-
-            if (a.vagas == -1) {
-                checkUnlim.checked = true;
-                inputVagas.disabled = true;
-                inputVagas.value = '';
-            } else {
-                checkUnlim.checked = false;
-                inputVagas.disabled = false;
-                inputVagas.value = a.vagas ?? '';
-            }
-
-            card.querySelector('.atv-data').value = a.data_atv || '';
-            card.querySelector('.atv-hora').value = a.hora_atv || '';
-            card.querySelector('.atv-local').value = a.local || '';
-            card.querySelector('.atv-palestrante').value = a.palestrante || '';
-            card.querySelector('.atv-email-palestrante').value = a.email_palestrante || '';
-            card.querySelector('.atv-desc').value = a.descricao || '';
+            addAtividade('containerAtividadesEdit', a);
         });
 
         new bootstrap.Modal(document.getElementById('modalEditarEvento')).show();

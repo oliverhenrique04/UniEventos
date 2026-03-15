@@ -132,6 +132,7 @@
         horas: {{ a.carga_horaria if a.carga_horaria is not none else 0 }},
         local: {{ (a.local or '') | tojson }},
         palestrante: {{ (a.palestrante or '') | tojson }},
+        palestrantes_label: {{ (a.palestrantes_label or '') | tojson }},
         vagas: {{ a.vagas if a.vagas is not none else -1 }},
         total_inscritos: {{ a.enrollments | length }},
         inscrito: {{ 'true' if user.is_authenticated and (a.enrollments | selectattr('user_cpf', 'equalto', user.cpf) | list | length > 0) else 'false' }}
@@ -211,7 +212,7 @@
               <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
                 <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.horas}h</span>
                 <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${escapeHtml(a.local || 'Auditório')}</span>
-                ${a.palestrante ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${escapeHtml(a.palestrante)}</span>` : ''}
+                ${(a.palestrantes_label || a.palestrante) ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${escapeHtml(a.palestrantes_label || a.palestrante)}</span>` : ''}
               </div>
             </div>
             ${vagasStatus}

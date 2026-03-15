@@ -237,11 +237,11 @@
                 <form id="formPerfilDados" onsubmit="salvarPerfil(event)">
                     <div class="mb-3">
                         <label class="small fw-bold">Nome de Usuário (identificador de acesso)</label>
-                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.username }}" disabled>
+                        <input type="text" class="form-control rounded-3" value="{{ user.username }}" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">Nome Completo</label>
-                        <input type="text" id="perfilNome" class="form-control rounded-3" value="{{ user.nome }}" required>
+                        <input type="text" id="perfilNome" class="form-control rounded-3" value="{{ user.nome }}" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">E-mail</label>
@@ -249,15 +249,15 @@
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">CPF</label>
-                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.cpf or '-' }}" disabled>
+                        <input type="text" class="form-control rounded-3" value="{{ user.cpf or '-' }}" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">RA</label>
-                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.ra or '-' }}" disabled>
+                        <input type="text" class="form-control rounded-3" value="{{ user.ra or '-' }}" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold">Curso de Graduação</label>
-                        <input type="text" class="form-control rounded-3 bg-light" value="{{ user.curso or '-' }}" disabled>
+                        <input type="text" class="form-control rounded-3" value="{{ user.curso or '-' }}" disabled>
                     </div>
                 </form>
             </div>

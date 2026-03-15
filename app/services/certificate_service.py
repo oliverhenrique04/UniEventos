@@ -648,6 +648,41 @@ class CertificateService:
             rich_markup = rich_markup.replace(tag, html.escape(str(val)))
         return rich_markup
 
+    @staticmethod
+    def _speaker_names_from_activity(activity):
+        if not activity:
+            return []
+
+        if hasattr(activity, 'get_speaker_names'):
+            names = activity.get_speaker_names()
+            if names:
+                return names
+
+        raw_speakers = getattr(activity, 'palestrantes', None)
+        if isinstance(raw_speakers, list):
+            names = []
+            for item in raw_speakers:
+                if isinstance(item, dict):
+                    candidate = str(item.get('nome') or '').strip()
+                else:
+                    candidate = str(getattr(item, 'nome', '') or '').strip()
+                if candidate:
+                    names.append(candidate)
+            if names:
+                return names
+
+        singular_name = str(getattr(activity, 'palestrante', '') or '').strip()
+        return [singular_name] if singular_name else []
+
+    @classmethod
+    def _speaker_label_from_activity(cls, activity):
+        if not activity:
+            return ''
+        label = str(getattr(activity, 'palestrantes_label', '') or '').strip()
+        if label:
+            return label
+        return ', '.join(cls._speaker_names_from_activity(activity))
+
     def _build_template_tags(self, event, user, activities, total_hours, enrollment=None, tag_overrides=None):
         activity = None
         if activities:
@@ -656,7 +691,9 @@ class CertificateService:
             activity = enrollment.activity
 
         activity_name = activity.nome if activity and getattr(activity, 'nome', None) else ''
-        speaker_name = activity.palestrante if activity and getattr(activity, 'palestrante', None) else ''
+        speaker_names = self._speaker_names_from_activity(activity)
+        speaker_name = speaker_names[0] if speaker_names else ''
+        speaker_label = self._speaker_label_from_activity(activity)
         issue_date = current_certificate_issue_date_label()
         reference_date_obj = (
             getattr(activity, 'data_atv', None)
@@ -674,6 +711,7 @@ class CertificateService:
             '{{EVENTO}}': str(getattr(event, 'nome', '') or ''),
             '{{ATIVIDADE}}': activity_name,
             '{{PALESTRANTE}}': speaker_name,
+            '{{PALESTRANTES}}': speaker_label,
             '{{HORAS}}': str(total_hours),
             '{{DATA}}': issue_date,
             '{{EMISSION_DATE}}': issue_date,

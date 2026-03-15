@@ -101,6 +101,8 @@ class SystemTestCase(unittest.TestCase):
         self.assertEqual(len(events['items']), 1)
         self.assertEqual(events['items'][0]['nome'], "Semana de TI")
         self.assertEqual(events['items'][0]['atividades'][0]['email_palestrante'], "gemini@example.com")
+        self.assertEqual(events['items'][0]['atividades'][0]['palestrantes'][0]['nome'], "Gemini")
+        self.assertEqual(events['items'][0]['atividades'][0]['palestrantes_label'], "Gemini")
         print(" -> Listagem OK")
 
     def test_pages_load(self):

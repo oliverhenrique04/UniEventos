@@ -238,7 +238,91 @@ class Activity(db.Model):
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
 
+    speakers = db.relationship(
+        'ActivitySpeaker',
+        back_populates='activity',
+        cascade="all, delete-orphan",
+        order_by='(ActivitySpeaker.ordem, ActivitySpeaker.id)',
+    )
     enrollments = db.relationship('Enrollment', backref='activity', cascade="all, delete-orphan")
+
+    def get_speakers_payload(self, include_emails=True):
+        payload = []
+        if self.speakers:
+            for speaker in self.speakers:
+                payload.append({
+                    'id': speaker.id,
+                    'nome': str(speaker.nome or ''),
+                    'email': (str(speaker.email or '') if include_emails else None),
+                    'ordem': int(speaker.ordem or 0),
+                })
+
+        if payload:
+            return payload
+
+        legacy_name = str(self.palestrante or '')
+        legacy_email = str(self.email_palestrante or '') if include_emails else None
+        if legacy_name.strip() or (legacy_email or '').strip():
+            return [{
+                'id': None,
+                'nome': legacy_name,
+                'email': legacy_email,
+                'ordem': 0,
+            }]
+
+        return []
+
+    def get_speaker_names(self):
+        return [
+            str(item.get('nome') or '').strip()
+            for item in self.get_speakers_payload(include_emails=False)
+            if str(item.get('nome') or '').strip()
+        ]
+
+    @property
+    def palestrantes_payload(self):
+        return self.get_speakers_payload(include_emails=True)
+
+    @property
+    def palestrantes_label(self):
+        return ', '.join(self.get_speaker_names())
+
+    @property
+    def primary_speaker_name(self):
+        names = self.get_speaker_names()
+        if names:
+            return names[0]
+        return str(self.palestrante or '').strip()
+
+    @property
+    def primary_speaker_email(self):
+        payload = self.get_speakers_payload(include_emails=True)
+        if not payload:
+            return None
+        email = str(payload[0].get('email') or '').strip()
+        return email or None
+
+    def sync_legacy_speaker_fields(self):
+        self.palestrante = self.primary_speaker_name or ''
+        self.email_palestrante = self.primary_speaker_email
+
+
+class ActivitySpeaker(db.Model):
+    """Represents one speaker/facilitator linked to an activity."""
+    __tablename__ = 'activity_speakers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'), nullable=False)
+    nome = db.Column(db.String(100), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    ordem = db.Column(db.Integer, nullable=False, default=0)
+
+    activity = db.relationship('Activity', back_populates='speakers')
+
+    __table_args__ = (
+        db.Index('ix_activity_speakers_activity_id', 'activity_id'),
+        db.Index('ix_activity_speakers_ordem', 'ordem'),
+    )
 
 
 class Enrollment(db.Model):

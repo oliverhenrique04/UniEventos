@@ -2,7 +2,7 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.enrollment_repository import EnrollmentRepository
 from app.services.notification_service import NotificationService
-from app.models import Event, Activity, Enrollment, Course, User, db
+from app.models import Event, Activity, ActivitySpeaker, Enrollment, Course, User, db
 import secrets
 from datetime import datetime, date
 from flask import current_app
@@ -61,6 +61,59 @@ class EventService:
     def _normalize_optional_email(value):
         raw = str(value or '').strip()
         return raw or None
+
+    def _normalize_speakers_payload(self, activity_data):
+        payload = []
+        raw_speakers = activity_data.get('palestrantes')
+
+        if isinstance(raw_speakers, list):
+            for idx, item in enumerate(raw_speakers):
+                if not isinstance(item, dict):
+                    continue
+
+                speaker_name = str(item.get('nome') or '').strip() or None
+                speaker_email = self._normalize_optional_email(item.get('email'))
+                if not speaker_name and not speaker_email:
+                    continue
+
+                try:
+                    order = int(item.get('ordem')) if item.get('ordem') is not None and str(item.get('ordem')).strip() != '' else idx
+                except (TypeError, ValueError):
+                    order = idx
+
+                payload.append({
+                    'nome': speaker_name,
+                    'email': speaker_email,
+                    'ordem': order,
+                })
+
+        if payload:
+            payload.sort(key=lambda item: (item.get('ordem', 0), str(item.get('nome') or '').lower()))
+            return payload
+
+        legacy_name = str(activity_data.get('palestrante') or '').strip() or None
+        legacy_email = self._normalize_optional_email(activity_data.get('email_palestrante'))
+        if legacy_name or legacy_email:
+            return [{
+                'nome': legacy_name,
+                'email': legacy_email,
+                'ordem': 0,
+            }]
+
+        return []
+
+    def _sync_activity_speakers(self, activity, activity_data):
+        normalized_speakers = self._normalize_speakers_payload(activity_data or {})
+        activity.speakers.clear()
+
+        for idx, speaker in enumerate(normalized_speakers):
+            activity.speakers.append(ActivitySpeaker(
+                nome=speaker.get('nome'),
+                email=speaker.get('email'),
+                ordem=int(speaker.get('ordem', idx) or 0),
+            ))
+
+        activity.sync_legacy_speaker_fields()
 
     @staticmethod
     def can_create_events(user):
@@ -321,10 +374,8 @@ class EventService:
             if atv_id and int(atv_id) in existing_ids:
                 # Update existing activity
                 activity = existing_ids[int(atv_id)]
-                activity.nome = atv_data['nome']
-                activity.palestrante = atv_data['palestrante']
-                activity.email_palestrante = self._normalize_optional_email(atv_data.get('email_palestrante'))
-                activity.local = atv_data['local']
+                activity.nome = atv_data.get('nome')
+                activity.local = atv_data.get('local')
                 activity.descricao = atv_data.get('descricao', '')
                 activity.data_atv = self._parse_date(atv_data.get('data_atv'))
                 activity.hora_atv = self._parse_time(atv_data.get('hora_atv'))
@@ -332,16 +383,15 @@ class EventService:
                 activity.vagas = vagas
                 activity.latitude = event.latitude
                 activity.longitude = event.longitude
+                self._sync_activity_speakers(activity, atv_data)
                 self.activity_repo.save(activity)
                 incoming_ids.add(int(atv_id))
             else:
                 # Create new activity
                 new_atv = Activity(
                     event_id=event.id,
-                    nome=atv_data['nome'],
-                    palestrante=atv_data['palestrante'],
-                    email_palestrante=self._normalize_optional_email(atv_data.get('email_palestrante')),
-                    local=atv_data['local'],
+                    nome=atv_data.get('nome'),
+                    local=atv_data.get('local'),
                     descricao=atv_data.get('descricao', ''),
                     data_atv=self._parse_date(atv_data.get('data_atv')),
                     hora_atv=self._parse_time(atv_data.get('hora_atv')),
@@ -350,6 +400,7 @@ class EventService:
                     latitude=event.latitude,
                     longitude=event.longitude
                 )
+                self._sync_activity_speakers(new_atv, atv_data)
                 self.activity_repo.save(new_atv)
         
         # Remove activities that are no longer in the list
@@ -621,6 +672,7 @@ class EventService:
 
     def _create_default_checkin_activity(self, event, workload_hours):
         activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", email_palestrante=None, local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=workload_hours, vagas=-1, latitude=event.latitude, longitude=event.longitude)
+        activity.sync_legacy_speaker_fields()
         self.activity_repo.save(activity)
 
     def _create_activities(self, event, activities_data):
@@ -638,10 +690,8 @@ class EventService:
 
             activity = Activity(
                 event_id=event.id,
-                nome=atv['nome'],
-                palestrante=atv['palestrante'],
-                email_palestrante=self._normalize_optional_email(atv.get('email_palestrante')),
-                local=atv['local'],
+                nome=atv.get('nome'),
+                local=atv.get('local'),
                 descricao=atv.get('descricao', ''),
                 data_atv=self._parse_date(atv.get('data_atv')),
                 hora_atv=self._parse_time(atv.get('hora_atv')),
@@ -650,4 +700,5 @@ class EventService:
                 latitude=event.latitude,
                 longitude=event.longitude,
             )
+            self._sync_activity_speakers(activity, atv)
             self.activity_repo.save(activity)

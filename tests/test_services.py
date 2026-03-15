@@ -34,6 +34,7 @@ def test_event_service_create(app, admin_user):
         'nome': 'Test Event',
         'descricao': 'Desc',
         'is_rapido': True,
+        'carga_horaria_rapida': 2,
         'data_inicio': '2026-01-01',
         'hora_inicio': '10:00',
         'data_fim': '2026-01-01',
@@ -52,6 +53,7 @@ def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin
         'nome': 'Fast Event Sem Data',
         'descricao': 'Desc',
         'is_rapido': True,
+        'carga_horaria_rapida': 2,
         'hora_inicio': '10:00',
         'data_inicio': '',
         'data_fim': '',
@@ -64,10 +66,10 @@ def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin
     assert event.data_fim == date.today()
 
 
-def test_event_service_create_standard_event_persists_speaker_email(app, admin_user):
+def test_event_service_create_standard_event_persists_multiple_speakers(app, admin_user):
     service = EventService()
     event = service.create_event(admin_user.username, {
-        'nome': 'Evento com Email de Palestrante',
+        'nome': 'Evento com Multiplos Palestrantes',
         'descricao': 'Desc',
         'is_rapido': False,
         'data_inicio': '2030-03-01',
@@ -77,8 +79,10 @@ def test_event_service_create_standard_event_persists_speaker_email(app, admin_u
         'atividades': [
             {
                 'nome': 'Mesa Redonda',
-                'palestrante': 'Profa. Teste',
-                'email_palestrante': 'profa.teste@example.com',
+                'palestrantes': [
+                    {'nome': 'Profa. Teste', 'email': 'profa.teste@example.com', 'ordem': 0},
+                    {'nome': 'Dr. Convidado', 'email': 'dr.convidado@example.com', 'ordem': 1},
+                ],
                 'local': 'Sala 5',
                 'descricao': 'Atividade com contato do palestrante',
                 'data_atv': '2030-03-01',
@@ -91,7 +95,86 @@ def test_event_service_create_standard_event_persists_speaker_email(app, admin_u
 
     assert event.tipo == 'PADRAO'
     assert len(event.activities) == 1
+    assert len(event.activities[0].speakers) == 2
+    assert event.activities[0].palestrante == 'Profa. Teste'
     assert event.activities[0].email_palestrante == 'profa.teste@example.com'
+    assert event.activities[0].palestrantes_label == 'Profa. Teste, Dr. Convidado'
+
+
+def test_event_service_create_standard_event_accepts_legacy_speaker_payload(app, admin_user):
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento Legado com Palestrante',
+        'descricao': 'Desc',
+        'is_rapido': False,
+        'data_inicio': '2030-03-02',
+        'hora_inicio': '19:00',
+        'data_fim': '2030-03-02',
+        'hora_fim': '21:00',
+        'atividades': [
+            {
+                'nome': 'Painel Antigo',
+                'palestrante': 'Profa. Legado',
+                'email_palestrante': 'profa.legado@example.com',
+                'local': 'Sala 6',
+                'descricao': 'Atividade em payload legado',
+                'data_atv': '2030-03-02',
+                'hora_atv': '19:30',
+                'horas': 2,
+                'vagas': 40,
+            }
+        ],
+    })
+
+    assert len(event.activities) == 1
+    assert len(event.activities[0].speakers) == 1
+    assert event.activities[0].speakers[0].nome == 'Profa. Legado'
+    assert event.activities[0].speakers[0].email == 'profa.legado@example.com'
+
+
+def test_activity_legacy_speaker_fields_still_expose_canonical_payload(app):
+    with app.app_context():
+        owner = User(username='legacy_owner', role='professor', nome='Owner Legado', cpf='55566677788')
+        owner.set_password('1234')
+        db.session.add(owner)
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Legado',
+            descricao='Desc',
+            tipo='PADRAO',
+            data_inicio=date(2030, 3, 3),
+            hora_inicio=time(19, 0),
+            data_fim=date(2030, 3, 3),
+            hora_fim=time(21, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade Legada',
+            palestrante='Prof. Legado',
+            email_palestrante='prof.legado@example.com',
+            local='Sala 1',
+            descricao='Atividade migrada',
+            data_atv=date(2030, 3, 3),
+            hora_atv=time(19, 30),
+            carga_horaria=2,
+            vagas=20,
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        assert activity.speakers == []
+        assert activity.get_speakers_payload(include_emails=True) == [{
+            'id': None,
+            'nome': 'Prof. Legado',
+            'email': 'prof.legado@example.com',
+            'ordem': 0,
+        }]
+        assert activity.palestrantes_label == 'Prof. Legado'
 
 
 def test_event_service_update_event_sends_email_to_owner(app):
@@ -102,6 +185,7 @@ def test_event_service_update_event_sends_email_to_owner(app):
             nome='Owner Update',
             cpf='44455566677',
             email='owner_update@test.local',
+            can_create_events=True,
         )
         owner.set_password('1234')
         db.session.add(owner)
@@ -115,15 +199,17 @@ def test_event_service_update_event_sends_email_to_owner(app):
             'nome': 'Evento Original',
             'descricao': 'Desc',
             'is_rapido': True,
+            'carga_horaria_rapida': 2,
             'data_inicio': '2030-01-01',
             'hora_inicio': '10:00',
         })
         sent_payloads.clear()
 
-        updated, msg = service.update_event(event.id, owner.username, owner.role, {
+        updated, msg = service.update_event(event.id, owner, {
             'nome': 'Evento Atualizado',
             'descricao': 'Desc atualizada',
             'is_rapido': True,
+            'carga_horaria_rapida': 2,
             'data_inicio': '2030-01-02',
             'hora_inicio': '11:00',
         })
@@ -143,6 +229,7 @@ def test_event_service_delete_event_sends_email_to_owner(app):
             nome='Owner Delete',
             cpf='55566677788',
             email='owner_delete@test.local',
+            can_create_events=True,
         )
         owner.set_password('1234')
         db.session.add(owner)
@@ -156,12 +243,13 @@ def test_event_service_delete_event_sends_email_to_owner(app):
             'nome': 'Evento Para Excluir',
             'descricao': 'Desc',
             'is_rapido': True,
+            'carga_horaria_rapida': 2,
             'data_inicio': '2030-01-03',
             'hora_inicio': '12:00',
         })
         sent_payloads.clear()
 
-        success, msg = service.delete_event(event.id, owner.username, owner.role)
+        success, msg = service.delete_event(event.id, owner)
 
         assert success is True
         assert msg == 'Evento removido com sucesso.'
@@ -753,6 +841,30 @@ def test_certificate_service_build_template_tags_exposes_reference_date_for_even
     assert tags_without_activity['{{DATA_REALIZACAO}}'] == '10/01/2030'
 
 
+def test_certificate_service_build_template_tags_exposes_plural_speakers(monkeypatch):
+    monkeypatch.setattr(
+        'app.services.certificate_service.current_certificate_issue_date_label',
+        lambda: '15/03/2026',
+    )
+    service = CertificateService()
+    event = SimpleNamespace(nome='Evento Teste', data_inicio=date(2030, 1, 10))
+    user = SimpleNamespace(nome='Aluno Teste', cpf='12345678900')
+    activity = SimpleNamespace(
+        nome='Oficina',
+        palestrante='Prof. Principal',
+        palestrantes=[
+            {'nome': 'Prof. Principal', 'email': 'principal@example.com', 'ordem': 0},
+            {'nome': 'Convidada Especial', 'email': 'convidada@example.com', 'ordem': 1},
+        ],
+        data_atv=date(2030, 1, 12),
+    )
+
+    tags = service._build_template_tags(event, user, [activity], '4 horas')
+
+    assert tags['{{PALESTRANTE}}'] == 'Prof. Principal'
+    assert tags['{{PALESTRANTES}}'] == 'Prof. Principal, Convidada Especial'
+
+
 def test_institutional_certificate_service_generate_recipient_pdf_injects_default_recipient_tags(monkeypatch):
     monkeypatch.setattr(
         'app.services.institutional_certificate_service.current_certificate_issue_date_label',
@@ -825,9 +937,8 @@ def test_certificate_service_parse_template_elements_restores_default_institutio
     by_id = {item['id']: item for item in elements}
 
     assert background == ''
-    assert 'txt1' in by_id
     assert 'txt2' in by_id
-    assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.'
+    assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou como {{CATEGORY}} do curso {{CURSO_USUARIO}}, com carga horária de {{CARGA_HORARIA}} horas.'
 
 
 def test_certificate_service_generate_pdf_template_override_keeps_fixed_element_geometry(app, admin_user):

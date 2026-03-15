@@ -54,6 +54,117 @@ def _create_event_for_certs(app, owner_username='admin_test'):
         return event.id
 
 
+def _seed_certificate_management_data(app):
+    with app.app_context():
+        course = Course(nome='Gestao de Certificados')
+        db.session.add(course)
+        db.session.flush()
+
+        owner = User(
+            username='cert_owner_user',
+            role='professor',
+            nome='Owner Certificados',
+            cpf='70080090010',
+            email='owner_certs@test.local',
+            course_id=course.id,
+            can_create_events=True,
+        )
+        owner.set_password('1234')
+
+        coordinator = User(
+            username='cert_coord_user',
+            role='coordenador',
+            nome='Coordenadora Certificados',
+            cpf='70080090011',
+            email='coord_certs@test.local',
+            course_id=course.id,
+        )
+        coordinator.set_password('1234')
+
+        manager = User(
+            username='cert_manager_user',
+            role='gestor',
+            nome='Gestor Certificados',
+            cpf='70080090012',
+            email='manager_certs@test.local',
+            course_id=course.id,
+        )
+        manager.set_password('1234')
+
+        participant = User(
+            username='cert_participant_user',
+            role='participante',
+            nome='Participante Certificados',
+            cpf='70080090013',
+            email='participant_certs@test.local',
+            course_id=course.id,
+        )
+        participant.set_password('1234')
+
+        outsider = User(
+            username='cert_outsider_user',
+            role='participante',
+            nome='Outro Participante',
+            cpf='70080090014',
+            email='outsider_certs@test.local',
+            course_id=course.id,
+        )
+        outsider.set_password('1234')
+
+        db.session.add_all([owner, coordinator, manager, participant, outsider])
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Gestao Certificados',
+            descricao='Teste de permissao de certificados',
+            tipo='PADRAO',
+            data_inicio=date(2030, 2, 1),
+            hora_inicio=time(19, 0),
+            data_fim=date(2030, 2, 1),
+            hora_fim=time(21, 0),
+            course_id=course.id,
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Painel Principal',
+            palestrante='Dra. Principal',
+            email_palestrante='principal@example.com',
+            local='Auditorio',
+            descricao='Sessao principal',
+            data_atv=date(2030, 2, 1),
+            hora_atv=time(19, 30),
+            carga_horaria=2,
+            vagas=100,
+        )
+        db.session.add(activity)
+        db.session.flush()
+
+        enrollment = Enrollment(
+            activity_id=activity.id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=True,
+            cert_hash='CERTMANAGEMENT001',
+        )
+        db.session.add(enrollment)
+        db.session.commit()
+
+        return {
+            'event_id': event.id,
+            'activity_id': activity.id,
+            'enrollment_id': enrollment.id,
+            'owner_username': owner.username,
+            'coordinator_username': coordinator.username,
+            'manager_username': manager.username,
+            'participant_username': participant.username,
+            'outsider_username': outsider.username,
+        }
+
+
 def _seed_manual_enrollment_data(app, participant_email='manual_api@test.local'):
     with app.app_context():
         participant = User(
@@ -1051,7 +1162,7 @@ def test_create_event_api(client, app, admin_user):
     assert 'link' in res.json
 
 
-def test_create_standard_event_api_persists_speaker_email(client, app, admin_user):
+def test_create_standard_event_api_returns_multiple_speakers_and_legacy_fields(client, app, admin_user):
     with app.app_context():
         admin = db.session.get(User, 'admin_test')
         admin.can_create_events = True
@@ -1060,7 +1171,7 @@ def test_create_standard_event_api_persists_speaker_email(client, app, admin_use
     _login_admin(client)
     data = {
         'nome': 'Evento API com Contato',
-        'descricao': 'Via API com email do palestrante',
+        'descricao': 'Via API com multiplos palestrantes',
         'is_rapido': False,
         'data_inicio': '2030-04-10',
         'hora_inicio': '18:00',
@@ -1069,8 +1180,10 @@ def test_create_standard_event_api_persists_speaker_email(client, app, admin_use
         'atividades': [
             {
                 'nome': 'Palestra de Abertura',
-                'palestrante': 'Dra. API',
-                'email_palestrante': 'dra.api@example.com',
+                'palestrantes': [
+                    {'nome': 'Dra. API', 'email': 'dra.api@example.com', 'ordem': 0},
+                    {'nome': 'Dr. Convidado', 'email': 'dr.convidado@example.com', 'ordem': 1},
+                ],
                 'local': 'Auditorio Central',
                 'descricao': 'Apresentacao principal',
                 'data_atv': '2030-04-10',
@@ -1088,14 +1201,74 @@ def test_create_standard_event_api_persists_speaker_email(client, app, admin_use
     assert list_res.status_code == 200
     payload = list_res.get_json()
     activity = payload['items'][0]['atividades'][0]
+    assert activity['palestrante'] == 'Dra. API'
     assert activity['email_palestrante'] == 'dra.api@example.com'
+    assert activity['palestrantes_label'] == 'Dra. API, Dr. Convidado'
+    assert [speaker['nome'] for speaker in activity['palestrantes']] == ['Dra. API', 'Dr. Convidado']
+    assert activity['palestrantes'][0]['email'] == 'dra.api@example.com'
 
     with app.app_context():
         saved_event = Event.query.filter_by(nome='Evento API com Contato').first()
         assert saved_event is not None
         saved_activity = Activity.query.filter_by(event_id=saved_event.id, nome='Palestra de Abertura').first()
         assert saved_activity is not None
+        assert len(saved_activity.speakers) == 2
+        assert saved_activity.speakers[0].nome == 'Dra. API'
         assert saved_activity.email_palestrante == 'dra.api@example.com'
+
+
+def test_open_events_api_hides_speaker_emails_for_participant(client, app, admin_user):
+    with app.app_context():
+        admin = db.session.get(User, 'admin_test')
+        admin.can_create_events = True
+        participant = User(
+            username='open_events_participant',
+            role='participante',
+            nome='Participante Eventos',
+            cpf='11122233344',
+            email='open_events_participant@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.commit()
+
+    _login_admin(client)
+    res = client.post('/api/criar_evento', json={
+        'nome': 'Evento Aberto com Palestrantes',
+        'descricao': 'Evento para validar exposicao publica',
+        'is_rapido': False,
+        'data_inicio': '2030-04-11',
+        'hora_inicio': '18:00',
+        'data_fim': '2030-04-11',
+        'hora_fim': '22:00',
+        'atividades': [
+            {
+                'nome': 'Mesa Publica',
+                'palestrantes': [
+                    {'nome': 'Dra. API', 'email': 'dra.api@example.com', 'ordem': 0},
+                    {'nome': 'Dr. Convidado', 'email': 'dr.convidado@example.com', 'ordem': 1},
+                ],
+                'local': 'Auditorio',
+                'descricao': 'Mesa principal',
+                'data_atv': '2030-04-11',
+                'hora_atv': '19:00',
+                'horas': 2,
+                'vagas': 120,
+            }
+        ],
+    })
+    assert res.status_code == 200
+
+    client.get('/api/logout')
+    _login_user(client, 'open_events_participant')
+    list_res = client.get('/api/eventos_abertos')
+
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    activity = payload['items'][0]['atividades'][0]
+    assert activity['palestrantes_label'] == 'Dra. API, Dr. Convidado'
+    assert activity['palestrantes'][0]['email'] is None
+    assert activity['palestrantes'][1]['email'] is None
 
 
 def test_manual_enroll_api_sends_email_notification(client, app, admin_user, monkeypatch):
@@ -1400,8 +1573,8 @@ def test_create_institutional_certificate_persists_default_template_when_missing
         saved = json.loads(cert.cert_template_json)
         by_id = {item['id']: item for item in saved['elements']}
 
-        assert {'txt1', 'txt2', 'name_fixed', 'date_fixed', 'hash', 'qrcode'}.issubset(by_id.keys())
-        assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.'
+        assert {'txt2', 'name_fixed', 'date_fixed', 'hash', 'qrcode'}.issubset(by_id.keys())
+        assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou como {{CATEGORY}} do curso {{CURSO_USUARIO}}, com carga horária de {{CARGA_HORARIA}} horas.'
 
 
 def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
@@ -1463,6 +1636,60 @@ def test_certificate_send_batch_starts_background_job(client, app, admin_user, m
     assert status_payload['completed'] is True
     assert status_payload['resultado'] == 'sucesso'
     assert status_payload['total_enviado'] == 1
+
+
+def test_certificate_management_endpoints_allow_authorized_profiles(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    for username in [
+        'admin_test',
+        seeded['owner_username'],
+        seeded['coordinator_username'],
+        seeded['manager_username'],
+    ]:
+        client.get('/api/logout')
+        _login_user(client, username)
+        res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
+        assert res.status_code == 200
+
+
+def test_certificate_send_batch_denies_participant(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    _login_user(client, seeded['participant_username'])
+    res = client.post(f"/api/certificates/send_batch/{seeded['event_id']}")
+
+    assert res.status_code == 403
+
+
+def test_certificate_download_and_preview_allow_only_owner_participant(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'certificate.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked certificate\n')
+
+    monkeypatch.setattr(
+        certificates_api.cert_service,
+        'generate_pdf',
+        lambda *args, **kwargs: str(pdf_path)
+    )
+
+    _login_user(client, seeded['participant_username'])
+
+    download_res = client.get(f"/api/certificates/download/{seeded['enrollment_id']}")
+    preview_res = client.get(f"/api/certificates/preview/{seeded['enrollment_id']}")
+
+    assert download_res.status_code == 200
+    assert preview_res.status_code == 200
+    assert preview_res.mimetype == 'application/pdf'
+
+    client.get('/api/logout')
+    _login_user(client, seeded['outsider_username'])
+
+    denied_download = client.get(f"/api/certificates/download/{seeded['enrollment_id']}")
+    denied_preview = client.get(f"/api/certificates/preview/{seeded['enrollment_id']}")
+
+    assert denied_download.status_code == 403
+    assert denied_preview.status_code == 403
 
 
 def test_upload_asset_requires_file(client, app, admin_user):

@@ -120,7 +120,7 @@
                         </td>
                         <td>
                             <div class="fw-semibold text-slate-800">${item.atividade || '-'}</div>
-                            <div class="text-muted x-small">Palestrante: ${item.palestrante || '-'}</div>
+                            <div class="text-muted x-small">Palestrantes: ${item.palestrantes_label || item.palestrante || '-'}</div>
                         </td>
                         <td>${statusBadge}</td>
                         <td>
@@ -262,5 +262,4 @@
     }
 </script>
 {% endblock %}
-
 
