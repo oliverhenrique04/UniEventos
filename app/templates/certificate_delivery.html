@@ -7,11 +7,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1">
                     <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none">Dashboard</a></li>
-                    {% if user.role in ['admin', 'coordenador', 'gestor'] %}
                     <li class="breadcrumb-item"><a href="{{ url_for('main.designer_certificado', event_id=event.id) }}" class="text-decoration-none">Designer</a></li>
-                    {% else %}
-                    <li class="breadcrumb-item">Designer</li>
-                    {% endif %}
                     <li class="breadcrumb-item active">Entregas</li>
                 </ol>
             </nav>
@@ -20,9 +16,13 @@
         </div>
         <div class="d-flex gap-2">
             <button onclick="carregarEntregas()" class="btn btn-light border"><i class="fa-solid fa-sync me-1"></i> Atualizar</button>
+            {% if can_manage_certificates %}
             <button onclick="dispararTodosPendentes()" class="btn btn-primary shadow-sm">
                 <i class="fa-solid fa-paper-plane me-2"></i> Enviar Pendentes
             </button>
+            {% else %}
+            <span class="badge bg-light text-dark border align-self-center">Somente visualização</span>
+            {% endif %}
         </div>
     </div>
 
@@ -92,6 +92,7 @@
 {% block scripts %}
 <script>
     const eventId = {{ event.id }};
+    const CAN_MANAGE_CERTIFICATES = {{ can_manage_certificates|tojson }};
 
     document.addEventListener('DOMContentLoaded', () => carregarEntregas(1));
 
@@ -126,9 +127,11 @@
                         <td>
                             <div class="d-flex align-items-center gap-2">
                                 <span>${item.email_atual}</span>
-                                <button onclick="abrirModalEmail(${item.enrollment_id}, '${item.email_atual}')" class="btn btn-xs btn-link p-0 text-primary">
+                                ${CAN_MANAGE_CERTIFICATES
+                                    ? `<button onclick="abrirModalEmail(${item.enrollment_id}, '${item.email_atual}')" class="btn btn-xs btn-link p-0 text-primary">
                                     <i class="fa-solid fa-pen"></i>
-                                </button>
+                                </button>`
+                                    : ''}
                             </div>
                         </td>
                         <td><small class="text-muted">${item.data_envio}</small></td>
@@ -140,9 +143,11 @@
                                 <a href="${apiUrl(`/api/certificates/download/${item.enrollment_id}`)}" class="btn btn-sm btn-light border" title="Baixar PDF">
                                     <i class="fa-solid fa-file-pdf text-danger"></i>
                                 </a>
-                                <button onclick="reenviarCertificado(${item.enrollment_id})" class="btn btn-sm btn-outline-primary rounded-end px-3">
+                                ${CAN_MANAGE_CERTIFICATES
+                                    ? `<button onclick="reenviarCertificado(${item.enrollment_id})" class="btn btn-sm btn-outline-primary rounded-end px-3">
                                     <i class="fa-solid fa-paper-plane me-1"></i> ${item.entregue ? 'Reenviar' : 'Enviar'}
-                                </button>
+                                </button>`
+                                    : ''}
                             </div>
                         </td>
                     </tr>
@@ -205,12 +210,20 @@
     }
 
     function abrirModalEmail(id, current) {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         document.getElementById('editEnrollId').value = id;
         document.getElementById('newEmail').value = current;
         new bootstrap.Modal(document.getElementById('modalEditEmail')).show();
     }
 
     async function salvarNovoEmail() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         const id = document.getElementById('editEnrollId').value;
         const email = document.getElementById('newEmail').value;
         
@@ -229,6 +242,10 @@
     }
 
     async function reenviarCertificado(id) {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         Toast.fire({ icon: 'info', title: 'Processando reenvio...' });
         try {
             const res = await fetch(apiUrl(`/api/certificates/resend_single/${id}`), { method: 'POST' });
@@ -243,6 +260,10 @@
     }
 
     async function dispararTodosPendentes() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         const confirm = await Swal.fire({
             title: 'Enviar todos os pendentes?',
             text: "Isso disparará o envio para todos os participantes que ainda não receberam.",
@@ -262,4 +283,3 @@
     }
 </script>
 {% endblock %}
-

@@ -52,12 +52,14 @@ def designer_certificado(event_id):
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
-    if not EventService.can_manage_event_certificates(current_user, event):
+    can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
+    if not EventService.can_view_event_certificates(current_user, event):
         return "Acesso negado", 403
     return render_template(
         'certificate_designer.html',
         user=current_user,
         event=event,
+        can_manage_certificates=can_manage_certificates,
         fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='event'),
     )
 
@@ -70,9 +72,15 @@ def gerenciar_entregas(event_id):
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
-    if not EventService.can_manage_event_certificates(current_user, event):
+    can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
+    if not EventService.can_view_event_certificates(current_user, event):
         return "Acesso negado", 403
-    return render_template('certificate_delivery.html', user=current_user, event=event)
+    return render_template(
+        'certificate_delivery.html',
+        user=current_user,
+        event=event,
+        can_manage_certificates=can_manage_certificates,
+    )
 
 
 @bp.route('/certificados_institucionais')
@@ -105,6 +113,7 @@ def designer_certificado_institucional(certificate_id):
         user=current_user,
         event=cert,
         designer_mode='institutional',
+        can_manage_certificates=True,
         fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='institutional'),
     )
 

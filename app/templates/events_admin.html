@@ -606,7 +606,7 @@
                             <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_notify_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
-                            ${ev.can_manage_certificates ? `
+                            ${ev.can_view_certificates ? `
                             <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Certificado">
                                 <i class="fa-solid fa-certificate text-warning"></i>
                             </a>` : `

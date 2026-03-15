@@ -800,6 +800,7 @@ def test_events_api_keeps_gestor_read_only_for_foreign_events(client, app):
     assert all(item['can_edit'] is False for item in payload['items'])
     assert all(item['can_delete'] is False for item in payload['items'])
     assert all(item['can_manage_participants'] is False for item in payload['items'])
+    assert all(item['can_view_certificates'] is True for item in payload['items'])
     assert all(item['can_manage_certificates'] is False for item in payload['items'])
 
 
@@ -1930,20 +1931,14 @@ def test_certificate_send_batch_starts_background_job(client, app, admin_user, m
     assert status_payload['total_enviado'] == 1
 
 
-def test_certificate_management_endpoints_allow_admin_owner_course_coordinator_and_extensao(client, app, admin_user):
+def test_certificate_management_endpoints_allow_admin_owner_course_coordinator_extensao_and_gestor_view(client, app, admin_user):
     seeded = _seed_certificate_management_data(app)
 
-    for username in ['admin_test', seeded['owner_username'], seeded['coordinator_username'], seeded['extension_username']]:
+    for username in ['admin_test', seeded['owner_username'], seeded['coordinator_username'], seeded['extension_username'], seeded['manager_username']]:
         client.get('/api/logout')
         _login_user(client, username)
         res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
         assert res.status_code == 200
-
-    for username in [seeded['manager_username']]:
-        client.get('/api/logout')
-        _login_user(client, username)
-        res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
-        assert res.status_code == 403
 
 
 def test_event_management_allows_extensao_participants_but_blocks_notifications(client, app, admin_user):
@@ -1973,6 +1968,41 @@ def test_event_management_allows_extensao_participants_but_blocks_notifications(
     with app.app_context():
         enrollment = db.session.get(Enrollment, seeded['enrollment_id'])
         assert enrollment is None
+
+
+def test_event_management_allows_gestor_certificate_visualization_but_blocks_certificate_mutations(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    _login_user(client, seeded['manager_username'])
+
+    panel_res = client.get('/eventos_admin')
+    page_res = client.get('/api/eventos_admin')
+    designer_res = client.get(f"/designer_certificado/{seeded['event_id']}")
+    delivery_res = client.get(f"/gerenciar_entregas/{seeded['event_id']}")
+    list_res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
+    preview_res = client.get(f"/api/certificates/preview/{seeded['enrollment_id']}")
+    download_res = client.get(f"/api/certificates/download/{seeded['enrollment_id']}")
+    update_email_res = client.post(f"/api/certificates/update_email/{seeded['enrollment_id']}", json={'email': 'gestor@test.local'})
+    resend_res = client.post(f"/api/certificates/resend_single/{seeded['enrollment_id']}")
+    send_batch_res = client.post(f"/api/certificates/send_batch/{seeded['event_id']}")
+
+    assert panel_res.status_code == 200
+    assert page_res.status_code == 200
+    payload = page_res.get_json()
+    assert any(
+        item['id'] == seeded['event_id']
+        and item['can_view_certificates'] is True
+        and item['can_manage_certificates'] is False
+        for item in payload['items']
+    )
+    assert designer_res.status_code == 200
+    assert delivery_res.status_code == 200
+    assert list_res.status_code == 200
+    assert preview_res.status_code == 200
+    assert download_res.status_code == 200
+    assert update_email_res.status_code == 403
+    assert resend_res.status_code == 403
+    assert send_batch_res.status_code == 403
 
 
 def test_certificate_send_batch_denies_participant(client, app, admin_user):

@@ -2563,7 +2563,7 @@
                 <button onclick="abrirRelatorio(${ev.id})" class="btn btn-sm btn-light border flex-grow-1" title="Lista de Inscritos">
                   <i class="fa-solid fa-users-viewfinder me-1"></i> Relatório
                 </button>
-                                ${ev.can_manage_certificates ? `
+                                ${ev.can_view_certificates ? `
                                 <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Designer de Certificado">
                                     <i class="fa-solid fa-certificate"></i>
                                 </a>` : ''}

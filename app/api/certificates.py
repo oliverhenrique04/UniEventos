@@ -157,6 +157,10 @@ def _can_manage_certificates(event):
     return EventService.can_manage_event_certificates(current_user, event)
 
 
+def _can_view_certificates(event):
+    return EventService.can_view_event_certificates(current_user, event)
+
+
 def _can_access_own_certificate(enrollment):
     if not enrollment or not current_user.is_authenticated:
         return False
@@ -283,7 +287,7 @@ def setup_certificate(event_id):
 @login_required
 def preview_layout(event_id):
     event = _get_or_404(Event, event_id)
-    if not _can_manage_certificates(event):
+    if not _can_view_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -402,7 +406,7 @@ def send_batch_status(job_id):
 def list_delivery(event_id):
     """Lists all participants eligible for certificates with pagination."""
     event = _get_or_404(Event, event_id)
-    if not _can_manage_certificates(event):
+    if not _can_view_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     page = request.args.get('page', 1, type=int)
@@ -556,7 +560,7 @@ def download_single(enrollment_id):
     # ... (Keep existing download_single code)
     enrollment = _get_or_404(Enrollment, enrollment_id)
     event = _event_from_enrollment(enrollment)
-    if not (_can_manage_certificates(event) or _can_access_own_certificate(enrollment)):
+    if not (_can_view_certificates(event) or _can_access_own_certificate(enrollment)):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
@@ -572,7 +576,7 @@ def preview_single(enrollment_id):
     """Generates and serves a certificate PDF for inline viewing (preview)."""
     enrollment = _get_or_404(Enrollment, enrollment_id)
     event = _event_from_enrollment(enrollment)
-    if not (_can_manage_certificates(event) or _can_access_own_certificate(enrollment)):
+    if not (_can_view_certificates(event) or _can_access_own_certificate(enrollment)):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()

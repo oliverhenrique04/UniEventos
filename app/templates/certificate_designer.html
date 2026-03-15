@@ -396,15 +396,21 @@
                 <i class="fa-solid fa-truck-fast me-1"></i> Entregas
             </a>
             {% endif %}
+            {% if can_manage_certificates %}
             <button onclick="adicionarTexto()" class="btn btn-light border"><i class="fa-solid fa-plus me-1"></i> Texto</button>
             <button onclick="adicionarImagem()" class="btn btn-light border"><i class="fa-solid fa-image me-1"></i> Imagem</button>
 <!--             <button onclick="duplicateSelected()" class="btn btn-light border"><i class="fa-solid fa-clone me-1"></i> Duplicar</button>
             <button onclick="undoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-left me-1"></i> Undo</button>
             <button onclick="redoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-right me-1"></i> Redo</button> -->
             <button onclick="resetarLayout()" class="btn btn-light border">Limpar Tudo</button>
+            {% else %}
+            <span class="badge bg-light text-dark border">Somente visualização</span>
+            {% endif %}
             <button onclick="openCertificatePreview()" class="btn btn-outline-secondary"><i class="fa-solid fa-eye me-1"></i> Preview</button>
+            {% if can_manage_certificates %}
             <button id="btnSalvarLayout" onclick="salvarConfiguracao()" class="btn btn-primary shadow-sm px-4">Salvar Layout</button>
             <button id="btnEnviarLote" onclick="confirmarEnvioLote()" class="btn btn-dark shadow-sm px-4">{% if designer_mode == 'institutional' %}Enviar Certificados{% else %}Enviar em Lote{% endif %}</button>
+            {% endif %}
         </div>
     </div>
 
@@ -426,7 +432,9 @@
                 <div class="bg-white p-5 rounded-5 shadow-sm border">
                     <i class="fa-solid fa-file-image fa-4x text-slate-200 mb-4"></i>
                     <h4 class="fw-bold">Nenhum Background</h4>
+                    {% if can_manage_certificates %}
                     <button class="btn btn-primary px-4" onclick="document.getElementById('inputBg').click()">Upload Imagem</button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -497,8 +505,12 @@
             <div class="glass-panel p-4 mb-4 border-top border-2 border-primary">
                 <h6 class="fw-bold mb-3">Template Base</h6>
                 <div class="d-grid gap-2">
+                    {% if can_manage_certificates %}
                     <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('inputBg').click()">Alterar Fundo</button>
                     <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="limparBackground()">Remover</button>
+                    {% else %}
+                    <span class="small text-muted">Background disponível apenas para consulta neste perfil.</span>
+                    {% endif %}
                 </div>
                 <input type="file" id="inputBg" class="d-none" accept="image/*" onchange="handleBgUpload(this)">
                 <input type="file" id="inputAsset" class="d-none" accept="image/*" onchange="handleAssetUpload(this)">
@@ -753,6 +765,7 @@
 <script>
     const designerMode = {{ (designer_mode or 'event')|tojson }};
     const entityId = {{ event.id }};
+    const CAN_MANAGE_CERTIFICATES = {{ can_manage_certificates|tojson }};
     const apiBaseUrl = designerMode === 'institutional'
         ? apiUrl('/api/institutional_certificates')
         : apiUrl('/api/certificates');
@@ -2634,7 +2647,13 @@
         openJoditEditor(obj);
     }
 
-    function adicionarTexto() { addTextElement(); }
+    function adicionarTexto() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
+        addTextElement();
+    }
 
     // =====================================================
     // Jodit Rich Text Editor Integration
@@ -2939,10 +2958,19 @@
     }
 
     async function adicionarImagem() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         document.getElementById('inputAsset').click();
     }
 
     async function handleAssetUpload(input) {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            if (input) input.value = '';
+            return;
+        }
         if (!input.files[0]) return;
         const formData = new FormData();
         formData.append('asset', input.files[0]);
@@ -2990,6 +3018,11 @@
     }
 
     async function handleBgUpload(input) {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            if (input) input.value = '';
+            return;
+        }
         if (!input.files[0]) return;
         const formData = new FormData();
         formData.append('background', input.files[0]);
@@ -3053,6 +3086,10 @@
     }
 
     async function salvarConfiguracao() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         const report = getLayoutValidationReport();
         if (report.errors.length) {
             const confirmSave = await Swal.fire({
@@ -3081,6 +3118,10 @@
     }
 
     function resetarLayout() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         Swal.fire({
             title: 'Limpar Design?',
             text: 'Isso removerá os elementos customizados e manterá data, hash e QR.',
@@ -3100,6 +3141,10 @@
     }
 
     async function confirmarEnvioLote() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         const report = getLayoutValidationReport();
         if (report.errors.length) {
             await Swal.fire({
@@ -3164,6 +3209,10 @@
     }
 
     async function limparBackground() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
         const confirm = await Swal.fire({ title: 'Remover Background?', icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
 

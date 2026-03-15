@@ -131,6 +131,8 @@ def test_event_service_can_manage_event_allows_coordinator_course_scope_but_keep
 
         assert EventService.can_view_event(gestor, event) is True
         assert EventService.can_manage_event(gestor, event) is False
+        assert EventService.can_view_event_certificates(gestor, event) is True
+        assert EventService.can_manage_event_certificates(gestor, event) is False
         assert EventService.can_view_event(coordenador, event) is True
         assert EventService.can_manage_event(coordenador, event) is True
         assert EventService.can_delete_event(coordenador, event) is False

@@ -83,6 +83,7 @@ def serialize_event(event, current_user=None):
     can_manage_participants = False
     can_add_participants = False
     can_notify_participants = False
+    can_view_certificates = False
     can_manage_certificates = False
 
     if current_user:
@@ -93,6 +94,7 @@ def serialize_event(event, current_user=None):
         can_manage_participants = EventService.can_manage_event_participants(current_user, event)
         can_add_participants = EventService.can_add_event_participants(current_user, event)
         can_notify_participants = EventService.can_notify_event_participants(current_user, event)
+        can_view_certificates = EventService.can_view_event_certificates(current_user, event)
         can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
 
     include_private_speaker_data = can_edit or can_manage_participants or can_manage_certificates
@@ -120,5 +122,6 @@ def serialize_event(event, current_user=None):
         'can_manage_participants': can_manage_participants,
         'can_add_participants': can_add_participants,
         'can_notify_participants': can_notify_participants,
+        'can_view_certificates': can_view_certificates,
         'can_manage_certificates': can_manage_certificates,
     }

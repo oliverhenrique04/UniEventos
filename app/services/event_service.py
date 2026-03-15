@@ -128,6 +128,14 @@ class EventService:
         return EventService.can_manage_event(user, event)
 
     @staticmethod
+    def can_view_event_certificates(user, event):
+        if not user or not event:
+            return False
+        if user.role in ['admin', 'extensao', 'gestor']:
+            return True
+        return EventService.can_manage_event_certificates(user, event)
+
+    @staticmethod
     def can_manage_event_participants(user, event):
         if not user or not event:
             return False
