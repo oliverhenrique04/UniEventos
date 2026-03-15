@@ -217,68 +217,364 @@
     .analytics-hero {
         position: relative;
         overflow: hidden;
-        background: linear-gradient(130deg, #f7fbff 0%, #edf6ff 42%, #f4fbf7 100%);
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.14), transparent 28%),
+            radial-gradient(circle at left center, rgba(37, 99, 235, 0.12), transparent 22%),
+            linear-gradient(145deg, #f7fbff 0%, #eef6ff 38%, #f8fcf8 100%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
         border-top: 4px solid #0b6cb8;
     }
 
-    .analytics-hero::before {
+    .analytics-hero::before,
+    .analytics-hero::after {
         content: "";
         position: absolute;
-        top: -60px;
-        right: -60px;
-        width: 220px;
-        height: 220px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(4, 77, 132, 0.16) 0%, rgba(4, 77, 132, 0) 72%);
         pointer-events: none;
+        z-index: 0;
+    }
+
+    .analytics-hero::before {
+        top: -70px;
+        right: -70px;
+        width: 240px;
+        height: 240px;
+        background: radial-gradient(circle, rgba(4, 77, 132, 0.16) 0%, rgba(4, 77, 132, 0) 72%);
+    }
+
+    .analytics-hero::after {
+        left: -120px;
+        bottom: -120px;
+        width: 280px;
+        height: 280px;
+        background: radial-gradient(circle, rgba(22, 163, 74, 0.08) 0%, rgba(22, 163, 74, 0) 72%);
+    }
+
+    .analytics-shell > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .analytics-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .analytics-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.75rem;
+        background: rgba(11, 108, 184, 0.08);
+        color: #0b5c99;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .analytics-toolbar {
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(214, 228, 240, 0.9);
+        border-radius: 20px;
+        padding: 1rem;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 12px 30px rgba(15, 23, 42, 0.05);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .analytics-toolbar-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .analytics-toolbar-title {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #17324d;
+    }
+
+    .analytics-period-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .analytics-period-btn {
+        min-width: 64px;
+        border-radius: 999px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+    }
+
+    .analytics-filters-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.85rem;
+        margin-top: 1rem;
+    }
+
+    .analytics-filter-field label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #64748b;
+    }
+
+    .analytics-filter-field .form-select {
+        border-radius: 12px;
+        border-color: #d9e6f2;
+        min-height: 42px;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .analytics-toolbar-footer {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .analytics-active-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        min-height: 34px;
+    }
+
+    .analytics-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.4rem 0.7rem;
+        background: #ffffff;
+        border: 1px solid #d7e5f3;
+        color: #1f4363;
+        font-size: 0.76rem;
+        font-weight: 700;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+    }
+
+    .executive-brief {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 249, 255, 0.96) 100%);
+        border: 1px solid #dfeaf5;
+        border-radius: 18px;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+    }
+
+    .executive-brief-head {
+        padding: 0.95rem 1.1rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-bottom: 1px solid #ebf1f7;
+        font-weight: 800;
+        color: #17324d;
+    }
+
+    .analytics-summary-text {
+        font-size: 0.98rem;
+        line-height: 1.75;
+        color: #1b3954;
+    }
+
+    .analytics-summary-points {
+        list-style: none;
+        margin: 0.9rem 0 0;
+        padding: 0;
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .analytics-summary-point {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.8rem;
+        padding: 0.9rem;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #e3edf7;
+    }
+
+    .analytics-summary-icon {
+        width: 2.15rem;
+        height: 2.15rem;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        color: #1d4ed8;
+        flex-shrink: 0;
+    }
+
+    .analytics-mini-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .analytics-mini-card {
+        background: #fff;
+        border: 1px solid #e4edf7;
+        border-radius: 14px;
+        padding: 0.85rem 0.9rem;
+        min-height: 94px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    .analytics-mini-label {
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+
+    .analytics-mini-value {
+        margin-top: 0.35rem;
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #15314c;
+        line-height: 1.1;
+    }
+
+    .analytics-mini-caption {
+        display: block;
+        margin-top: 0.35rem;
+        font-size: 0.78rem;
+        color: #6b7d90;
+    }
+
+    .analytics-section-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .analytics-section-title strong {
+        font-size: 0.98rem;
+        letter-spacing: 0.01em;
+        color: #17324d;
+    }
+
+    .analytics-section-title small {
+        color: #64748b;
+        font-weight: 600;
     }
 
     .kpi-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0.9rem;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.95rem;
     }
 
     .kpi-card {
-        background: #fff;
-        border: 1px solid #e6eef8;
-        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, #ffffff 0%, #f9fbfe 100%);
+        border: 1px solid #e5edf6;
+        border-radius: 16px;
         padding: 1rem;
-        box-shadow: 0 8px 20px rgba(12, 74, 110, 0.06);
+        box-shadow: 0 10px 24px rgba(12, 74, 110, 0.06);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 16px 34px rgba(12, 74, 110, 0.1);
+        border-color: #d5e5f4;
+    }
+
+    .kpi-card::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 72px;
+        height: 72px;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0) 70%);
     }
 
     .kpi-label {
         font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
+        font-weight: 800;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         color: #57738e;
     }
 
     .kpi-value {
-        font-size: 1.65rem;
+        margin-top: 0.35rem;
+        font-size: 1.75rem;
         font-weight: 800;
         color: #14324b;
-        line-height: 1.1;
+        line-height: 1.05;
+    }
+
+    .kpi-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.75rem;
+    }
+
+    .kpi-meta-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.32rem 0.62rem;
+        border-radius: 999px;
+        background: #f5f9fd;
+        border: 1px solid #d9e6f3;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #31506c;
+    }
+
+    .kpi-note {
+        display: block;
+        margin-top: 0.7rem;
+        font-size: 0.82rem;
+        color: #64809b;
     }
 
     .insight-card {
         background: #fff;
         border: 1px solid #e9eef6;
-        border-radius: 14px;
+        border-radius: 16px;
         box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
     }
 
     .insight-card .insight-head {
         border-bottom: 1px solid #edf2f7;
         padding: 0.9rem 1rem;
-        font-weight: 700;
+        font-weight: 800;
         color: #19324d;
     }
 
     .rank-list {
         margin: 0;
-        padding: 0.8rem 1rem 1rem;
+        padding: 0.9rem 1rem 1rem;
         list-style: none;
     }
 
@@ -287,7 +583,7 @@
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 0.65rem;
         align-items: center;
-        padding: 0.55rem 0;
+        padding: 0.7rem 0;
         border-bottom: 1px dashed #edf2f7;
     }
 
@@ -296,9 +592,9 @@
     }
 
     .rank-track {
-        margin-top: 0.3rem;
+        margin-top: 0.35rem;
         width: 100%;
-        height: 6px;
+        height: 7px;
         background: #edf3fa;
         border-radius: 999px;
         overflow: hidden;
@@ -320,22 +616,35 @@
         align-items: center;
         gap: 0.35rem;
         border-radius: 999px;
-        padding: 0.35rem 0.7rem;
-        background: #f6fbff;
-        border: 1px solid #d8e8fb;
+        padding: 0.45rem 0.8rem;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #d6e5f3;
         color: #21507a;
         font-size: 0.78rem;
-        font-weight: 700;
+        font-weight: 800;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
     }
 
-    @media (max-width: 992px) {
-        .kpi-grid {
+    @media (max-width: 1200px) {
+        .analytics-filters-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .analytics-mini-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
 
+    @media (max-width: 768px) {
+        .analytics-toolbar,
+        .executive-brief {
+            border-radius: 18px;
+        }
+    }
+
     @media (max-width: 576px) {
-        .kpi-grid {
+        .analytics-filters-grid,
+        .analytics-mini-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -350,23 +659,18 @@
 
         {% if user.role in ['admin', 'gestor'] %}
         <div class="col-lg-12">
-            <div class="glass-panel analytics-hero p-4 p-lg-5 shadow-sm">
-                <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-4">
+            <div class="glass-panel analytics-hero analytics-shell p-4 p-lg-5 shadow-sm">
+                <div class="analytics-header mb-4">
                     <div>
                         <h3 class="fw-bold text-gradient mb-1">
                             <i class="fa-solid fa-chart-line text-primary me-2"></i>Painel Analítico de Gestão
                         </h3>
-                        <p class="text-muted mb-0">Visão estratégica de desempenho por curso, presença e emissão de certificados.</p>
+                        <br>
+                        <span class="analytics-eyebrow mb-3">
+                            <i class="fa-solid fa-chart-simple"></i>Inteligência Operacional
+                        </span>
                     </div>
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Período analítico">
-                            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="7">7d</button>
-                            <button type="button" class="btn btn-primary analytics-period-btn" data-days="30">30d</button>
-                            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="90">90d</button>
-                        </div>
-                        <select class="form-select form-select-sm" id="analyticsCourseFilter" style="min-width: 220px;">
-                            <option value="">Todos os cursos</option>
-                        </select>
                         <span class="metric-pill" id="analyticsLastUpdate">Atualizando insights...</span>
                         <button class="btn btn-sm btn-outline-primary" id="btnRefreshGestorAnalytics">
                             <i class="fa-solid fa-rotate me-1"></i>Atualizar
@@ -374,39 +678,158 @@
                     </div>
                 </div>
 
-                <div class="insight-card mb-3">
-                    <div class="insight-head d-flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span><i class="fa-solid fa-bullseye text-success me-2"></i>Metas e Alertas Proativos</span>
-                        <small class="text-muted">Defina limites para identificar desvios operacionais em tempo real</small>
+                <div class="analytics-toolbar mb-4">
+                    <div class="analytics-toolbar-header">
+                        <div>
+                            <div class="analytics-toolbar-title">Filtros dinâmicos do recorte analítico</div>
+                            <div class="text-muted small">Refine o painel em tempo real por horizonte, curso, status, tipo de evento e responsável.</div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" id="btnClearAnalyticsFilters">
+                            <i class="fa-solid fa-filter-circle-xmark me-1"></i>Limpar filtros
+                        </button>
                     </div>
-                    <div class="p-3 p-lg-4">
-                        <div class="row g-2 align-items-end mb-3">
-                            <div class="col-md-5">
-                                <label class="form-label small text-muted mb-1">Meta mínima de presença (%)</label>
-                                <input type="number" class="form-control form-control-sm" id="goalPresenceInput" min="1" max="100" value="75">
+
+                    <div class="analytics-period-strip" role="group" aria-label="Período analítico">
+                        <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="7">7d</button>
+                        <button type="button" class="btn btn-primary analytics-period-btn" data-days="30">30d</button>
+                        <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="90">90d</button>
+                        <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="180">180d</button>
+                        <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="365">365d</button>
+                    </div>
+
+                    <div class="analytics-filters-grid">
+                        <div class="analytics-filter-field">
+                            <label for="analyticsCourseFilter">Curso</label>
+                            <select class="form-select form-select-sm" id="analyticsCourseFilter">
+                                <option value="">Todos os cursos</option>
+                            </select>
+                        </div>
+                        <div class="analytics-filter-field">
+                            <label for="analyticsStatusFilter">Status do Evento</label>
+                            <select class="form-select form-select-sm" id="analyticsStatusFilter">
+                                <option value="">Todos os status</option>
+                                <option value="ABERTO">Aberto</option>
+                                <option value="ENCERRADO">Encerrado</option>
+                            </select>
+                        </div>
+                        <div class="analytics-filter-field">
+                            <label for="analyticsTypeFilter">Tipo do Evento</label>
+                            <select class="form-select form-select-sm" id="analyticsTypeFilter">
+                                <option value="">Todos os tipos</option>
+                                <option value="PADRAO">Padrão</option>
+                                <option value="RAPIDO">Rápido</option>
+                            </select>
+                        </div>
+                        <div class="analytics-filter-field">
+                            <label for="analyticsOwnerFilter">Responsável</label>
+                            <select class="form-select form-select-sm" id="analyticsOwnerFilter">
+                                <option value="">Todos os responsáveis</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="analytics-toolbar-footer">
+                        <div id="analyticsActiveFilters" class="analytics-active-filters"></div>
+                        <div class="small text-muted" id="analyticsContextText">Consolidando o recorte executivo do período selecionado...</div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-xl-9">
+                        <div class="executive-brief h-100">
+                            <div class="executive-brief-head">
+                                <span><i class="fa-solid fa-compass-drafting text-primary me-2"></i>Resumo Executivo</span>
+                                <small class="text-muted">Leitura orientada para decisão</small>
                             </div>
-                            <div class="col-md-5">
-                                <label class="form-label small text-muted mb-1">Meta mínima de emissão (%)</label>
-                                <input type="number" class="form-control form-control-sm" id="goalEmissionInput" min="1" max="100" value="85">
-                            </div>
-                            <div class="col-md-2 d-grid">
-                                <button class="btn btn-sm btn-success" id="btnSaveAnalyticsGoals">
-                                    <i class="fa-solid fa-floppy-disk me-1"></i>Salvar metas
-                                </button>
+                            <div class="p-3 p-lg-4">
+                                <div id="analyticsExecutiveSummary" class="analytics-summary-text">Carregando leitura executiva do período...</div>
+                                <div class="analytics-mini-grid mt-3" id="analyticsStatusBreakdown">
+                                    <div class="analytics-mini-card">
+                                        <div class="analytics-mini-label">Eventos</div>
+                                        <div class="analytics-mini-value">--</div>
+                                        <small class="analytics-mini-caption">Aguardando dados</small>
+                                    </div>
+                                    <div class="analytics-mini-card">
+                                        <div class="analytics-mini-label">Presença</div>
+                                        <div class="analytics-mini-value">--</div>
+                                        <small class="analytics-mini-caption">Aguardando dados</small>
+                                    </div>
+                                    <div class="analytics-mini-card">
+                                        <div class="analytics-mini-label">Cobertura</div>
+                                        <div class="analytics-mini-value">--</div>
+                                        <small class="analytics-mini-caption">Aguardando dados</small>
+                                    </div>
+                                    <div class="analytics-mini-card">
+                                        <div class="analytics-mini-label">Entrega</div>
+                                        <div class="analytics-mini-value">--</div>
+                                        <small class="analytics-mini-caption">Aguardando dados</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div id="analyticsAlerts" class="small text-muted">Aguardando análise de metas...</div>
+                    </div>
+                    <div class="col-xl-3">
+                        <div class="insight-card h-100">
+                            <div class="insight-head d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <span><i class="fa-solid fa-bullseye text-success me-2"></i>Metas e Alertas Proativos</span>
+                                <small class="text-muted">Acompanhe desvios operacionais com maior precisão</small>
+                            </div>
+                            <div class="p-3 p-lg-4">
+                                <div class="row g-2 align-items-end mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted mb-1">Meta mínima de presença (%)</label>
+                                        <input type="number" class="form-control form-control-sm" id="goalPresenceInput" min="1" max="100" value="75">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted mb-1">Meta mínima de emissão (%)</label>
+                                        <input type="number" class="form-control form-control-sm" id="goalEmissionInput" min="1" max="100" value="85">
+                                    </div>
+                                </div>
+                                <div class="row g-2 align-items-end mb-3">
+                                    <div class="col-md-12 d-grid">
+                                        <button class="btn btn-sm btn-success" id="btnSaveAnalyticsGoals">
+                                            <i class="fa-solid fa-floppy-disk me-1"></i>Salvar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="analyticsAlerts" class="small text-muted">Aguardando análise de metas...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div id="gestorKpiGrid" class="kpi-grid mb-4">
-                    <div class="kpi-card"><div class="kpi-label">Eventos</div><div class="kpi-value">--</div></div>
-                    <div class="kpi-card"><div class="kpi-label">Alunos Inscritos</div><div class="kpi-value">--</div></div>
-                    <div class="kpi-card"><div class="kpi-label">Taxa de Presença</div><div class="kpi-value">--</div></div>
-                    <div class="kpi-card"><div class="kpi-label">Eventos sem Certificado</div><div class="kpi-value">--</div></div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Eventos Monitorados</div>
+                        <div class="kpi-value">--</div>
+                        <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+                        <small class="kpi-note">Consolidação do período selecionado.</small>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Base de Participação</div>
+                        <div class="kpi-value">--</div>
+                        <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+                        <small class="kpi-note">Aguardando volume de inscrições.</small>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Eficiência de Presença</div>
+                        <div class="kpi-value">--</div>
+                        <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+                        <small class="kpi-note">Aguardando taxa operacional.</small>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Cobertura de Certificados</div>
+                        <div class="kpi-value">--</div>
+                        <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+                        <small class="kpi-note">Aguardando pipeline de emissão.</small>
+                    </div>
                 </div>
 
-                <div class="row g-3 mb-3">
+                <div class="analytics-section-title">
+                    <strong>Desempenho por agrupamento</strong>
+                    <small>Volume de eventos e alunos por curso no recorte selecionado</small>
+                </div>
+                <div class="row g-3 mb-4">
                     <div class="col-lg-6">
                         <div class="insight-card h-100">
                             <div class="insight-head"><i class="fa-solid fa-graduation-cap text-primary me-2"></i>Eventos por Curso</div>
@@ -425,7 +848,11 @@
                     </div>
                 </div>
 
-                <div class="insight-card mb-3">
+                <div class="analytics-section-title">
+                    <strong>Operação acadêmica institucional</strong>
+                    <small>Entrega e pendências de certificados acadêmicos</small>
+                </div>
+                <div class="insight-card mb-4">
                     <div class="insight-head"><i class="fa-solid fa-school text-primary me-2"></i>Certificados Acadêmicos (Institucionais)</div>
                     <div class="p-3 p-lg-4">
                         <div class="row g-3 mb-3" id="academicoSummaryCards">
@@ -464,6 +891,10 @@
                     </div>
                 </div>
 
+                <div class="analytics-section-title">
+                    <strong>Risco operacional</strong>
+                    <small>Eventos com maior passivo de certificados para priorização imediata</small>
+                </div>
                 <div class="insight-card">
                     <div class="insight-head d-flex flex-wrap gap-2 align-items-center justify-content-between">
                         <span><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Eventos com Pendência de Certificado</span>
@@ -886,6 +1317,9 @@
     const analyticsState = {
         periodDays: 30,
         courseId: '',
+        eventStatus: '',
+        eventType: '',
+        ownerUsername: '',
         goals: {
             presence: 75,
             emission: 85,
@@ -1185,11 +1619,175 @@
             const data = await parseJsonSafeResponse(res);
             if (!res.ok || !Array.isArray(data)) return;
 
+            const currentValue = analyticsState.courseId || '';
             const options = data
                 .map(c => `<option value="${c.id}">${c.nome}</option>`)
                 .join('');
-            select.insertAdjacentHTML('beforeend', options);
+            select.innerHTML = `<option value="">Todos os cursos</option>${options}`;
+            select.value = currentValue;
         } catch (_) {}
+    }
+
+    function setSelectValueIfPresent(selectId, value) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const normalized = String(value || '');
+        const exists = Array.from(select.options).some(option => option.value === normalized);
+        select.value = exists ? normalized : '';
+    }
+
+    function popularResponsaveisAnalytics(items = []) {
+        const select = document.getElementById('analyticsOwnerFilter');
+        if (!select) return;
+
+        const previousValue = analyticsState.ownerUsername || '';
+        const options = (items || [])
+            .map(item => `<option value="${item.username}">${item.name}</option>`)
+            .join('');
+
+        select.innerHTML = `<option value="">Todos os responsáveis</option>${options}`;
+        setSelectValueIfPresent('analyticsOwnerFilter', previousValue);
+        analyticsState.ownerUsername = select.value || '';
+    }
+
+    function obterTextoOpcao(selectId, fallback = 'Todos') {
+        const select = document.getElementById(selectId);
+        if (!select) return fallback;
+        const option = select.options[select.selectedIndex];
+        return option?.text?.trim() || fallback;
+    }
+
+    function renderAnalyticsActiveFilters() {
+        const container = document.getElementById('analyticsActiveFilters');
+        if (!container) return;
+
+        const chips = [
+            `<span class="analytics-filter-chip"><i class="fa-regular fa-calendar"></i>${analyticsState.periodDays} dias</span>`
+        ];
+
+        if (analyticsState.courseId) {
+            chips.push(`<span class="analytics-filter-chip"><i class="fa-solid fa-graduation-cap"></i>${obterTextoOpcao('analyticsCourseFilter')}</span>`);
+        }
+        if (analyticsState.eventStatus) {
+            chips.push(`<span class="analytics-filter-chip"><i class="fa-solid fa-signal"></i>${obterTextoOpcao('analyticsStatusFilter')}</span>`);
+        }
+        if (analyticsState.eventType) {
+            chips.push(`<span class="analytics-filter-chip"><i class="fa-solid fa-layer-group"></i>${obterTextoOpcao('analyticsTypeFilter')}</span>`);
+        }
+        if (analyticsState.ownerUsername) {
+            chips.push(`<span class="analytics-filter-chip"><i class="fa-solid fa-user-tie"></i>${obterTextoOpcao('analyticsOwnerFilter')}</span>`);
+        }
+
+        container.innerHTML = chips.join('');
+    }
+
+    function renderAnalyticsContext(summary = {}) {
+        const el = document.getElementById('analyticsContextText');
+        if (!el) return;
+
+        const totalEvents = Number(summary.total_events || 0);
+        const totalCourses = Number(summary.total_courses || 0);
+        const totalEnrollments = Number(summary.total_enrollments || 0);
+
+        el.textContent = `Recorte atual: ${analyticsState.periodDays} dias, ${formatInteger(totalEvents)} eventos, ${formatInteger(totalCourses)} cursos e ${formatInteger(totalEnrollments)} inscrições consolidadas.`;
+    }
+
+    function renderStatusBreakdown(summary = {}, pipeline = {}, institutionalSummary = {}) {
+        const wrapper = document.getElementById('analyticsStatusBreakdown');
+        if (!wrapper) return;
+
+        const withCertificate = Number(pipeline?.with_certificate || 0);
+        const withoutCertificate = Number(pipeline?.without_certificate || 0);
+        const certificateCoverage = (withCertificate + withoutCertificate) > 0
+            ? (withCertificate / (withCertificate + withoutCertificate)) * 100
+            : 0;
+
+        wrapper.innerHTML = `
+            <div class="analytics-mini-card">
+                <div class="analytics-mini-label">Eventos</div>
+                <div class="analytics-mini-value">${formatInteger(summary.total_events)}</div>
+                <small class="analytics-mini-caption">${formatInteger(summary.active_events)} abertos no período</small>
+            </div>
+            <div class="analytics-mini-card">
+                <div class="analytics-mini-label">Presença</div>
+                <div class="analytics-mini-value">${formatPercent(summary.presence_rate)}</div>
+                <small class="analytics-mini-caption">${formatInteger(summary.total_enrollments)} inscrições auditadas</small>
+            </div>
+            <div class="analytics-mini-card">
+                <div class="analytics-mini-label">Cobertura</div>
+                <div class="analytics-mini-value">${formatPercent(certificateCoverage)}</div>
+                <small class="analytics-mini-caption">${formatInteger(summary.pending_certificate_events)} evento(s) com pendência</small>
+            </div>
+            <div class="analytics-mini-card">
+                <div class="analytics-mini-label">Entrega Acadêmica</div>
+                <div class="analytics-mini-value">${formatPercent(institutionalSummary.delivery_rate)}</div>
+                <small class="analytics-mini-caption">${formatInteger(institutionalSummary.pending_recipients)} destinatário(s) pendentes</small>
+            </div>
+        `;
+    }
+
+    function renderExecutiveSummary(data = {}) {
+        const container = document.getElementById('analyticsExecutiveSummary');
+        if (!container) return;
+
+        const summary = data.summary || {};
+        const pipeline = data.certificate_pipeline || {};
+        const institutionalSummary = data.institutional_summary || {};
+        const topCourseByEvents = data.events_by_course?.[0];
+        const topCourseByStudents = data.students_by_course?.[0];
+        const highestRisk = data.pending_certificate_events?.[0];
+        const withCertificate = Number(pipeline.with_certificate || 0);
+        const withoutCertificate = Number(pipeline.without_certificate || 0);
+        const coverageRate = (withCertificate + withoutCertificate) > 0
+            ? (withCertificate / (withCertificate + withoutCertificate)) * 100
+            : 0;
+
+        const overview = `
+            No recorte dos últimos <strong>${analyticsState.periodDays} dias</strong>, o painel consolidou
+            <strong>${formatInteger(summary.total_events)}</strong> evento(s), <strong>${formatInteger(summary.total_enrollments)}</strong>
+            inscrição(ões) e uma taxa média de presença de <strong>${formatPercent(summary.presence_rate)}</strong>.
+            A cobertura de emissão para eventos ficou em <strong>${formatPercent(coverageRate)}</strong> e a entrega institucional em
+            <strong>${formatPercent(institutionalSummary.delivery_rate)}</strong>.
+        `;
+
+        const points = [
+            {
+                icon: 'fa-graduation-cap',
+                title: 'Curso com maior tração',
+                text: topCourseByEvents
+                    ? `${topCourseByEvents.course} lidera em volume com ${formatInteger(topCourseByEvents.count)} evento(s) no período.`
+                    : 'Ainda não há volume suficiente para destacar um curso por oferta.',
+            },
+            {
+                icon: 'fa-users',
+                title: 'Base de participação',
+                text: topCourseByStudents
+                    ? `${topCourseByStudents.course} concentrou a maior base de alunos ativos, com ${formatInteger(topCourseByStudents.count)} participante(s) únicos.`
+                    : 'Ainda não há base suficiente para destacar uma concentração de alunos.',
+            },
+            {
+                icon: 'fa-triangle-exclamation',
+                title: 'Ponto crítico prioritário',
+                text: highestRisk
+                    ? `${highestRisk.name} é o principal foco imediato, com ${formatInteger(highestRisk.pending_count)} certificado(s) pendente(s).`
+                    : 'Não há passivos críticos de certificados no recorte atual.',
+            },
+        ];
+
+        container.innerHTML = `
+            <div class="analytics-summary-text">${overview}</div>
+            <ul class="analytics-summary-points">
+                ${points.map(item => `
+                    <li class="analytics-summary-point">
+                        <span class="analytics-summary-icon"><i class="fa-solid ${item.icon}"></i></span>
+                        <div>
+                            <div class="fw-semibold text-slate-800 mb-1">${item.title}</div>
+                            <div class="text-muted small">${item.text}</div>
+                        </div>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
     }
 
     function renderAlertasProativos(summary, pipeline, institutionalSummary) {
@@ -1270,12 +1868,47 @@
             btn.addEventListener('click', () => {
                 analyticsState.periodDays = Number(btn.dataset.days || 30);
                 setActivePeriodButton();
+                renderAnalyticsActiveFilters();
                 carregarDashboardGestorAnalytics(true);
             });
         });
 
         document.getElementById('analyticsCourseFilter')?.addEventListener('change', (ev) => {
             analyticsState.courseId = ev.target.value || '';
+            renderAnalyticsActiveFilters();
+            carregarDashboardGestorAnalytics(true);
+        });
+
+        document.getElementById('analyticsStatusFilter')?.addEventListener('change', (ev) => {
+            analyticsState.eventStatus = ev.target.value || '';
+            renderAnalyticsActiveFilters();
+            carregarDashboardGestorAnalytics(true);
+        });
+
+        document.getElementById('analyticsTypeFilter')?.addEventListener('change', (ev) => {
+            analyticsState.eventType = ev.target.value || '';
+            renderAnalyticsActiveFilters();
+            carregarDashboardGestorAnalytics(true);
+        });
+
+        document.getElementById('analyticsOwnerFilter')?.addEventListener('change', (ev) => {
+            analyticsState.ownerUsername = ev.target.value || '';
+            renderAnalyticsActiveFilters();
+            carregarDashboardGestorAnalytics(true);
+        });
+
+        document.getElementById('btnClearAnalyticsFilters')?.addEventListener('click', () => {
+            analyticsState.periodDays = 30;
+            analyticsState.courseId = '';
+            analyticsState.eventStatus = '';
+            analyticsState.eventType = '';
+            analyticsState.ownerUsername = '';
+            setActivePeriodButton();
+            setSelectValueIfPresent('analyticsCourseFilter', '');
+            setSelectValueIfPresent('analyticsStatusFilter', '');
+            setSelectValueIfPresent('analyticsTypeFilter', '');
+            setSelectValueIfPresent('analyticsOwnerFilter', '');
+            renderAnalyticsActiveFilters();
             carregarDashboardGestorAnalytics(true);
         });
 
@@ -1292,6 +1925,8 @@
             Toast.fire({ icon: 'success', title: 'Metas salvas com sucesso.' });
             carregarDashboardGestorAnalytics(true);
         });
+
+        renderAnalyticsActiveFilters();
     }
 
     function renderRankingList(containerId, items, maxValue) {
@@ -1357,24 +1992,38 @@
 
         grid.innerHTML = `
             <div class="kpi-card">
-                <div class="kpi-label">Total de Eventos</div>
+                <div class="kpi-label">Eventos Monitorados</div>
                 <div class="kpi-value">${formatInteger(summary.total_events)}</div>
-                <small class="text-muted">${formatInteger(summary.active_events)} abertos • ${formatInteger(summary.closed_events)} finalizados</small>
+                <div class="kpi-meta">
+                    <span class="kpi-meta-badge"><i class="fa-regular fa-circle-play"></i>${formatInteger(summary.active_events)} abertos</span>
+                    <span class="kpi-meta-badge"><i class="fa-regular fa-circle-stop"></i>${formatInteger(summary.closed_events)} encerrados</span>
+                </div>
+                <small class="kpi-note">${formatInteger(summary.total_courses)} curso(s) com movimentação no período.</small>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Alunos Inscritos</div>
+                <div class="kpi-label">Base de Participação</div>
                 <div class="kpi-value">${formatInteger(summary.unique_students)}</div>
-                <small class="text-muted">${formatInteger(summary.total_enrollments)} inscrições processadas</small>
+                <div class="kpi-meta">
+                    <span class="kpi-meta-badge"><i class="fa-solid fa-users"></i>${formatInteger(summary.total_enrollments)} inscrições</span>
+                </div>
+                <small class="kpi-note">Participantes únicos engajados em atividades do recorte.</small>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Taxa de Presença</div>
+                <div class="kpi-label">Eficiência de Presença</div>
                 <div class="kpi-value">${formatPercent(summary.presence_rate)}</div>
-                <small class="text-muted">Eficiência de participação nas atividades</small>
+                <div class="kpi-meta">
+                    <span class="kpi-meta-badge"><i class="fa-solid fa-bullseye"></i>Meta atual ${formatPercent(analyticsState.goals.presence)}</span>
+                </div>
+                <small class="kpi-note">Eficiência de comparecimento nas atividades registradas.</small>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Pipeline de Certificados</div>
+                <div class="kpi-label">Cobertura de Certificados</div>
                 <div class="kpi-value">${formatPercent(completionRate)}</div>
-                <small class="text-muted">${formatInteger(withoutCertificate)} eventos sem emissão registrada</small>
+                <div class="kpi-meta">
+                    <span class="kpi-meta-badge"><i class="fa-solid fa-certificate"></i>${formatInteger(withCertificate)} com emissão</span>
+                    <span class="kpi-meta-badge"><i class="fa-solid fa-triangle-exclamation"></i>${formatInteger(withoutCertificate)} sem emissão</span>
+                </div>
+                <small class="kpi-note">${formatInteger(summary.pending_certificate_events)} evento(s) exigem ação prioritária.</small>
             </div>
         `;
     }
@@ -1402,6 +2051,9 @@
             const params = new URLSearchParams();
             params.set('period_days', String(analyticsState.periodDays));
             if (analyticsState.courseId) params.set('course_id', String(analyticsState.courseId));
+            if (analyticsState.eventStatus) params.set('event_status', analyticsState.eventStatus);
+            if (analyticsState.eventType) params.set('event_type', analyticsState.eventType);
+            if (analyticsState.ownerUsername) params.set('owner_username', analyticsState.ownerUsername);
             if (forceRefresh) params.set('t', String(Date.now()));
 
             const res = await fetch(apiUrl(`/api/dashboard/analytics?${params.toString()}`), {
@@ -1412,6 +2064,11 @@
                 throw new Error(data.erro || 'Falha ao carregar painel analítico.');
             }
 
+            popularResponsaveisAnalytics(data.filter_options?.owners || []);
+            renderAnalyticsActiveFilters();
+            renderAnalyticsContext(data.summary || {});
+            renderExecutiveSummary(data);
+            renderStatusBreakdown(data.summary || {}, data.certificate_pipeline || {}, data.institutional_summary || {});
             renderGestorKpis(data.summary || {}, data.certificate_pipeline || {});
             renderRankingList('rankingEventosCurso', data.events_by_course || [], data.events_by_course?.[0]?.count || 1);
             renderRankingList('rankingAlunosCurso', data.students_by_course || [], data.students_by_course?.[0]?.count || 1);
@@ -1422,6 +2079,24 @@
             renderAlertasProativos(data.summary || {}, data.certificate_pipeline || {}, data.institutional_summary || {});
             renderAnalyticsTimestamp(data.generated_at);
         } catch (error) {
+            const executive = document.getElementById('analyticsExecutiveSummary');
+            if (executive) {
+                executive.innerHTML = `<span class="text-danger">${error.message || 'Não foi possível consolidar o resumo executivo.'}</span>`;
+            }
+            const statusGrid = document.getElementById('analyticsStatusBreakdown');
+            if (statusGrid) {
+                statusGrid.innerHTML = `
+                    <div class="analytics-mini-card">
+                        <div class="analytics-mini-label">Falha</div>
+                        <div class="analytics-mini-value">--</div>
+                        <small class="analytics-mini-caption">Não foi possível atualizar os indicadores.</small>
+                    </div>
+                `;
+            }
+            const context = document.getElementById('analyticsContextText');
+            if (context) {
+                context.textContent = 'Não foi possível consolidar o recorte atual.';
+            }
             const tbody = document.getElementById('tabelaPendenciasCertificadosGestor');
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">${error.message || 'Não foi possível carregar os indicadores.'}</td></tr>`;
