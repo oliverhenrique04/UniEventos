@@ -940,7 +940,7 @@
                     <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
                         <label for="cleanupCertDays" class="small fw-bold text-muted mb-0">Arquivos com mais de</label>
                         <div class="input-group" style="max-width: 220px;">
-                            <input type="number" min="0" max="3650" value="90" id="cleanupCertDays" class="form-control">
+                            <input type="number" min="0" max="3650" value="10" id="cleanupCertDays" class="form-control">
                             <span class="input-group-text">dias</span>
                         </div>
                         <button class="btn btn-outline-secondary" id="btnPreviewCertCleanup">
@@ -1040,6 +1040,9 @@
     {% endif %}
 
     <div class="row justify-content-center mb-4">
+        <h4 class="fw-bold mb-4 px-2 text-primary">
+            <i class="fa-solid fa-bolt me-2 text-primary"></i>Eventos em Aberto para Inscrição
+        </h4>
         <div class="col-12 col-xl-10">
             <div class="glass-panel p-3 p-md-4 bg-white shadow-sm border-top border-2 border-info text-start">
                 <h6 class="fw-bold mb-3 text-uppercase small text-muted">
@@ -1064,13 +1067,9 @@
     </div>
 
     <div class="row">
-        <div class="col-12 px-0 px-md-4">
-            <h4 class="fw-bold mb-4 px-2">
-                <i class="fa-solid fa-bolt text-warning me-2"></i>Eventos em Aberto para Inscrição
-            </h4>
+        <div class="col-12 px-0 px-md-4">            
 
             <div id="listaEventosAluno" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"></div>
-
             <nav class="mt-4">
                 <ul class="pagination justify-content-center" id="paginacaoAluno"></ul>
             </nav>
