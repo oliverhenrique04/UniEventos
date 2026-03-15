@@ -651,10 +651,28 @@ def listar_eventos():
 def listar_eventos_abertos():
     """Endpoint for listing open enrollment events visible to any authenticated user."""
     page = request.args.get('page', 1, type=int)
+    course_id = request.args.get('course_id', type=int)
+    if course_id is not None and course_id <= 0:
+        course_id = None
+
+    tipo = (request.args.get('tipo') or '').strip().upper() or None
+    if tipo not in {'PADRAO', 'RAPIDO'}:
+        tipo = None
+
+    situacao = (request.args.get('situacao') or '').strip().lower() or None
+    if situacao not in {'inscrito', 'nao_inscrito'}:
+        situacao = None
+
     filters = {
         'nome': request.args.get('nome'),
         'data': request.args.get('data'),
-        'curso': request.args.get('curso')
+        'data_inicio': request.args.get('data_inicio'),
+        'data_fim': request.args.get('data_fim'),
+        'curso': request.args.get('curso'),
+        'course_id': course_id,
+        'tipo': tipo,
+        'situacao': situacao,
+        'programacao': request.args.get('programacao'),
     }
     pagination = event_service.get_open_events_paginated(current_user, page=page, filters=filters)
 

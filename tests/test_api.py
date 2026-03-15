@@ -636,6 +636,93 @@ def _seed_open_events_access_data(app):
             'open_extensao_cpf': '90100000005',
         }
 
+
+def _seed_open_events_filter_data(app):
+    with app.app_context():
+        course_tech = Course(nome='Tecnologia Aplicada')
+        course_law = Course(nome='Direito Corporativo')
+        db.session.add_all([course_tech, course_law])
+        db.session.flush()
+
+        participant = User(
+            username='filter_open_participant',
+            role='participante',
+            nome='Participante Filtro',
+            cpf='90100000011',
+            email='filter_open_participant@test.local',
+            course_id=course_tech.id,
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event_python = Event(
+            owner_username='admin_test',
+            nome='Semana Python',
+            descricao='Evento aberto de tecnologia.',
+            tipo='PADRAO',
+            status='ABERTO',
+            token_publico='semana-python',
+            data_inicio=date(2030, 9, 10),
+            hora_inicio=time(19, 0),
+            course_id=course_tech.id,
+        )
+        event_law = Event(
+            owner_username='admin_test',
+            nome='Seminario Juridico',
+            descricao='Evento aberto da area juridica.',
+            tipo='RAPIDO',
+            status='ABERTO',
+            token_publico='seminario-juridico',
+            data_inicio=date(2030, 9, 25),
+            hora_inicio=time(9, 0),
+            course_id=course_law.id,
+        )
+        db.session.add_all([event_python, event_law])
+        db.session.flush()
+
+        activity_python = Activity(
+            event_id=event_python.id,
+            nome='Oficina de Automacao',
+            palestrante='Profa. Maria Silva',
+            local='Laboratorio Inovacao',
+            descricao='Atividade pratica com scripts.',
+            data_atv=date(2030, 9, 10),
+            hora_atv=time(19, 30),
+            carga_horaria=2,
+            vagas=40,
+        )
+        activity_law = Activity(
+            event_id=event_law.id,
+            nome='Painel de Compliance',
+            palestrante='Dr. Paulo Souza',
+            local='Auditorio Juridico',
+            descricao='Discussao institucional.',
+            data_atv=date(2030, 9, 25),
+            hora_atv=time(9, 30),
+            carga_horaria=3,
+            vagas=60,
+        )
+        db.session.add_all([activity_python, activity_law])
+        db.session.flush()
+
+        enrollment = Enrollment(
+            activity_id=activity_python.id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=False,
+        )
+        db.session.add(enrollment)
+        db.session.commit()
+
+        return {
+            'participant_username': participant.username,
+            'course_tech_id': course_tech.id,
+            'course_tech_name': course_tech.nome,
+            'python_event_name': event_python.nome,
+            'law_event_name': event_law.nome,
+        }
+
 def test_login_api(client, admin_user):
     res = client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
     assert res.status_code == 200
@@ -1325,6 +1412,9 @@ def test_dashboard_open_events_are_visible_and_enrollable_for_all_profiles(clien
         _login_user(client, username)
         html = client.get('/').get_data(as_text=True)
         assert 'Eventos em Aberto para Inscrição' in html
+        assert 'filtPartTipo' in html
+        assert 'filtPartSituacao' in html
+        assert 'btnLimparFiltrosEventosAbertos' in html
 
     client.get('/logout')
     _login_user(client, 'open_extensao')
@@ -1475,6 +1565,46 @@ def test_open_events_api_hides_speaker_emails_for_participant(client, app, admin
     assert activity['palestrantes_label'] == 'Dra. API, Dr. Convidado'
     assert activity['palestrantes'][0]['email'] is None
     assert activity['palestrantes'][1]['email'] is None
+
+
+def test_open_events_api_supports_extended_filters_and_keeps_course_name_compatibility(client, app, admin_user):
+    seeded = _seed_open_events_filter_data(app)
+
+    _login_user(client, seeded['participant_username'])
+
+    by_course_id = client.get(f"/api/eventos_abertos?course_id={seeded['course_tech_id']}")
+    assert by_course_id.status_code == 200
+    assert [item['nome'] for item in by_course_id.get_json()['items']] == [seeded['python_event_name']]
+
+    by_course_name = client.get(f"/api/eventos_abertos?curso=Tecnologia")
+    assert by_course_name.status_code == 200
+    assert [item['nome'] for item in by_course_name.get_json()['items']] == [seeded['python_event_name']]
+
+    by_type = client.get('/api/eventos_abertos?tipo=RAPIDO')
+    assert by_type.status_code == 200
+    assert [item['nome'] for item in by_type.get_json()['items']] == [seeded['law_event_name']]
+
+    by_programming = client.get('/api/eventos_abertos?programacao=Maria')
+    assert by_programming.status_code == 200
+    assert [item['nome'] for item in by_programming.get_json()['items']] == [seeded['python_event_name']]
+
+    by_period = client.get('/api/eventos_abertos?data_inicio=2030-09-01&data_fim=2030-09-15')
+    assert by_period.status_code == 200
+    assert [item['nome'] for item in by_period.get_json()['items']] == [seeded['python_event_name']]
+
+
+def test_open_events_api_can_filter_by_current_user_enrollment_status(client, app, admin_user):
+    seeded = _seed_open_events_filter_data(app)
+
+    _login_user(client, seeded['participant_username'])
+
+    enrolled = client.get('/api/eventos_abertos?situacao=inscrito')
+    assert enrolled.status_code == 200
+    assert [item['nome'] for item in enrolled.get_json()['items']] == [seeded['python_event_name']]
+
+    not_enrolled = client.get('/api/eventos_abertos?situacao=nao_inscrito')
+    assert not_enrolled.status_code == 200
+    assert [item['nome'] for item in not_enrolled.get_json()['items']] == [seeded['law_event_name']]
 
 
 def test_manual_enroll_api_sends_email_notification(client, app, admin_user, monkeypatch):

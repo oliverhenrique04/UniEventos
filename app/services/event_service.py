@@ -7,6 +7,7 @@ import secrets
 from datetime import datetime, date
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 from app.utils import normalize_cpf
 
 class EventService:
@@ -552,17 +553,50 @@ class EventService:
     def get_open_events_paginated(self, user, page=1, per_page=12, filters=None):
         """Lists open enrollment events available to any authenticated user."""
         query = Event.query.filter(Event.status == 'ABERTO')
+        joined_course = False
 
         if filters:
             if filters.get('nome'):
                 query = query.filter(Event.nome.ilike(f"%{filters['nome']}%"))
+            if filters.get('tipo'):
+                query = query.filter(Event.tipo == filters['tipo'])
+            if filters.get('course_id'):
+                query = query.filter(Event.course_id == filters['course_id'])
+            if filters.get('curso'):
+                if not joined_course:
+                    query = query.join(Course, Event.course_id == Course.id, isouter=True)
+                    joined_course = True
+                query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
             if filters.get('data'):
                 parsed_date = self._parse_date(filters['data'])
                 if parsed_date:
                     query = query.filter(Event.data_inicio == parsed_date)
-            if filters.get('curso'):
-                query = query.join(Course, Event.course_id == Course.id, isouter=True)
-                query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
+            else:
+                start_date = self._parse_date(filters.get('data_inicio'))
+                end_date = self._parse_date(filters.get('data_fim'))
+                if start_date and end_date and start_date > end_date:
+                    start_date, end_date = end_date, start_date
+                if start_date:
+                    query = query.filter(Event.data_inicio >= start_date)
+                if end_date:
+                    query = query.filter(Event.data_inicio <= end_date)
+            if filters.get('programacao'):
+                search = f"%{filters['programacao']}%"
+                query = query.filter(Event.activities.any(or_(
+                    Activity.nome.ilike(search),
+                    Activity.descricao.ilike(search),
+                    Activity.local.ilike(search),
+                    Activity.palestrante.ilike(search),
+                    Activity.speakers.any(ActivitySpeaker.nome.ilike(search)),
+                )))
+            if filters.get('situacao') in {'inscrito', 'nao_inscrito'} and user and getattr(user, 'cpf', None):
+                user_is_enrolled = Event.activities.any(
+                    Activity.enrollments.any(Enrollment.user_cpf == user.cpf)
+                )
+                if filters['situacao'] == 'inscrito':
+                    query = query.filter(user_is_enrolled)
+                else:
+                    query = query.filter(~user_is_enrolled)
 
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 

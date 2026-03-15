@@ -1033,6 +1033,34 @@
             linear-gradient(145deg, #ffffff 0%, #f7fbff 58%, #f8fcf8 100%);
     }
 
+    .open-events-filter-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .open-events-filter-chips {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        min-height: 1.75rem;
+    }
+
+    .open-events-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+        font-size: 0.76rem;
+        font-weight: 700;
+        border: 1px solid rgba(4, 77, 132, 0.12);
+    }
+
     .role-scope-badge {
         display: inline-flex;
         align-items: center;
@@ -1579,17 +1607,61 @@
                     <i class="fa-solid fa-magnifying-glass me-2"></i>Localizar Eventos em Aberto
                 </h6>
 
-                <div class="row g-2">
-                    <div class="col-12 col-sm-6 col-md-5">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-lg-4">
+                        <label for="filtPartNome" class="form-label small fw-bold text-muted mb-1">Nome do evento</label>
                         <input type="text" id="filtPartNome" class="form-control form-control-sm"
-                            placeholder="Nome do evento...">
+                            placeholder="Digite o nome do evento...">
                     </div>
-                    <div class="col-12 col-sm-6 col-md-4">
-                        <input type="text" id="filtPartCurso" class="form-control form-control-sm"
-                            placeholder="Curso...">
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label for="filtPartCurso" class="form-label small fw-bold text-muted mb-1">Curso</label>
+                        <select id="filtPartCurso" class="form-select form-select-sm">
+                            <option value="">Todos os cursos</option>
+                        </select>
                     </div>
-                    <div class="col-12 col-md-3">
-                        <input type="date" id="filtPartData" class="form-control form-control-sm">
+                    <div class="col-6 col-sm-3 col-lg-2">
+                        <label for="filtPartTipo" class="form-label small fw-bold text-muted mb-1">Tipo</label>
+                        <select id="filtPartTipo" class="form-select form-select-sm">
+                            <option value="">Todos os tipos</option>
+                            <option value="PADRAO">Padrão</option>
+                            <option value="RAPIDO">Rápido</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-sm-3 col-lg-3">
+                        <label for="filtPartSituacao" class="form-label small fw-bold text-muted mb-1">Minha situação</label>
+                        <select id="filtPartSituacao" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            <option value="inscrito">Já inscrito</option>
+                            <option value="nao_inscrito">Ainda não inscrito</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-5">
+                        <label for="filtPartProgramacao" class="form-label small fw-bold text-muted mb-1">Programação, local ou palestrante</label>
+                        <input type="text" id="filtPartProgramacao" class="form-control form-control-sm"
+                            placeholder="Ex.: oficina, laboratório, prof. maria...">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="filtPartDataInicio" class="form-label small fw-bold text-muted mb-1">Data inicial</label>
+                        <input type="date" id="filtPartDataInicio" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="filtPartDataFim" class="form-label small fw-bold text-muted mb-1">Data final</label>
+                        <input type="date" id="filtPartDataFim" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-3 d-grid">
+                        <button type="button" id="btnLimparFiltrosEventosAbertos" class="btn btn-light btn-sm border">
+                            <i class="fa-solid fa-filter-circle-xmark me-2"></i>Limpar filtros
+                        </button>
+                    </div>
+                </div>
+
+                <div class="open-events-filter-meta mt-3 pt-3 border-top">
+                    <div>
+                        <div class="small fw-bold text-primary" id="openEventsFilterCount">Todos os eventos em aberto</div>
+                        <div class="small text-muted" id="openEventsFilterInfo">Use os filtros para refinar a lista de inscrições disponíveis.</div>
+                    </div>
+                    <div class="open-events-filter-chips" id="openEventsFilterChips">
+                        <span class="text-muted small">Sem filtros adicionais.</span>
                     </div>
                 </div>
             </div>
@@ -1929,7 +2001,11 @@
         }
         inicializarModalCheckin();
         if (document.getElementById('listaEventosGestor')) carregarEventosGestor(1);
-        if (document.getElementById('listaEventosAluno')) carregarEventosAluno(1);
+        if (document.getElementById('listaEventosAluno')) {
+            inicializarFiltrosEventosAbertos();
+            carregarCursosEventosAbertosFiltro();
+            carregarEventosAluno(1);
+        }
 
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('open_checkin') === '1') {
@@ -1967,8 +2043,19 @@
         if (document.getElementById('listaEventosAluno')) {
             const debounced = debounce(() => carregarEventosAluno(1), 350);
             document.getElementById('filtPartNome')?.addEventListener('input', debounced);
-            document.getElementById('filtPartCurso')?.addEventListener('input', debounced);
-            document.getElementById('filtPartData')?.addEventListener('change', debounced);
+            document.getElementById('filtPartProgramacao')?.addEventListener('input', debounced);
+            document.getElementById('filtPartCurso')?.addEventListener('change', () => carregarEventosAluno(1));
+            document.getElementById('filtPartTipo')?.addEventListener('change', () => carregarEventosAluno(1));
+            document.getElementById('filtPartSituacao')?.addEventListener('change', () => carregarEventosAluno(1));
+            document.getElementById('filtPartDataInicio')?.addEventListener('change', () => {
+                sincronizarPeriodoEventosAbertos('inicio');
+                carregarEventosAluno(1);
+            });
+            document.getElementById('filtPartDataFim')?.addEventListener('change', () => {
+                sincronizarPeriodoEventosAbertos('fim');
+                carregarEventosAluno(1);
+            });
+            document.getElementById('btnLimparFiltrosEventosAbertos')?.addEventListener('click', limparFiltrosEventosAbertos);
         }
     });
 
@@ -1980,11 +2067,132 @@
         };
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getSelectedOptionLabel(id, fallback = '') {
+        const select = document.getElementById(id);
+        return select?.selectedOptions?.[0]?.textContent?.trim() || fallback;
+    }
+
     function clearQueryParam(paramName) {
         const url = new URL(window.location.href);
         if (!url.searchParams.has(paramName)) return;
         url.searchParams.delete(paramName);
         history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+
+    function inicializarFiltrosEventosAbertos() {
+        sincronizarPeriodoEventosAbertos();
+        atualizarResumoFiltrosEventosAbertos();
+    }
+
+    function sincronizarPeriodoEventosAbertos(origin = '') {
+        const inputInicio = document.getElementById('filtPartDataInicio');
+        const inputFim = document.getElementById('filtPartDataFim');
+        if (!inputInicio || !inputFim) return;
+
+        inputFim.min = inputInicio.value || '';
+        inputInicio.max = inputFim.value || '';
+
+        if (inputInicio.value && inputFim.value && inputInicio.value > inputFim.value) {
+            if (origin === 'inicio') {
+                inputFim.value = inputInicio.value;
+            } else if (origin === 'fim') {
+                inputInicio.value = inputFim.value;
+            }
+        }
+    }
+
+    async function carregarCursosEventosAbertosFiltro() {
+        const select = document.getElementById('filtPartCurso');
+        if (!select) return;
+
+        try {
+            const res = await fetch(apiUrl('/api/courses/'), { headers: { 'Accept': 'application/json' } });
+            const data = await parseJsonSafeResponse(res);
+            if (!res.ok || !Array.isArray(data)) return;
+
+            const currentValue = select.value || '';
+            const options = data
+                .map((course) => `<option value="${course.id}">${escapeHtml(course.nome)}</option>`)
+                .join('');
+
+            select.innerHTML = `<option value="">Todos os cursos</option>${options}`;
+            if (currentValue && Array.from(select.options).some((option) => option.value === currentValue)) {
+                select.value = currentValue;
+            }
+            atualizarResumoFiltrosEventosAbertos(eventosAlunoState?.total);
+        } catch (_) {}
+    }
+
+    function getOpenEventsActiveFilters() {
+        const filters = [];
+        const nome = document.getElementById('filtPartNome')?.value.trim();
+        const programacao = document.getElementById('filtPartProgramacao')?.value.trim();
+        const courseId = document.getElementById('filtPartCurso')?.value || '';
+        const tipo = document.getElementById('filtPartTipo')?.value || '';
+        const situacao = document.getElementById('filtPartSituacao')?.value || '';
+        const dataInicio = document.getElementById('filtPartDataInicio')?.value || '';
+        const dataFim = document.getElementById('filtPartDataFim')?.value || '';
+
+        if (nome) filters.push(`Nome: ${nome}`);
+        if (courseId) filters.push(`Curso: ${getSelectedOptionLabel('filtPartCurso', 'Curso selecionado')}`);
+        if (tipo) filters.push(`Tipo: ${getSelectedOptionLabel('filtPartTipo', tipo)}`);
+        if (situacao) filters.push(`Situação: ${getSelectedOptionLabel('filtPartSituacao', situacao)}`);
+        if (programacao) filters.push(`Programação: ${programacao}`);
+        if (dataInicio && dataFim) {
+            filters.push(`Período: ${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`);
+        } else if (dataInicio) {
+            filters.push(`A partir de: ${dataInicio.split('-').reverse().join('/')}`);
+        } else if (dataFim) {
+            filters.push(`Até: ${dataFim.split('-').reverse().join('/')}`);
+        }
+
+        return filters;
+    }
+
+    function atualizarResumoFiltrosEventosAbertos(total = null) {
+        const countEl = document.getElementById('openEventsFilterCount');
+        const infoEl = document.getElementById('openEventsFilterInfo');
+        const chipsEl = document.getElementById('openEventsFilterChips');
+        if (!countEl || !infoEl || !chipsEl) return;
+
+        const activeFilters = getOpenEventsActiveFilters();
+        const totalNumber = Number(total);
+        const hasValidTotal = Number.isFinite(totalNumber);
+
+        countEl.textContent = hasValidTotal
+            ? `${formatInteger(totalNumber)} evento(s) encontrado(s)`
+            : 'Todos os eventos em aberto';
+
+        infoEl.textContent = activeFilters.length
+            ? `Refinando por ${activeFilters.length} filtro(s) ativo(s).`
+            : 'Use os filtros para refinar a lista de inscrições disponíveis.';
+
+        chipsEl.innerHTML = activeFilters.length
+            ? activeFilters.map((label) => `<span class="open-events-filter-chip"><i class="fa-solid fa-filter"></i>${escapeHtml(label)}</span>`).join('')
+            : '<span class="text-muted small">Sem filtros adicionais.</span>';
+    }
+
+    function limparFiltrosEventosAbertos() {
+        ['filtPartNome', 'filtPartProgramacao', 'filtPartDataInicio', 'filtPartDataFim'].forEach((id) => {
+            const input = document.getElementById(id);
+            if (input) input.value = '';
+        });
+        ['filtPartCurso', 'filtPartTipo', 'filtPartSituacao'].forEach((id) => {
+            const select = document.getElementById(id);
+            if (select) select.value = '';
+        });
+        sincronizarPeriodoEventosAbertos();
+        atualizarResumoFiltrosEventosAbertos();
+        carregarEventosAluno(1);
     }
 
     function inicializarPainelLimpezaCertificados() {
@@ -3173,8 +3381,12 @@
     function getFilters(page = 1) {
         return {
             nome: document.getElementById('filtPartNome')?.value.trim() || '',
-            curso: document.getElementById('filtPartCurso')?.value.trim() || '',
-            data: document.getElementById('filtPartData')?.value || '',
+            course_id: document.getElementById('filtPartCurso')?.value || '',
+            tipo: document.getElementById('filtPartTipo')?.value || '',
+            situacao: document.getElementById('filtPartSituacao')?.value || '',
+            programacao: document.getElementById('filtPartProgramacao')?.value.trim() || '',
+            data_inicio: document.getElementById('filtPartDataInicio')?.value || '',
+            data_fim: document.getElementById('filtPartDataFim')?.value || '',
             page: String(page)
         };
     }
@@ -3208,11 +3420,13 @@
         const qs = buildQuery(getFilters(page));
         const url = `/api/eventos_abertos?${qs}`;
         eventosAlunoLastQuery = qs;
+        atualizarResumoFiltrosEventosAbertos();
 
         const cached = eventosAlunoCache.get(qs);
         const now = Date.now();
         if (cached && (now - cached.ts) < CACHE_TTL_MS) {
             eventosAlunoState = cached.data;
+            atualizarResumoFiltrosEventosAbertos(cached.data?.total);
             renderEventosAluno(cached.data, div);
             return;
         }
@@ -3228,9 +3442,11 @@
 
             eventosAlunoCache.set(qs, { ts: now, data });
             eventosAlunoState = data;
+            atualizarResumoFiltrosEventosAbertos(data?.total);
             renderEventosAluno(data, div);
         } catch (err) {
             if (err.name === 'AbortError') return;
+            atualizarResumoFiltrosEventosAbertos();
             div.innerHTML = `
         <div class="col-12 text-center text-muted py-5 px-4 glass-panel border-dashed">
           <p class="mb-0">Falha ao carregar eventos. Tente novamente.</p>
@@ -3243,6 +3459,7 @@
         div.innerHTML = '';
 
         if (!data?.items || data.items.length === 0) {
+            atualizarResumoFiltrosEventosAbertos(data?.total ?? 0);
             div.innerHTML = `
         <div class="col-12 text-center text-muted py-5 px-4 glass-panel border-dashed animate__animated animate__fadeIn">
           <i class="fa-regular fa-calendar-xmark fs-1 mb-3 text-slate-300"></i>
@@ -3334,6 +3551,7 @@
       `;
         }
 
+        atualizarResumoFiltrosEventosAbertos(data?.total);
         div.innerHTML = html;
         renderPaginacao(data.current_page, data.pages, 'paginacaoAluno', carregarEventosAluno);
     }
