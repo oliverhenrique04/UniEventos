@@ -5,7 +5,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from flask import current_app
-from app.utils import build_absolute_app_url
+from app.utils import build_absolute_app_url, current_certificate_issue_date_label
 
 from app.services.certificate_service import CertificateService
 from app.services.notification_service import NotificationService
@@ -24,19 +24,6 @@ class InstitutionalCertificateService:
         for key, value in values.items():
             rendered = rendered.replace(key, value)
         return rendered
-
-    @staticmethod
-    def _format_issue_date(value):
-        raw = str(value or '').strip()
-        if not raw:
-            return ''
-
-        for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
-            try:
-                return datetime.strptime(raw, fmt).strftime('%d/%m/%Y')
-            except ValueError:
-                continue
-        return raw
 
     @staticmethod
     def _recipient_metadata(recipient):
@@ -88,7 +75,7 @@ class InstitutionalCertificateService:
         profile = self._recipient_effective_profile(recipient)
         carga_horaria = str(metadata.get('carga_horaria') or '-')
         curso_usuario = str(metadata.get('curso_usuario') or '-')
-        issue_date = self._format_issue_date(certificate.data_emissao)
+        issue_date = current_certificate_issue_date_label()
 
         placeholders = {
             '{{RECIPIENT_NAME}}': profile['nome'] or '',
@@ -138,7 +125,7 @@ class InstitutionalCertificateService:
         rendered_template_json = self._render_institutional_template_json(certificate, recipient)
         carga_horaria = str(metadata.get('carga_horaria') or '-')
         curso_usuario = str(metadata.get('curso_usuario') or '-')
-        issue_date = self._format_issue_date(certificate.data_emissao)
+        issue_date = current_certificate_issue_date_label()
         default_tag_overrides = {
             '{{RECIPIENT_NAME}}': profile['nome'] or '',
             '{{CERTIFICATE_TITLE}}': certificate.titulo or '',
@@ -160,6 +147,8 @@ class InstitutionalCertificateService:
             **default_tag_overrides,
             **{str(key): '' if value is None else str(value) for key, value in (tag_overrides or {}).items()},
         }
+        merged_tag_overrides['{{DATA}}'] = issue_date
+        merged_tag_overrides['{{EMISSION_DATE}}'] = issue_date
         fake_event = SimpleNamespace(
             id=certificate.id,
             nome=certificate.titulo,
@@ -204,7 +193,7 @@ class InstitutionalCertificateService:
                 'recipient_name': profile['nome'],
                 'certificate_title': certificate.titulo,
                 'category_name': certificate.categoria,
-                'issue_date': self._format_issue_date(certificate.data_emissao),
+                'issue_date': current_certificate_issue_date_label(),
                 'certificate_number': recipient.cert_hash,
                 'signer_name': certificate.signer_name,
                 'recipient_cpf': profile['cpf'],

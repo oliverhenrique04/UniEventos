@@ -1,9 +1,11 @@
 import time
 import hashlib
 import hmac
+from datetime import datetime
 from math import radians, cos, sin, asin, sqrt
 from flask import current_app
 from urllib.parse import urlparse, urlunparse
+from zoneinfo import ZoneInfo
 
 import unicodedata
 import re
@@ -36,6 +38,14 @@ def build_absolute_app_url(path):
 
     final_path = _join_url_paths(merged_base_path, normalized_path)
     return urlunparse((parsed.scheme, parsed.netloc, final_path, '', '', ''))
+
+
+def current_certificate_issue_date_label():
+    """Returns the certificate issue date label in dd/mm/yyyy using Brasilia timezone."""
+    try:
+        return datetime.now(ZoneInfo('America/Sao_Paulo')).strftime('%d/%m/%Y')
+    except Exception:
+        return datetime.now().strftime('%d/%m/%Y')
 
 
 def normalize_cpf(value):

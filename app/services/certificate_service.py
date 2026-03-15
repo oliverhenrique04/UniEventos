@@ -12,7 +12,7 @@ from app.repositories.activity_repository import ActivityRepository
 from app.services.notification_service import NotificationService
 from app.extensions import db
 from flask import current_app, has_app_context
-from app.utils import build_absolute_app_url
+from app.utils import build_absolute_app_url, current_certificate_issue_date_label
 
 class CertificateService:
     """Service for managing, generating and distributing academic certificates."""
@@ -196,9 +196,9 @@ class CertificateService:
         'id': 'txt2',
         'type': 'text',
         'text': (
-            'Certificamos que {{{{RECIPIENT_NAME}}}} participou de {{{{CERTIFICATE_TITLE}}}} em {{{{EMISSION_DATE}}}}.'
+            'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.'
             if designer_mode == 'institutional'
-            else 'Certificamos que {{{{NOME}}}}, CPF {{{{CPF}}}}, participou do evento {{{{EVENTO}}}} realizado em {{{{DATA}}}}.'
+            else 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}}.'
         ),
         'x': 50,
         'y': 50,
@@ -658,6 +658,7 @@ class CertificateService:
 
         activity_name = activity.nome if activity and getattr(activity, 'nome', None) else ''
         speaker_name = activity.palestrante if activity and getattr(activity, 'palestrante', None) else ''
+        issue_date = current_certificate_issue_date_label()
 
         tags = {
             '{{NOME}}': str(getattr(user, 'nome', '') or '').upper(),
@@ -665,15 +666,20 @@ class CertificateService:
             '{{ATIVIDADE}}': activity_name,
             '{{PALESTRANTE}}': speaker_name,
             '{{HORAS}}': str(total_hours),
-            '{{DATA}}': event.data_inicio.strftime('%d/%m/%Y') if getattr(event, 'data_inicio', None) else "",
+            '{{DATA}}': issue_date,
+            '{{EMISSION_DATE}}': issue_date,
             '{{CPF}}': str(getattr(user, 'cpf', '') or ''),
         }
 
         normalized_overrides = {}
         for key, value in (tag_overrides or {}).items():
+            if str(key) in {'{{DATA}}', '{{EMISSION_DATE}}'}:
+                continue
             normalized_overrides[str(key)] = '' if value is None else str(value)
 
         tags.update(normalized_overrides)
+        tags['{{DATA}}'] = issue_date
+        tags['{{EMISSION_DATE}}'] = issue_date
         return tags
 
     def _draw_qr_element(self, pdf_canvas, config, page_width, page_height, validation_url):
