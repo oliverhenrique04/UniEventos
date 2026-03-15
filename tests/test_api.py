@@ -14,6 +14,7 @@ from app.extensions import db
 from openpyxl import Workbook
 from app.services.auth_service import AuthService
 from app.api import admin as admin_api
+from app.api import certificates as certificates_api
 
 
 def _login_admin(client):
@@ -32,6 +33,18 @@ def _create_event_for_certs(app, owner_username='admin_test'):
         )
         from app.extensions import db
         db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Check-in Presenca',
+            descricao='Atividade padrao do evento',
+            data_atv=date(2030, 1, 1),
+            hora_atv=time(10, 0),
+            carga_horaria=4,
+            vagas=100,
+        )
+        db.session.add(activity)
         db.session.commit()
         return event.id
 
@@ -334,6 +347,112 @@ def test_certificate_setup_accepts_v2_template(client, app, admin_user):
         saved = json.loads(event.cert_template_json)
         assert saved['version'] == 2
         assert saved['elements'][0]['id'] == 'txt1'
+
+
+def test_certificate_setup_normalizes_fonts_and_injects_required_elements(client, app, admin_user):
+    _login_admin(client)
+    event_id = _create_event_for_certs(app)
+
+    payload = {
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'elements': [
+            {
+                'id': 'txt1',
+                'type': 'text',
+                'text': 'CERTIFICADO {{NOME}}',
+                'x': 50,
+                'y': 20,
+                'w': 80,
+                'h': 10,
+                'font': 30,
+                'color': '#111111',
+                'align': 'center',
+                'font_family': 'Arial',
+                'zIndex': 1,
+                'locked': False,
+                'visible': True
+            }
+        ]
+    }
+
+    res = client.post(
+        f'/api/certificates/setup/{event_id}',
+        data={'template': json.dumps(payload)}
+    )
+
+    assert res.status_code == 200
+    with app.app_context():
+        event = db.session.get(Event, event_id)
+        saved = json.loads(event.cert_template_json)
+        txt1 = next(item for item in saved['elements'] if item['id'] == 'txt1')
+        date_fixed = next(item for item in saved['elements'] if item['id'] == 'date_fixed')
+        fixed_ids = {item['id'] for item in saved['elements']}
+
+        assert txt1['font_family'] == 'Helvetica'
+        assert '{{DATA}}' in date_fixed['text']
+        assert {'date_fixed', 'hash', 'qrcode'}.issubset(fixed_ids)
+
+
+def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
+    event_id = _create_event_for_certs(app)
+
+    with app.app_context():
+        event = db.session.get(Event, event_id)
+        participant = User(
+            username='cert_batch_participant',
+            role='participante',
+            nome='Participante Cert Batch',
+            cpf='77788899900',
+            email='batch@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        activity = event.activities[0]
+        db.session.add(Enrollment(
+            activity_id=activity.id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=True,
+        ))
+        db.session.commit()
+
+    monkeypatch.setattr(
+        certificates_api.CertificateService,
+        'queue_event_certificates',
+        lambda self, event_id: (
+            True,
+            'Envio concluido',
+            {'total_enviado': 1, 'sem_email': 0, 'falha_fila': 0}
+        )
+    )
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=None, daemon=None):
+            self.target = target
+            self.args = args or ()
+
+        def start(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(certificates_api, 'Thread', ImmediateThread)
+
+    _login_admin(client)
+    res = client.post(f'/api/certificates/send_batch/{event_id}')
+
+    assert res.status_code == 202
+    payload = res.get_json()
+    assert payload['resultado'] == 'processando'
+    assert payload['job_id']
+
+    status_res = client.get(f"/api/certificates/send_batch/status/{payload['job_id']}")
+    assert status_res.status_code == 200
+    status_payload = status_res.get_json()
+    assert status_payload['completed'] is True
+    assert status_payload['resultado'] == 'sucesso'
+    assert status_payload['total_enviado'] == 1
 
 
 def test_upload_asset_requires_file(client, app, admin_user):

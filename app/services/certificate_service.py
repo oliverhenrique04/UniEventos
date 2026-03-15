@@ -2,6 +2,7 @@ import os
 import json
 import secrets
 import html
+import re
 from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, A4
@@ -15,12 +16,235 @@ from app.utils import build_absolute_app_url
 
 class CertificateService:
     """Service for managing, generating and distributing academic certificates."""
+
+    SUPPORTED_FONT_FAMILIES = ('Helvetica', 'Times-Roman', 'Courier')
+    REQUIRED_TEMPLATE_ELEMENTS = (
+        {
+            'id': 'date_fixed',
+            'type': 'text',
+            'text': 'Data de Emissão: {{DATA}}',
+            'x': 50,
+            'y': 97,
+            'w': 70,
+            'h': 4,
+            'font': 11,
+            'color': '#64748b',
+            'align': 'center',
+            'bold': False,
+            'italic': False,
+            'font_family': 'Helvetica',
+            'zIndex': 3,
+            'locked': False,
+            'visible': True,
+            'auto_fit': True,
+        },
+        {
+            'id': 'hash',
+            'type': 'text',
+            'text': '{{HASH}}',
+            'x': 88,
+            'y': 95,
+            'w': 12,
+            'h': 4,
+            'font': 16,
+            'color': '#94a3b8',
+            'align': 'left',
+            'bold': False,
+            'italic': False,
+            'font_family': 'Courier',
+            'zIndex': 4,
+            'locked': False,
+            'visible': True,
+            'auto_fit': False,
+        },
+        {
+            'id': 'qrcode',
+            'type': 'qr',
+            'x': 88,
+            'y': 88,
+            'w': 12,
+            'h': 12,
+            'size': 80,
+            'zIndex': 5,
+            'locked': False,
+            'visible': True,
+        },
+    )
     
     def __init__(self):
         self.event_repo = EventRepository()
         self.user_repo = UserRepository()
         self.activity_repo = ActivityRepository()
         self.notifier = NotificationService()
+
+    @classmethod
+    def normalize_font_family(cls, family):
+        raw = str(family or '').strip().strip('"\'')
+        lowered = raw.lower()
+
+        if not raw:
+            return 'Helvetica'
+        if raw in cls.SUPPORTED_FONT_FAMILIES:
+            return raw
+        if 'courier' in lowered or 'mono' in lowered:
+            return 'Courier'
+        if 'sans' in lowered or lowered in {'arial', 'helvetica', 'inter', 'roboto', 'system-ui'}:
+            return 'Helvetica'
+        if 'times' in lowered or lowered in {'georgia', 'garamond'} or (
+            'serif' in lowered and 'sans' not in lowered
+        ):
+            return 'Times-Roman'
+        return 'Helvetica'
+
+    @classmethod
+    def _normalize_text_styles(cls, text_styles):
+        if not isinstance(text_styles, dict):
+            return {}
+
+        normalized = {}
+        for line_key, line_styles in text_styles.items():
+            if not isinstance(line_styles, dict):
+                continue
+
+            compact_line = {}
+            for char_key, style in line_styles.items():
+                if not isinstance(style, dict):
+                    continue
+
+                compact_style = dict(style)
+                if compact_style.get('fontFamily'):
+                    compact_style['fontFamily'] = cls.normalize_font_family(compact_style.get('fontFamily'))
+
+                font_size = compact_style.get('fontSize')
+                if font_size is not None:
+                    try:
+                        compact_style['fontSize'] = max(8, float(font_size))
+                    except (TypeError, ValueError):
+                        compact_style.pop('fontSize', None)
+
+                compact_line[str(char_key)] = compact_style
+
+            if compact_line:
+                normalized[str(line_key)] = compact_line
+
+        return normalized
+
+    @classmethod
+    def normalize_template_payload(cls, template):
+        def _as_int(value, default):
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
+        def _as_float(value, default):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        if not isinstance(template, dict):
+            template = {}
+
+        raw_document = template.get('document') if isinstance(template.get('document'), dict) else {}
+        raw_elements = template.get('elements')
+
+        normalized = {
+            'version': 2,
+            'document': {
+                'gridSize': max(1, min(10, _as_int(raw_document.get('gridSize', 2) or 2, 2))),
+                'snap': raw_document.get('snap', True) is not False,
+                'guides': raw_document.get('guides', True) is not False,
+            },
+            'bg': str(template.get('bg') or '').strip(),
+            'elements': [],
+        }
+
+        if not isinstance(raw_elements, list):
+            raw_elements = []
+
+        seen_fixed_ids = set()
+        normalized_elements = []
+
+        for idx, element in enumerate(raw_elements):
+            if not isinstance(element, dict):
+                continue
+
+            element_id = str(element.get('id') or f'el_{idx}').strip() or f'el_{idx}'
+            is_fixed_validation_element = element_id in {'date_fixed', 'hash', 'qrcode'}
+            if element_id in {'date_fixed', 'hash', 'qrcode'}:
+                if element_id in seen_fixed_ids:
+                    continue
+                seen_fixed_ids.add(element_id)
+
+            element_type = element.get('type') or ('qr' if element_id == 'qrcode' else 'text')
+            if element_id == 'qrcode':
+                element_type = 'qr'
+
+            base = {
+                'id': element_id,
+                'type': element_type,
+                'x': _as_float(element.get('x', 50) or 50, 50),
+                'y': _as_float(element.get('y', 50) or 50, 50),
+                'w': _as_float(element.get('w', 20) or 20, 20),
+                'h': _as_float(element.get('h', 8) or 8, 8),
+                'zIndex': _as_int(element.get('zIndex', idx + 1) or (idx + 1), idx + 1),
+                'locked': False if is_fixed_validation_element else bool(element.get('locked')),
+                'visible': True if is_fixed_validation_element else element.get('visible', True) is not False,
+            }
+
+            if element_type == 'qr':
+                normalized_elements.append({
+                    **base,
+                    'size': _as_int(element.get('size', 80) or 80, 80),
+                })
+                continue
+
+            if element_type == 'image':
+                src = str(element.get('src') or '').strip()
+                if not src:
+                    continue
+                normalized_elements.append({
+                    **base,
+                    'src': src,
+                })
+                continue
+
+            font_family = cls.normalize_font_family(element.get('font_family'))
+            text = str(element.get('text') or '')
+            if element_id == 'date_fixed' and '{{DATA}}' not in text:
+                text = 'Data de Emissão: {{DATA}}'
+            if element_id == 'hash':
+                font_family = 'Courier'
+                text = '{{HASH}}'
+
+            normalized_elements.append({
+                **base,
+                'type': 'text',
+                'text': text,
+                'font': max(8, _as_float(element.get('font', 20) or 20, 20)),
+                'color': str(element.get('color') or '#000000'),
+                'align': 'left' if element_id == 'hash' else str(element.get('align') or 'center'),
+                'bold': bool(element.get('bold')),
+                'italic': bool(element.get('italic')),
+                'font_family': font_family,
+                'text_styles': cls._normalize_text_styles(element.get('text_styles') or {}),
+                'is_html': False if element_id == 'hash' else bool(element.get('is_html')),
+                'html_content': None if element_id == 'hash' else element.get('html_content'),
+                'auto_fit': False if element_id == 'hash' else element.get('auto_fit', True) is not False,
+            })
+
+        for required in cls.REQUIRED_TEMPLATE_ELEMENTS:
+            if any(element.get('id') == required['id'] for element in normalized_elements):
+                continue
+            normalized_elements.append(json.loads(json.dumps(required)))
+
+        normalized_elements.sort(key=lambda item: item.get('zIndex', 0))
+        for idx, element in enumerate(normalized_elements, start=1):
+            element['zIndex'] = idx
+
+        normalized['elements'] = normalized_elements
+        return normalized
 
     def _parse_template_elements(self, event):
         """Loads and normalizes template elements with legacy compatibility."""
@@ -31,18 +255,37 @@ class CertificateService:
         }
 
         if not event.cert_template_json:
-            return self._normalize_legacy_elements(legacy_defaults)
+            normalized_legacy = {
+                'version': 2,
+                'document': {'gridSize': 2, 'snap': True, 'guides': True},
+                'elements': self._normalize_legacy_elements(legacy_defaults),
+            }
+            normalized = self.normalize_template_payload(normalized_legacy)
+            return normalized.get('elements', [])
 
         try:
             template = json.loads(event.cert_template_json)
         except Exception:
-            return self._normalize_legacy_elements(legacy_defaults)
+            normalized_legacy = {
+                'version': 2,
+                'document': {'gridSize': 2, 'snap': True, 'guides': True},
+                'elements': self._normalize_legacy_elements(legacy_defaults),
+            }
+            normalized = self.normalize_template_payload(normalized_legacy)
+            return normalized.get('elements', [])
 
         if isinstance(template, dict) and isinstance(template.get('elements'), list):
-            return template.get('elements', [])
+            normalized = self.normalize_template_payload(template)
+            return normalized.get('elements', [])
 
         if isinstance(template, dict):
-            return self._normalize_legacy_elements(template)
+            normalized_legacy = {
+                'version': 2,
+                'document': {'gridSize': 2, 'snap': True, 'guides': True},
+                'elements': self._normalize_legacy_elements(template),
+            }
+            normalized = self.normalize_template_payload(normalized_legacy)
+            return normalized.get('elements', [])
 
         return self._normalize_legacy_elements(legacy_defaults)
 
@@ -90,7 +333,7 @@ class CertificateService:
         return elements
 
     def _resolve_font_name(self, family, is_bold=False, is_italic=False):
-        family = family or 'Helvetica'
+        family = self.normalize_font_family(family)
         font_name = family
         if family == 'Helvetica':
             if is_bold and is_italic:
@@ -122,7 +365,6 @@ class CertificateService:
         ReportLab Paragraph supports: <b>, <i>, <u>, <strike>, <br/>, <font>, <a>.
         Other tags are converted to their closest equivalents or stripped.
         """
-        import re
         h = html_content or ''
         # Normalize line endings
         h = h.replace('\r\n', ' ').replace('\r', ' ')
@@ -140,12 +382,50 @@ class CertificateService:
         h = re.sub(r'</(ul|ol)>', '', h, flags=re.IGNORECASE)
         h = re.sub(r'<li[^>]*>', '• ', h, flags=re.IGNORECASE)
         h = re.sub(r'</li>', '<br/>', h, flags=re.IGNORECASE)
-        # <span style="color:#..."> -> <font color="...">
-        h = re.sub(
-            r'<span\s+style="[^"]*?color\s*:\s*(#[\w]+)[^"]*">(.*?)</span>',
-            r'<font color="\1">\2</font>',
-            h, flags=re.IGNORECASE | re.DOTALL
-        )
+
+        def _replace_span(match):
+            attrs = match.group(1) or ''
+            content = match.group(2) or ''
+            style_match = re.search(r'style=(["\'])(.*?)\1', attrs, flags=re.IGNORECASE | re.DOTALL)
+            style_attr = style_match.group(2) if style_match else ''
+
+            font_attrs = []
+            wrappers = []
+            for rule in style_attr.split(';'):
+                raw_key, _, raw_value = rule.partition(':')
+                key = raw_key.strip().lower()
+                value = raw_value.strip()
+                if not key or not value:
+                    continue
+
+                if key == 'color':
+                    font_attrs.append(f'color="{value}"')
+                elif key == 'font-size':
+                    match_size = re.search(r'(\d+(?:\.\d+)?)', value)
+                    if match_size:
+                        font_attrs.append(f'size="{match_size.group(1)}"')
+                elif key == 'font-family':
+                    family_name = CertificateService.normalize_font_family(value.split(',')[0])
+                    font_attrs.append(f'name="{family_name}"')
+                elif key == 'font-weight' and value.lower() not in {'normal', '400'}:
+                    wrappers.append(('b', 'b'))
+                elif key == 'font-style' and value.lower() == 'italic':
+                    wrappers.append(('i', 'i'))
+                elif key == 'text-decoration':
+                    lower_value = value.lower()
+                    if 'underline' in lower_value:
+                        wrappers.append(('u', 'u'))
+                    if 'line-through' in lower_value:
+                        wrappers.append(('strike', 'strike'))
+
+            result = content
+            for open_tag, close_tag in wrappers:
+                result = f'<{open_tag}>{result}</{close_tag}>'
+            if font_attrs:
+                result = f'<font {" ".join(font_attrs)}>{result}</font>'
+            return result
+
+        h = re.sub(r'<span([^>]*)>(.*?)</span>', _replace_span, h, flags=re.IGNORECASE | re.DOTALL)
         # Strip remaining unsupported/unknown tags but preserve their content
         h = re.sub(
             r'<(?!/?(b|i|u|strike|br|font|a)(\s[^>]*)?/?>)[^>]+>',
@@ -398,8 +678,14 @@ class CertificateService:
         """Queues certificate delivery for all present participants of an event."""
         event = self.event_repo.get_by_id(event_id)
         if not event:
-            return False, "Evento não encontrado"
+            return False, "Evento não encontrado", {
+                'total_enviado': 0,
+                'sem_email': 0,
+                'falha_fila': 0,
+            }
         count = 0
+        skipped_without_email = 0
+        failed_queue = 0
         for atv in event.activities:
             for enroll in atv.enrollments:
                 if not enroll.presente:
@@ -407,6 +693,7 @@ class CertificateService:
 
                 user = self.user_repo.get_by_cpf(enroll.user_cpf)
                 if not user or not user.email:
+                    skipped_without_email += 1
                     continue
 
                 # Standard events issue one certificate per activity/enrollment.
@@ -419,7 +706,7 @@ class CertificateService:
                 event_date = event.data_inicio.strftime('%d/%m/%Y') if event and event.data_inicio else ''
                 activity_suffix = f" - {atv.nome}" if getattr(event, 'tipo', None) == 'PADRAO' else ''
 
-                self.notifier.send_email_task(
+                if not self.notifier.send_email_task(
                     to_email=user.email,
                     subject=f"Seu Certificado: {event.nome}{activity_suffix}",
                     template_name='certificate_ready.html',
@@ -434,14 +721,38 @@ class CertificateService:
                         'my_certificates_url': validation_url,
                     },
                     attachment_path=pdf_path
-                )
+                ):
+                    failed_queue += 1
+                    continue
 
                 enroll.cert_data_envio = datetime.now()
                 enroll.cert_entregue = True
                 db.session.commit()
                 count += 1
-            
-        return True, f"{count} certificados colocados na fila de envio."
+
+        if count == 0 and failed_queue > 0:
+            return False, "Problema no envio: falha ao enfileirar e-mails.", {
+                'total_enviado': count,
+                'sem_email': skipped_without_email,
+                'falha_fila': failed_queue,
+            }
+
+        if count == 0:
+            return False, "Problema no envio: nenhum participante com e-mail válido.", {
+                'total_enviado': count,
+                'sem_email': skipped_without_email,
+                'falha_fila': failed_queue,
+            }
+
+        message = f"{count} certificados colocados na fila de envio."
+        if failed_queue > 0:
+            message = f"Envio parcialmente concluído. {count} certificados enfileirados."
+
+        return True, message, {
+            'total_enviado': count,
+            'sem_email': skipped_without_email,
+            'falha_fila': failed_queue,
+        }
 
     def update_config(self, event_id, bg_path=None, template_json=None):
         """Updates certificate configuration for an event."""

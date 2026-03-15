@@ -524,6 +524,112 @@ def test_certificate_service_generates_pdf_with_partial_rich_text_styles(app, ad
         assert os.path.getsize(pdf_path) > 0
 
 
+def test_certificate_service_generates_pdf_with_unsupported_font_family_fallback(app, admin_user):
+    with app.app_context():
+        output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')
+        os.makedirs(output_dir, exist_ok=True)
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Fonte Fallback',
+            descricao='Teste fonte fallback',
+            tipo='RAPIDO',
+            data_inicio=date(2030, 7, 1),
+            hora_inicio=time(9, 0),
+            cert_template_json=json.dumps({
+                'version': 2,
+                'document': {'gridSize': 2, 'snap': True, 'guides': True},
+                'elements': [
+                    {
+                        'id': 'txt_custom',
+                        'type': 'text',
+                        'text': 'Texto com fonte nao suportada',
+                        'x': 50,
+                        'y': 50,
+                        'w': 60,
+                        'h': 12,
+                        'font': 24,
+                        'color': '#111111',
+                        'align': 'center',
+                        'font_family': 'Arial',
+                        'zIndex': 1,
+                        'visible': True
+                    }
+                ]
+            })
+        )
+
+        user = User(
+            username='cert_user_font_fallback',
+            role='student',
+            nome='Aluno Fonte Fallback',
+            cpf='10000000003',
+            email='font-fallback@example.com'
+        )
+        user.set_password('1234')
+
+        db.session.add(event)
+        db.session.add(user)
+        db.session.commit()
+
+        service = CertificateService()
+        pdf_path = service.generate_pdf(event, user, activities=[], total_hours=4)
+
+        assert os.path.exists(pdf_path)
+        assert os.path.getsize(pdf_path) > 0
+
+
+def test_certificate_service_normalize_template_payload_restores_fixed_validation_elements():
+    normalized = CertificateService.normalize_template_payload({
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'elements': [
+            {
+                'id': 'date_fixed',
+                'type': 'text',
+                'text': 'Data estática',
+                'x': 50,
+                'y': 96,
+                'w': 50,
+                'h': 4,
+                'font': 12,
+                'visible': False,
+            },
+            {
+                'id': 'hash',
+                'type': 'text',
+                'text': 'HASH-FIXO',
+                'x': 90,
+                'y': 95,
+                'w': 12,
+                'h': 4,
+                'font': 12,
+                'font_family': 'Arial',
+                'visible': False,
+            },
+            {
+                'id': 'qrcode',
+                'type': 'image',
+                'x': 90,
+                'y': 88,
+                'w': 12,
+                'h': 12,
+                'visible': False,
+            },
+        ],
+    })
+
+    by_id = {item['id']: item for item in normalized['elements']}
+
+    assert by_id['date_fixed']['visible'] is True
+    assert '{{DATA}}' in by_id['date_fixed']['text']
+    assert by_id['hash']['visible'] is True
+    assert by_id['hash']['text'] == '{{HASH}}'
+    assert by_id['hash']['font_family'] == 'Courier'
+    assert by_id['qrcode']['visible'] is True
+    assert by_id['qrcode']['type'] == 'qr'
+
+
 def _build_students_xlsx(rows, include_email=True):
     wb = Workbook()
     ws = wb.active
