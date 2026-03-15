@@ -485,6 +485,7 @@
                         {% endif %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">{{HORAS}} — Horas</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">{{DATA}} — Data</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA_REALIZACAO}}', event)">{{DATA_REALIZACAO}} — {% if event.tipo == 'PADRAO' %}Data da Atividade{% else %}Data do Evento{% endif %}</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">{{CPF}} — CPF</a></li>
                         {% endif %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{ '{{HASH}}' }}', event)">{{ '{{HASH}}' }} — Hash</a></li>
@@ -610,6 +611,10 @@
                         <div class="fw-bold text-primary small">{{ '{{DATA}}' }}</div>
                         <div class="text-muted x-small">Data de Emissão</div>
                     </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{DATA_REALIZACAO}}')">
+                        <div class="fw-bold text-primary small">{{ '{{DATA_REALIZACAO}}' }}</div>
+                        <div class="text-muted x-small">{% if event.tipo == 'PADRAO' %}Data da Atividade{% else %}Data do Evento{% endif %}</div>
+                    </div>
                     {% endif %}
                     <div class="variable-guide-item" onclick="injectVar('{{ '{{HASH}}' }}')">
                         <div class="fw-bold text-primary small">{{ '{{HASH}}' }}</div>
@@ -713,6 +718,7 @@
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HORAS}}' }}')">{{ '{{HORAS}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA}}' }}')">{{ '{{DATA}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA_REALIZACAO}}' }}')">{{ '{{DATA_REALIZACAO}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{CPF}}' }}')">{{ '{{CPF}}' }}</button>
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HASH}}' }}')">{{ '{{HASH}}' }}</button>
@@ -771,6 +777,7 @@
     const TAG_PALESTRANTE = "{{ '{{PALESTRANTE}}' }}";
     const TAG_HORAS = "{{ '{{HORAS}}' }}";
     const TAG_DATA = "{{ '{{DATA}}' }}";
+    const TAG_DATA_REALIZACAO = "{{ '{{DATA_REALIZACAO}}' }}";
     const TAG_RECIPIENT_NAME = "{{ '{{RECIPIENT_NAME}}' }}";
     const TAG_CERTIFICATE_TITLE = "{{ '{{CERTIFICATE_TITLE}}' }}";
     const TAG_CATEGORY = "{{ '{{CATEGORY}}' }}";
@@ -790,11 +797,12 @@
     const FIXED_NAME_TAG = designerMode === 'institutional' ? TAG_RECIPIENT_NAME : TAG_NOME;
     const FIXED_NAME_LABEL = designerMode === 'institutional' ? 'Nome do destinatário' : 'Nome do participante';
 
-    function getTodayDateBrasilia() {
-        return new Date().toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIMEZONE });
+    function getDateLabelBrasilia(dayOffset = 0) {
+        return new Date(Date.now() + (dayOffset * 24 * 60 * 60 * 1000)).toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIMEZONE });
     }
 
-    const todayDateLabel = getTodayDateBrasilia();
+    const todayDateLabel = getDateLabelBrasilia();
+    const referenceDateLabel = getDateLabelBrasilia(-7);
     const defaultFixedDateText = `Data de Emissão: ${TAG_DATA}`;
     const deepClone = (value) => JSON.parse(JSON.stringify(value));
     const defaultTemplateElements = [];
@@ -818,26 +826,28 @@
             visible: true
         });
     }
-    defaultTemplateElements.push({
-        id: 'txt2',
-        type: 'text',
-        text: designerMode === 'institutional'
-            ? 'Certificamos que {{ "{{RECIPIENT_NAME}}" }} participou de {{ "{{CERTIFICATE_TITLE}}" }}.'
-            : 'Certificamos que {{ "{{NOME}}" }}, CPF {{ "{{CPF}}" }}, participou do evento {{ "{{EVENTO}}" }}.',
-        x: 50,
-        y: 50,
-        w: designerMode === 'institutional' ? 80 : 82,
-        h: 24,
-        font: 22,
-        color: '#334155',
-        align: 'center',
-        bold: false,
-        italic: false,
-        font_family: 'Helvetica',
-        zIndex: 3,
-        locked: false,
-        visible: true
-    });
+    {% raw %}
+        defaultTemplateElements.push({
+            id: 'txt2',
+            type: 'text',
+            text: designerMode === 'institutional'
+                ? 'Certificamos que {{RECIPIENT_NAME}} matriculado(a) no curso {{CURSO_USUARIO}} atuou como {{CATEGORY}} com carga horária de {{CARGA_HORARIA}}.'
+                : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}}.',
+            x: 50,
+            y: 50,
+            w: designerMode === 'institutional' ? 80 : 82,
+            h: 24,
+            font: 22,
+            color: '#334155',
+            align: 'center',
+            bold: false,
+            italic: false,
+            font_family: 'Helvetica',
+            zIndex: 3,
+            locked: false,
+            visible: true
+        });
+        {% endraw %}
     defaultTemplateElements.push(...deepClone(fixedValidationElements));
 
     const defaultTemplate = {
@@ -1198,7 +1208,8 @@
         const palestrante = ['Profa. Fulana', 'Dr. Fulano', 'Msc. Ciclana', 'Prof. Fulano'].sort(() => Math.random() - 0.5)[0];
         const horas = `${8 + Math.floor(Math.random() * 33)} horas`;
         const cpfNum = `${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}-${Math.floor(10 + Math.random() * 90)}`;
-        const data = getTodayDateBrasilia();
+        const data = todayDateLabel;
+        const dataRealizacao = referenceDateLabel;
         const hash = randomHash16();
 
         const baseData = {
@@ -1208,6 +1219,7 @@
             [TAG_PALESTRANTE]: palestrante,
             [TAG_HORAS]: horas,
             [TAG_DATA]: data,
+            [TAG_DATA_REALIZACAO]: dataRealizacao,
             [TAG_CPF]: cpfNum,
             [HASH_TAG]: hash
         };
@@ -1250,6 +1262,7 @@
                 {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTE, tags[TAG_PALESTRANTE]],{% endif %}
                 [TAG_HORAS, tags[TAG_HORAS]],
                 [TAG_DATA, tags[TAG_DATA]],
+                [TAG_DATA_REALIZACAO, tags[TAG_DATA_REALIZACAO]],
                 [HASH_TAG, tags[HASH_TAG]]
             ];
         list.innerHTML = rows

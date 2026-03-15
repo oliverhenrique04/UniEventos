@@ -659,6 +659,16 @@ class CertificateService:
         activity_name = activity.nome if activity and getattr(activity, 'nome', None) else ''
         speaker_name = activity.palestrante if activity and getattr(activity, 'palestrante', None) else ''
         issue_date = current_certificate_issue_date_label()
+        reference_date_obj = (
+            getattr(activity, 'data_atv', None)
+            if activity and getattr(activity, 'data_atv', None)
+            else getattr(event, 'data_inicio', None)
+        )
+        reference_date = (
+            reference_date_obj.strftime('%d/%m/%Y')
+            if getattr(reference_date_obj, 'strftime', None)
+            else str(reference_date_obj or '')
+        )
 
         tags = {
             '{{NOME}}': str(getattr(user, 'nome', '') or '').upper(),
@@ -668,6 +678,7 @@ class CertificateService:
             '{{HORAS}}': str(total_hours),
             '{{DATA}}': issue_date,
             '{{EMISSION_DATE}}': issue_date,
+            '{{DATA_REALIZACAO}}': reference_date,
             '{{CPF}}': str(getattr(user, 'cpf', '') or ''),
         }
 

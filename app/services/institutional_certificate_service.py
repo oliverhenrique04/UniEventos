@@ -92,6 +92,7 @@ class InstitutionalCertificateService:
             '{{HORAS}}': carga_horaria,
             '{{CURSO}}': curso_usuario,
             '{{DATA}}': issue_date,
+            '{{DATA_REALIZACAO}}': '',
             '{{CPF}}': profile['cpf'] or '',
         }
 
@@ -141,6 +142,7 @@ class InstitutionalCertificateService:
             '{{HORAS}}': carga_horaria,
             '{{CURSO}}': curso_usuario,
             '{{DATA}}': issue_date,
+            '{{DATA_REALIZACAO}}': '',
             '{{CPF}}': profile['cpf'] or '',
         }
         merged_tag_overrides = {
@@ -149,6 +151,7 @@ class InstitutionalCertificateService:
         }
         merged_tag_overrides['{{DATA}}'] = issue_date
         merged_tag_overrides['{{EMISSION_DATE}}'] = issue_date
+        merged_tag_overrides['{{DATA_REALIZACAO}}'] = ''
         fake_event = SimpleNamespace(
             id=certificate.id,
             nome=certificate.titulo,

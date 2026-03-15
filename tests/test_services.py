@@ -706,6 +706,23 @@ def test_certificate_service_build_template_tags_uses_generation_date_for_issue_
     assert tags['{{EMISSION_DATE}}'] == '15/03/2026'
 
 
+def test_certificate_service_build_template_tags_exposes_reference_date_for_event_or_activity(monkeypatch):
+    monkeypatch.setattr(
+        'app.services.certificate_service.current_certificate_issue_date_label',
+        lambda: '15/03/2026',
+    )
+    service = CertificateService()
+    event = SimpleNamespace(nome='Evento Teste', data_inicio=date(2030, 1, 10))
+    user = SimpleNamespace(nome='Aluno Teste', cpf='12345678900')
+    activity = SimpleNamespace(nome='Oficina', palestrante='Prof. Teste', data_atv=date(2030, 1, 12))
+
+    tags_with_activity = service._build_template_tags(event, user, [activity], '4 horas')
+    tags_without_activity = service._build_template_tags(event, user, [], '4 horas')
+
+    assert tags_with_activity['{{DATA_REALIZACAO}}'] == '12/01/2030'
+    assert tags_without_activity['{{DATA_REALIZACAO}}'] == '10/01/2030'
+
+
 def test_institutional_certificate_service_generate_recipient_pdf_injects_default_recipient_tags(monkeypatch):
     monkeypatch.setattr(
         'app.services.institutional_certificate_service.current_certificate_issue_date_label',
@@ -755,6 +772,7 @@ def test_institutional_certificate_service_generate_recipient_pdf_injects_defaul
     assert captured['tag_overrides']['{{CERTIFICATE_TITLE}}'] == 'Certificado Institucional'
     assert captured['tag_overrides']['{{EMISSION_DATE}}'] == '15/03/2026'
     assert captured['tag_overrides']['{{DATA}}'] == '15/03/2026'
+    assert captured['tag_overrides']['{{DATA_REALIZACAO}}'] == ''
     assert captured['tag_overrides']['{{CARGA_HORARIA}}'] == '12 horas'
     assert captured['tag_overrides']['{{CURSO_USUARIO}}'] == 'Direito'
     assert captured['tag_overrides']['{{HASH}}'] == 'HASH1234567890AB'
