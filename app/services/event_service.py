@@ -120,12 +120,40 @@ class EventService:
         return bool(user and getattr(user, 'can_create_events', False))
 
     @staticmethod
+    def can_manage_event_certificates(user, event):
+        if not user or not event:
+            return False
+        if user.role in ['admin', 'extensao']:
+            return True
+        return EventService.can_manage_event(user, event)
+
+    @staticmethod
     def can_access_event_management(user):
         if not user:
             return False
         if user.role in ['admin', 'coordenador', 'gestor']:
             return True
         return EventService.can_create_events(user)
+
+    @staticmethod
+    def _can_manage_own_events(user):
+        if not user:
+            return False
+        if user.role in ['coordenador', 'gestor']:
+            return True
+        return EventService.can_create_events(user)
+
+    @staticmethod
+    def is_event_owner(user, event):
+        if not user or not event:
+            return False
+        return bool(event.owner_username and event.owner_username == user.username)
+
+    @staticmethod
+    def is_same_course_event(user, event):
+        if not user or not event:
+            return False
+        return bool(user.course_id and event.course_id and user.course_id == event.course_id)
 
     @staticmethod
     def can_view_event(user, event):
@@ -136,24 +164,34 @@ class EventService:
         if user.role == 'gestor':
             return True
         if user.role == 'coordenador':
-            return bool(user.course_id and event.course_id and user.course_id == event.course_id)
+            return EventService.is_same_course_event(user, event)
         if EventService.can_create_events(user):
             return event.owner_username == user.username
         return False
 
     @staticmethod
-    def can_manage_event(user, event):
+    def can_edit_event(user, event):
         if not user or not event:
             return False
         if user.role == 'admin':
             return True
         if user.role == 'coordenador':
-            return bool(user.course_id and event.course_id and user.course_id == event.course_id)
-        if user.role == 'gestor':
-            return bool(user.course_id and event.course_id and user.course_id == event.course_id)
-        if EventService.can_create_events(user):
-            return event.owner_username == user.username
-        return False
+            return EventService.is_same_course_event(user, event)
+        return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
+
+    @staticmethod
+    def can_delete_event(user, event):
+        if not user or not event:
+            return False
+        if user.role == 'admin':
+            return True
+        if user.role == 'coordenador':
+            return EventService.is_same_course_event(user, event)
+        return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
+
+    @staticmethod
+    def can_manage_event(user, event):
+        return EventService.can_edit_event(user, event)
 
     def create_event(self, owner_username, data):
         """Creates a new event and its associated activities."""
@@ -415,6 +453,8 @@ class EventService:
         query = Event.query
         if user.role == 'admin':
             pass
+        elif user.role == 'extensao':
+            pass
         elif user.role == 'gestor':
             # Gestor can consult events across courses.
             pass
@@ -446,6 +486,8 @@ class EventService:
         query = Event.query
 
         if user.role == 'admin':
+            pass
+        elif user.role == 'extensao':
             pass
         elif user.role == 'coordenador':
             if user.course_id:
@@ -559,7 +601,7 @@ class EventService:
     def delete_event(self, event_id, user):
         event = self.event_repo.get_by_id(event_id)
         if not event: return False, "Evento não encontrado"
-        if not self.can_manage_event(user, event):
+        if not self.can_delete_event(user, event):
             return False, "Permissão negada"
 
         event_name = event.nome

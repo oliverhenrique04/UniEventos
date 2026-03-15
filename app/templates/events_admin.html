@@ -599,7 +599,7 @@
                             <button class="btn btn-sm btn-light border" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Registro de Presença">
                                 <i class="fa-solid fa-display text-primary"></i>
                             </button>
-                            <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes">
+                            <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-users-viewfinder text-primary"></i>
                             </button>
                             <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>

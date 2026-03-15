@@ -91,6 +91,16 @@ def _seed_certificate_management_data(app):
         )
         manager.set_password('1234')
 
+        extension = User(
+            username='cert_extension_user',
+            role='extensao',
+            nome='Extensao Certificados',
+            cpf='70080090015',
+            email='extension_certs@test.local',
+            course_id=course.id,
+        )
+        extension.set_password('1234')
+
         participant = User(
             username='cert_participant_user',
             role='participante',
@@ -111,7 +121,7 @@ def _seed_certificate_management_data(app):
         )
         outsider.set_password('1234')
 
-        db.session.add_all([owner, coordinator, manager, participant, outsider])
+        db.session.add_all([owner, coordinator, manager, extension, participant, outsider])
         db.session.flush()
 
         event = Event(
@@ -160,6 +170,7 @@ def _seed_certificate_management_data(app):
             'owner_username': owner.username,
             'coordinator_username': coordinator.username,
             'manager_username': manager.username,
+            'extension_username': extension.username,
             'participant_username': participant.username,
             'outsider_username': outsider.username,
         }
@@ -226,6 +237,7 @@ def _seed_dashboard_analytics_data(app):
             User(username='coord_analytics', role='coordenador', nome='Coord Analytics', cpf='20030040050', course_id=course_eng.id),
             User(username='coord_sem_curso', role='coordenador', nome='Coord Sem Curso', cpf='20030040051'),
             User(username='gestor_analytics', role='gestor', nome='Gestor Analytics', cpf='20030040052', course_id=course_eng.id),
+            User(username='ext_analytics', role='extensao', nome='Extensao Analytics', cpf='20030040060', course_id=course_eng.id),
             User(username='prof_eng_a', role='professor', nome='Prof Eng A', cpf='20030040053', course_id=course_eng.id),
             User(username='prof_eng_b', role='professor', nome='Prof Eng B', cpf='20030040054', course_id=course_eng.id),
             User(username='prof_dir', role='professor', nome='Prof Dir', cpf='20030040055', course_id=course_dir.id),
@@ -402,6 +414,7 @@ def _seed_dashboard_analytics_data(app):
             'coord_username': 'coord_analytics',
             'coord_no_course_username': 'coord_sem_curso',
             'gestor_username': 'gestor_analytics',
+            'extensao_username': 'ext_analytics',
             'prof_eng_a_username': 'prof_eng_a',
             'prof_eng_b_username': 'prof_eng_b',
             'prof_dir_username': 'prof_dir',
@@ -758,6 +771,148 @@ def test_dashboard_analytics_gestor_behavior_remains_unchanged(client, app):
     assert payload['summary']['total_events'] == 1
     assert payload['events_by_course'] == [{'course': 'Direito', 'count': 1}]
     assert payload['institutional_summary']['total_certificates'] == 3
+
+
+def test_events_api_keeps_gestor_read_only_for_foreign_events(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['gestor_username'])
+    res = client.get('/api/eventos')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['total'] == 3
+    assert {item['course_id'] for item in payload['items']} == {
+        seeded['course_eng_id'],
+        seeded['course_dir_id'],
+    }
+    assert all(item['can_edit'] is False for item in payload['items'])
+    assert all(item['can_delete'] is False for item in payload['items'])
+    assert all(item['can_manage_participants'] is False for item in payload['items'])
+    assert all(item['can_manage_certificates'] is False for item in payload['items'])
+
+
+def test_events_api_allows_coordinator_management_within_course_scope_without_delete(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['coord_username'])
+    res = client.get('/api/eventos')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['total'] == 2
+    assert {item['course_id'] for item in payload['items']} == {seeded['course_eng_id']}
+    assert all(item['can_edit'] is True for item in payload['items'])
+    assert all(item['can_delete'] is False for item in payload['items'])
+    assert all(item['can_manage_participants'] is True for item in payload['items'])
+    assert all(item['can_manage_certificates'] is True for item in payload['items'])
+
+
+def test_events_api_allows_extensao_event_certificate_access_without_event_management(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['extensao_username'])
+    page_res = client.get('/eventos_admin')
+    assert page_res.status_code == 200
+
+    res = client.get('/api/eventos_admin')
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['total'] == 3
+    assert all(item['can_edit'] is False for item in payload['items'])
+    assert all(item['can_delete'] is False for item in payload['items'])
+    assert all(item['can_manage_participants'] is False for item in payload['items'])
+    assert all(item['can_manage_certificates'] is True for item in payload['items'])
+
+
+def test_event_mutations_are_denied_for_non_owner_management_profiles(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    with app.app_context():
+        event = Event.query.filter_by(owner_username=seeded['prof_eng_a_username']).first()
+        assert event is not None
+        event_id = event.id
+        event_payload = {
+            'id': event.id,
+            'nome': event.nome,
+            'descricao': event.descricao,
+            'is_rapido': event.tipo == 'RAPIDO',
+            'carga_horaria_rapida': 3 if event.tipo == 'RAPIDO' else None,
+            'data_inicio': event.data_inicio.isoformat() if event.data_inicio else None,
+            'hora_inicio': event.hora_inicio.strftime('%H:%M') if event.hora_inicio else None,
+            'data_fim': event.data_fim.isoformat() if event.data_fim else None,
+            'hora_fim': event.hora_fim.strftime('%H:%M') if event.hora_fim else None,
+            'curso': event.curso,
+            'atividades': [],
+        }
+
+    client.get('/api/logout')
+    _login_user(client, seeded['gestor_username'])
+
+    edit_res = client.post('/api/editar_evento', json={'id': event_id})
+    delete_res = client.delete(f'/api/deletar_evento/{event_id}')
+
+    assert edit_res.status_code == 403
+    assert delete_res.status_code == 403
+
+    client.get('/api/logout')
+    _login_user(client, seeded['coord_username'])
+
+    coord_edit_res = client.post('/api/editar_evento', json=event_payload)
+    coord_delete_res = client.delete(f'/api/deletar_evento/{event_id}')
+
+    assert coord_edit_res.status_code == 200
+    assert coord_delete_res.status_code == 403
+
+    client.get('/api/logout')
+    _login_user(client, seeded['extensao_username'])
+
+    extension_edit_res = client.post('/api/editar_evento', json=event_payload)
+    extension_delete_res = client.delete(f'/api/deletar_evento/{event_id}')
+    extension_notify_res = client.post(f'/api/notificar_participantes/{event_id}', json={
+        'assunto': 'Comunicado',
+        'mensagem': 'Mensagem de teste',
+    })
+
+    assert extension_edit_res.status_code == 403
+    assert extension_delete_res.status_code == 403
+    assert extension_notify_res.status_code == 403
+
+
+def test_gestor_can_edit_and_delete_only_own_events(client, app):
+    seeded = _seed_flagged_event_creator(app, username='gestor_owner_scope', role='gestor')
+
+    _login_user(client, seeded['username'])
+    create_res = client.post('/api/criar_evento', json={
+        'nome': 'Evento do Gestor',
+        'descricao': 'Evento proprio do gestor',
+        'curso': seeded['course_name'],
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-09-01',
+        'hora_inicio': '19:00',
+    })
+
+    assert create_res.status_code == 200
+
+    with app.app_context():
+        event = Event.query.filter_by(owner_username=seeded['username'], nome='Evento do Gestor').first()
+        assert event is not None
+        event_id = event.id
+
+    edit_res = client.post('/api/editar_evento', json={
+        'id': event_id,
+        'nome': 'Evento do Gestor Atualizado',
+        'descricao': 'Evento proprio atualizado',
+        'is_rapido': True,
+        'carga_horaria_rapida': 3,
+        'data_inicio': '2030-09-02',
+        'hora_inicio': '20:00',
+    })
+    assert edit_res.status_code == 200
+
+    delete_res = client.delete(f'/api/deletar_evento/{event_id}')
+    assert delete_res.status_code == 200
 
 
 def test_dashboard_analytics_professor_owner_filter_remains_disabled(client, app):
@@ -1577,6 +1732,74 @@ def test_create_institutional_certificate_persists_default_template_when_missing
         assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou como {{CATEGORY}} do curso {{CURSO_USUARIO}}, com carga horária de {{CARGA_HORARIA}} horas.'
 
 
+def test_institutional_certificates_keep_gestor_read_only_for_foreign_records(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    with app.app_context():
+        cert = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_a_username']).first()
+        assert cert is not None
+        cert_id = cert.id
+
+    _login_user(client, seeded['gestor_username'])
+
+    list_res = client.get('/api/institutional_certificates')
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    assert payload['total'] == 3
+    assert all(item['can_edit'] is False for item in payload['items'])
+
+    detail_res = client.get(f'/api/institutional_certificates/{cert_id}')
+    assert detail_res.status_code == 200
+    assert detail_res.get_json()['can_edit'] is False
+
+    update_res = client.put(f'/api/institutional_certificates/{cert_id}', json={})
+    designer_res = client.get(f'/designer_certificado_institucional/{cert_id}')
+
+    assert update_res.status_code == 403
+    assert designer_res.status_code == 403
+
+
+def test_institutional_certificates_allow_extensao_full_management_for_foreign_records(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    with app.app_context():
+        editable_cert = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_a_username']).first()
+        deletable_cert = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_b_username']).first()
+        assert editable_cert is not None
+        assert deletable_cert is not None
+        editable_cert_id = editable_cert.id
+        deletable_cert_id = deletable_cert.id
+
+    _login_user(client, seeded['extensao_username'])
+
+    list_res = client.get('/api/institutional_certificates')
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    assert payload['total'] == 3
+    assert all(item['can_edit'] is True for item in payload['items'])
+
+    designer_res = client.get(f'/designer_certificado_institucional/{editable_cert_id}')
+    update_res = client.put(f'/api/institutional_certificates/{editable_cert_id}', json={
+        'titulo': 'Certificado Engenharia A - Ajustado',
+        'categoria': 'Extensao',
+        'data_emissao': date.today().isoformat(),
+        'status': 'ENVIADO',
+        'descricao': 'Atualizado pela extensao',
+        'signer_name': 'Coord. Extensao',
+    })
+    delete_res = client.delete(f'/api/institutional_certificates/{deletable_cert_id}')
+
+    assert designer_res.status_code == 200
+    assert update_res.status_code == 200
+    assert delete_res.status_code == 200
+
+    with app.app_context():
+        updated_cert = db.session.get(InstitutionalCertificate, editable_cert_id)
+        deleted_cert = db.session.get(InstitutionalCertificate, deletable_cert_id)
+        assert updated_cert.titulo == 'Certificado Engenharia A - Ajustado'
+        assert deleted_cert is None
+
+
 def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
     event_id = _create_event_for_certs(app)
 
@@ -1638,19 +1861,41 @@ def test_certificate_send_batch_starts_background_job(client, app, admin_user, m
     assert status_payload['total_enviado'] == 1
 
 
-def test_certificate_management_endpoints_allow_authorized_profiles(client, app, admin_user):
+def test_certificate_management_endpoints_allow_admin_owner_course_coordinator_and_extensao(client, app, admin_user):
     seeded = _seed_certificate_management_data(app)
 
-    for username in [
-        'admin_test',
-        seeded['owner_username'],
-        seeded['coordinator_username'],
-        seeded['manager_username'],
-    ]:
+    for username in ['admin_test', seeded['owner_username'], seeded['coordinator_username'], seeded['extension_username']]:
         client.get('/api/logout')
         _login_user(client, username)
         res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
         assert res.status_code == 200
+
+    for username in [seeded['manager_username']]:
+        client.get('/api/logout')
+        _login_user(client, username)
+        res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
+        assert res.status_code == 403
+
+
+def test_event_certificate_pages_allow_extensao_but_not_participant_management(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    _login_user(client, seeded['extension_username'])
+
+    designer_res = client.get(f"/designer_certificado/{seeded['event_id']}")
+    delivery_res = client.get(f"/gerenciar_entregas/{seeded['event_id']}")
+    list_res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
+    notify_res = client.post(f"/api/notificar_participantes/{seeded['event_id']}", json={
+        'assunto': 'Teste',
+        'mensagem': 'Mensagem',
+    })
+    participants_res = client.get(f"/api/participantes_evento/{seeded['event_id']}")
+
+    assert designer_res.status_code == 200
+    assert delivery_res.status_code == 200
+    assert list_res.status_code == 200
+    assert notify_res.status_code == 403
+    assert participants_res.status_code == 403
 
 
 def test_certificate_send_batch_denies_participant(client, app, admin_user):

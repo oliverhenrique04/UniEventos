@@ -260,7 +260,7 @@ def editar_evento():
 @login_required
 def listar_eventos_admin():
     """Paginated and filtered list of all events for administrative purposes."""
-    if not _user_can_access_event_management():
+    if not (_user_can_access_event_management() or current_user.role == 'extensao'):
         return jsonify([]), 403
     
     page = request.args.get('page', 1, type=int)

@@ -66,6 +66,70 @@ def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin
     assert event.data_fim == date.today()
 
 
+def test_event_service_can_manage_event_allows_coordinator_course_scope_but_keeps_delete_owner_only(app):
+    with app.app_context():
+        course = Course(nome='Curso Permissoes')
+        db.session.add(course)
+        db.session.flush()
+
+        admin = User(username='admin_owner_scope', role='admin', nome='Admin Scope', cpf='10020030040')
+        admin.set_password('1234')
+
+        owner = User(
+            username='owner_scope',
+            role='professor',
+            nome='Owner Scope',
+            cpf='10020030041',
+            course_id=course.id,
+            can_create_events=True,
+        )
+        owner.set_password('1234')
+
+        gestor = User(
+            username='gestor_scope',
+            role='gestor',
+            nome='Gestor Scope',
+            cpf='10020030042',
+            course_id=course.id,
+        )
+        gestor.set_password('1234')
+
+        coordenador = User(
+            username='coord_scope',
+            role='coordenador',
+            nome='Coord Scope',
+            cpf='10020030043',
+            course_id=course.id,
+        )
+        coordenador.set_password('1234')
+
+        db.session.add_all([admin, owner, gestor, coordenador])
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Escopo',
+            descricao='Desc',
+            tipo='PADRAO',
+            data_inicio=date(2030, 3, 10),
+            hora_inicio=time(19, 0),
+            data_fim=date(2030, 3, 10),
+            hora_fim=time(21, 0),
+            course_id=course.id,
+        )
+        db.session.add(event)
+        db.session.commit()
+
+        assert EventService.can_view_event(gestor, event) is True
+        assert EventService.can_manage_event(gestor, event) is False
+        assert EventService.can_view_event(coordenador, event) is True
+        assert EventService.can_manage_event(coordenador, event) is True
+        assert EventService.can_delete_event(coordenador, event) is False
+        assert EventService.can_manage_event(owner, event) is True
+        assert EventService.can_delete_event(owner, event) is True
+        assert EventService.can_manage_event(admin, event) is True
+
+
 def test_event_service_create_standard_event_persists_multiple_speakers(app, admin_user):
     service = EventService()
     event = service.create_event(admin_user.username, {

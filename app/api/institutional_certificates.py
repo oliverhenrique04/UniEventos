@@ -44,9 +44,9 @@ def _can_view_institutional_certificates():
 
 
 def _can_edit_institutional_certificate(cert):
-    if current_user.role in ['admin', 'gestor']:
+    if current_user.role in ['admin', 'extensao']:
         return True
-    if current_user.role == 'extensao':
+    if current_user.role == 'gestor':
         return cert.created_by_username == current_user.username
     return False
 

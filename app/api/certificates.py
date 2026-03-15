@@ -154,7 +154,7 @@ def _can_manage_event(event):
 
 
 def _can_manage_certificates(event):
-    return _can_manage_event(event)
+    return EventService.can_manage_event_certificates(current_user, event)
 
 
 def _can_access_own_certificate(enrollment):

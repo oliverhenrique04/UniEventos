@@ -52,7 +52,7 @@ def designer_certificado(event_id):
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
-    if not EventService.can_manage_event(current_user, event):
+    if not EventService.can_manage_event_certificates(current_user, event):
         return "Acesso negado", 403
     return render_template(
         'certificate_designer.html',
@@ -70,7 +70,7 @@ def gerenciar_entregas(event_id):
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
-    if not EventService.can_manage_event(current_user, event):
+    if not EventService.can_manage_event_certificates(current_user, event):
         return "Acesso negado", 403
     return render_template('certificate_delivery.html', user=current_user, event=event)
 
@@ -97,7 +97,7 @@ def designer_certificado_institucional(certificate_id):
     if not cert:
         abort(404)
 
-    if current_user.role not in ['admin', 'gestor'] and cert.created_by_username != current_user.username:
+    if current_user.role not in ['admin', 'extensao'] and cert.created_by_username != current_user.username:
         return "Acesso negado", 403
 
     return render_template(
@@ -141,7 +141,7 @@ def confirmar_presenca_page(atv_id, token_hash):
 @login_required
 def gerenciar_eventos():
     """Page for full administrative event management CRUD and participant control."""
-    if not EventService.can_access_event_management(current_user):
+    if not (EventService.can_access_event_management(current_user) or current_user.role == 'extensao'):
         return "Acesso negado", 403
     return render_template('events_admin.html', user=current_user)
 

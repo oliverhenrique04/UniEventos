@@ -84,30 +84,12 @@ def serialize_event(event, current_user=None):
     can_manage_certificates = False
 
     if current_user:
-        same_course = bool(current_user.course_id and event.course_id and current_user.course_id == event.course_id)
-        is_owner = event.owner_username == current_user.username
-        can_manage_own_events = bool(getattr(current_user, 'can_create_events', False) and is_owner)
+        from app.services.event_service import EventService
 
-        if current_user.role == 'admin':
-            can_edit = True
-            can_delete = True
-            can_manage_participants = True
-            can_manage_certificates = True
-        elif current_user.role == 'coordenador':
-            can_edit = same_course
-            can_delete = same_course
-            can_manage_participants = same_course
-            can_manage_certificates = same_course
-        elif current_user.role == 'gestor':
-            can_edit = same_course
-            can_delete = same_course
-            can_manage_participants = same_course
-            can_manage_certificates = same_course
-        elif can_manage_own_events:
-            can_edit = True
-            can_delete = True
-            can_manage_participants = True
-            can_manage_certificates = True
+        can_edit = EventService.can_edit_event(current_user, event)
+        can_delete = EventService.can_delete_event(current_user, event)
+        can_manage_participants = EventService.can_manage_event(current_user, event)
+        can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
 
     include_private_speaker_data = can_edit or can_manage_participants or can_manage_certificates
 
