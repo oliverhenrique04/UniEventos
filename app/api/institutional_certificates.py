@@ -7,6 +7,7 @@ import os
 import time
 from threading import Lock, Thread
 from uuid import uuid4
+from types import SimpleNamespace
 
 from flask import Blueprint, jsonify, request, make_response, send_file, current_app
 from flask import url_for
@@ -115,10 +116,22 @@ def _normalize_template(template_json):
     if template_json is None:
         return None, None
 
-    try:
-        parsed = json.loads(template_json)
-    except (ValueError, TypeError):
-        return None, 'Template invalido: JSON malformado'
+    normalized, error = _normalize_template_payload(template_json)
+    if error:
+        return None, error
+    return json.dumps(normalized, ensure_ascii=False), None
+
+
+def _normalize_template_payload(template_source):
+    if template_source is None:
+        return None, None
+
+    parsed = template_source
+    if isinstance(template_source, str):
+        try:
+            parsed = json.loads(template_source)
+        except (ValueError, TypeError):
+            return None, 'Template invalido: JSON malformado'
 
     if not isinstance(parsed, dict):
         return None, 'Template invalido: estrutura esperada e um objeto'
@@ -127,8 +140,15 @@ def _normalize_template(template_json):
         if element.get('is_html') and element.get('html_content'):
             element['html_content'] = _sanitize_html_content(element['html_content'])
 
-    normalized = CertificateService.normalize_template_payload(parsed)
-    return json.dumps(normalized, ensure_ascii=False), None
+    return CertificateService.normalize_template_payload(parsed), None
+
+
+def _build_pdf_preview_response(pdf_path):
+    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 def _normalize_workload_hours(value):
@@ -627,6 +647,45 @@ def setup_institutional_certificate(certificate_id):
         'mensagem': 'Configuracao de certificado institucional atualizada com sucesso!',
         'bg_url': url_for('static', filename=bg_path) if bg_path else (url_for('static', filename=cert.cert_bg_path) if cert.cert_bg_path else None),
     })
+
+
+@bp.route('/<int:certificate_id>/preview_layout', methods=['POST'])
+@login_required
+def preview_layout(certificate_id):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    normalized_template, template_error = _normalize_template_payload(payload.get('template'))
+    if template_error:
+        return jsonify({'erro': template_error}), 400
+
+    preview_data = payload.get('preview_data') or {}
+    if not isinstance(preview_data, dict):
+        return jsonify({'erro': 'preview_data deve ser um objeto'}), 400
+
+    preview_metadata = {
+        'carga_horaria': preview_data.get('{{CARGA_HORARIA}}'),
+        'curso_usuario': preview_data.get('{{CURSO_USUARIO}}'),
+    }
+    preview_recipient = SimpleNamespace(
+        id=0,
+        nome=str(preview_data.get('{{RECIPIENT_NAME}}') or 'Destinatario Preview'),
+        email=None,
+        cpf=str(preview_data.get('{{CPF}}') or 'PREVIEW-INSTITUTIONAL'),
+        cert_hash=str(preview_data.get('{{HASH}}') or 'VALID-SAMPLE-HASH'),
+        metadata_json=json.dumps(preview_metadata, ensure_ascii=False),
+        linked_user=None,
+    )
+
+    pdf_path = institutional_service.generate_recipient_pdf(
+        cert,
+        preview_recipient,
+        template_override=normalized_template,
+        tag_overrides=preview_data,
+    )
+    return _build_pdf_preview_response(pdf_path)
 
 
 @bp.route('/<int:certificate_id>/upload_asset', methods=['POST'])
@@ -1181,11 +1240,7 @@ def preview_public_by_hash(cert_hash):
     if not pdf_path:
         return jsonify({'erro': 'Falha ao gerar PDF'}), 500
 
-    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    return _build_pdf_preview_response(pdf_path)
 
 
 @bp.route('/<int:certificate_id>/recipients/<int:recipient_id>/preview', methods=['GET'])
@@ -1211,12 +1266,7 @@ def preview_recipient_pdf(certificate_id, recipient_id):
     if not pdf_path:
         return jsonify({'erro': 'Falha ao gerar PDF'}), 500
 
-    # Return inline PDF and disable cache to avoid stale previews after edits.
-    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    return _build_pdf_preview_response(pdf_path)
 
 
 @bp.route('/<int:certificate_id>/send', methods=['POST'])

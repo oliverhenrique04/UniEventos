@@ -47,7 +47,7 @@
                             </div>
                             <div>
                                 <div class="fw-bold">Documento Autêntico Verificado</div>
-                                <div class="small text-muted">Emitido e autenticado digitalmente conforme padrões de segurança.</div>
+                                <div class="small text-muted">Emitido e autenticado digitalmente.</div>
                             </div>
                         </div>
 
@@ -57,7 +57,6 @@
                             <i class="fa-solid fa-award fs-3"></i>
                             <div class="mb-0">
                                 <div class="fw-bold">Certificado de Natureza Institucional</div>
-                                <div class="small">Documento não vinculado a evento acadêmico específico</div>
                             </div>
                         </div>
                         {% endif %}
@@ -72,6 +71,14 @@
                                     <div class="details-label">Beneficiário do Certificado</div>
                                     <div class="details-value">{{ nome }}</div>
                                 </div>
+
+                                <!-- Show CPF -->
+                                {% if cpf %}
+                                <div class="details-row">
+                                    <div class="details-label">CPF</div>
+                                    <div class="details-value font-monospace small">{{ cpf }}</div>
+                                </div>
+                                {% endif %}
 
                                 <div class="details-row">
                                     <div class="details-label">
@@ -107,14 +114,6 @@
                                 <div class="details-row mt-3 pt-3 border-top">
                                     <div class="details-label text-warning"><i class="fa-solid fa-signature me-2"></i>Responsável pela Emissão e Envio</div>
                                     <div class="details-value fw-bold">{{ signatario }}</div>
-                                </div>
-                                {% endif %}
-
-                                <!-- Show CPF -->
-                                {% if cpf %}
-                                <div class="details-row">
-                                    <div class="details-label">CPF</div>
-                                    <div class="details-value font-monospace small">{{ cpf }}</div>
                                 </div>
                                 {% endif %}
                             </div>

@@ -394,6 +394,119 @@ def test_certificate_setup_normalizes_fonts_and_injects_required_elements(client
         assert {'date_fixed', 'hash', 'qrcode'}.issubset(fixed_ids)
 
 
+def test_certificate_designer_default_script_removes_participation_title(client, app, admin_user):
+    _login_admin(client)
+    event_id = _create_event_for_certs(app)
+
+    res = client.get(f'/designer_certificado/{event_id}')
+
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert 'CERTIFICADO DE PARTICIPAÇÃO' not in html
+
+
+def test_certificate_preview_layout_returns_pdf(client, app, admin_user):
+    _login_admin(client)
+    event_id = _create_event_for_certs(app)
+
+    payload = {
+        'template': {
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': [
+                {
+                    'id': 'txt2',
+                    'type': 'text',
+                    'text': 'Certificamos que {{NOME}} participou do evento {{EVENTO}} em {{DATA}}.',
+                    'x': 50,
+                    'y': 50,
+                    'w': 70,
+                    'h': 15,
+                    'font': 22,
+                    'color': '#111111',
+                    'align': 'center',
+                    'font_family': 'Helvetica',
+                    'visible': True,
+                }
+            ],
+        },
+        'preview_data': {
+            '{{NOME}}': 'Participante Preview',
+            '{{CPF}}': '123.456.789-00',
+            '{{EVENTO}}': 'Evento Preview',
+            '{{HORAS}}': '4 horas',
+            '{{DATA}}': '15/03/2026',
+            '{{HASH}}': 'PREVIEWHASH0001',
+        },
+    }
+
+    res = client.post(f'/api/certificates/preview_layout/{event_id}', json=payload)
+
+    assert res.status_code == 200
+    assert res.mimetype == 'application/pdf'
+    assert res.data.startswith(b'%PDF')
+
+
+def test_institutional_certificate_preview_layout_returns_pdf(client, app, admin_user):
+    with app.app_context():
+        category = InstitutionalCertificateCategory(nome='Reconhecimento')
+        db.session.add(category)
+        db.session.flush()
+
+        cert = InstitutionalCertificate(
+            created_by_username='admin_test',
+            titulo='Certificado Institucional Preview',
+            category_id=category.id,
+            descricao='Teste',
+            data_emissao='2030-01-10',
+            signer_name='Coord. NUTED',
+        )
+        db.session.add(cert)
+        db.session.commit()
+        certificate_id = cert.id
+
+    _login_admin(client)
+    payload = {
+        'template': {
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': [
+                {
+                    'id': 'txt2',
+                    'type': 'text',
+                    'text': 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.',
+                    'x': 50,
+                    'y': 50,
+                    'w': 70,
+                    'h': 15,
+                    'font': 22,
+                    'color': '#111111',
+                    'align': 'center',
+                    'font_family': 'Helvetica',
+                    'visible': True,
+                }
+            ],
+        },
+        'preview_data': {
+            '{{RECIPIENT_NAME}}': 'Destinatário Preview',
+            '{{CERTIFICATE_TITLE}}': 'Certificado Institucional Preview',
+            '{{CATEGORY}}': 'Reconhecimento',
+            '{{CARGA_HORARIA}}': '12 horas',
+            '{{CURSO_USUARIO}}': 'Direito',
+            '{{EMISSION_DATE}}': '15/03/2026',
+            '{{SIGNER}}': 'Coord. NUTED',
+            '{{CPF}}': '123.456.789-00',
+            '{{HASH}}': 'INSTPREVHASH001',
+        },
+    }
+
+    res = client.post(f'/api/institutional_certificates/{certificate_id}/preview_layout', json=payload)
+
+    assert res.status_code == 200
+    assert res.mimetype == 'application/pdf'
+    assert res.data.startswith(b'%PDF')
+
+
 def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
     event_id = _create_event_for_certs(app)
 

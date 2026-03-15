@@ -5,6 +5,7 @@ from app.services.event_service import EventService
 from werkzeug.utils import secure_filename
 from threading import Lock, Thread
 from uuid import uuid4
+from types import SimpleNamespace
 import os
 import json
 import re
@@ -111,21 +112,41 @@ def _normalize_template(template_json):
     if template_json is None:
         return None, None
 
-    try:
-        parsed = json.loads(template_json)
-    except (ValueError, TypeError):
-        return None, "Template inválido: JSON malformado"
+    normalized, error = _normalize_template_payload(template_json)
+    if error:
+        return None, error
+    return json.dumps(normalized, ensure_ascii=False), None
+
+
+def _normalize_template_payload(template_source):
+    if template_source is None:
+        return None, None
+
+    parsed = template_source
+    if isinstance(template_source, str):
+        try:
+            parsed = json.loads(template_source)
+        except (ValueError, TypeError):
+            return None, "Template inválido: JSON malformado"
 
     if not isinstance(parsed, dict):
         return None, "Template inválido: estrutura esperada é um objeto"
 
-    # Sanitize HTML content in text elements that use the Jodit rich editor
     for element in parsed.get('elements', []):
         if element.get('is_html') and element.get('html_content'):
             element['html_content'] = _sanitize_html_content(element['html_content'])
 
-    normalized = cert_service.normalize_template_payload(parsed)
-    return json.dumps(normalized, ensure_ascii=False), None
+    return cert_service.normalize_template_payload(parsed), None
+
+
+def _build_pdf_preview_response(pdf_path):
+    from flask import send_file
+
+    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 def _can_manage_event(event):
@@ -256,6 +277,39 @@ def setup_certificate(event_id):
             "bg_url": url_for('static', filename=bg_path) if bg_path else None
         })
     return jsonify({"erro": "Falha ao atualizar configuração"}), 400
+
+
+@bp.route('/preview_layout/<int:event_id>', methods=['POST'])
+@login_required
+def preview_layout(event_id):
+    event = _get_or_404(Event, event_id)
+    if not _can_manage_certificates(event):
+        return jsonify({"erro": "Acesso negado para este evento"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    normalized_template, template_error = _normalize_template_payload(payload.get('template'))
+    if template_error:
+        return jsonify({"erro": template_error}), 400
+
+    preview_data = payload.get('preview_data') or {}
+    if not isinstance(preview_data, dict):
+        return jsonify({"erro": "preview_data deve ser um objeto"}), 400
+
+    preview_user = SimpleNamespace(
+        id=f"preview-event-{event_id}",
+        nome=str(preview_data.get('{{NOME}}') or 'Participante Preview'),
+        cpf=str(preview_data.get('{{CPF}}') or f'PREVIEW-EVENT-{event_id}'),
+        email=None,
+    )
+    pdf_path = cert_service.generate_pdf(
+        event,
+        preview_user,
+        [],
+        preview_data.get('{{HORAS}}') or '0',
+        template_override=normalized_template,
+        tag_overrides=preview_data,
+    )
+    return _build_pdf_preview_response(pdf_path)
 
 
 @bp.route('/upload_asset/<int:event_id>', methods=['POST'])
@@ -491,13 +545,8 @@ def preview_public(cert_hash):
 
     cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
 
-    from flask import send_file
     pdf_path = cert_service.generate_pdf(event, user, [cert_ctx['activity']] if cert_ctx['activity'] else [], cert_ctx['hours'], enrollment=enrollment)
-    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    return _build_pdf_preview_response(pdf_path)
 
 @bp.route('/download/<int:enrollment_id>')
 @login_required
@@ -530,12 +579,5 @@ def preview_single(enrollment_id):
     
     cert_ctx = _certificate_context_for_enrollment(event, enrollment, user)
 
-    from flask import send_file
     pdf_path = cert_service.generate_pdf(event, user, [cert_ctx['activity']] if cert_ctx['activity'] else [], cert_ctx['hours'], enrollment=enrollment)
-
-    # Force fresh render in browser preview to avoid stale cached PDFs.
-    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    return _build_pdf_preview_response(pdf_path)

@@ -51,6 +51,13 @@ class Config:
     RABBITMQ_URL = os.environ.get('RABBITMQ_URL') or 'amqp://guest:guest@localhost:5672/'
     BASE_URL = os.environ.get('BASE_URL') or 'http://localhost:5000'
     BASE_PATH = (os.environ.get('BASE_PATH') or '').strip()
+    CERTIFICATE_QR_DEFAULT_X_MM = float(os.environ.get('CERTIFICATE_QR_DEFAULT_X_MM', '12'))
+    CERTIFICATE_QR_DEFAULT_Y_MM = float(os.environ.get('CERTIFICATE_QR_DEFAULT_Y_MM', '108'))
+    CERTIFICATE_QR_DEFAULT_SIZE_MM = float(os.environ.get('CERTIFICATE_QR_DEFAULT_SIZE_MM', '36'))
+    CERTIFICATE_HASH_DEFAULT_X_MM = float(os.environ.get('CERTIFICATE_HASH_DEFAULT_X_MM', '12'))
+    CERTIFICATE_HASH_DEFAULT_Y_MM = float(os.environ.get('CERTIFICATE_HASH_DEFAULT_Y_MM', '150'))
+    CERTIFICATE_DATE_DEFAULT_X_MM = float(os.environ.get('CERTIFICATE_DATE_DEFAULT_X_MM', '12'))
+    CERTIFICATE_DATE_DEFAULT_Y_MM = float(os.environ.get('CERTIFICATE_DATE_DEFAULT_Y_MM', '195'))
     CHECKIN_RADIUS_METERS = int(os.environ.get('CHECKIN_RADIUS_METERS', '500'))
     MOODLE_LOGIN_ENABLED = os.environ.get('MOODLE_LOGIN_ENABLED', 'false').lower() == 'true'
     MOODLE_LOGIN_URL = os.environ.get('MOODLE_LOGIN_URL', '')

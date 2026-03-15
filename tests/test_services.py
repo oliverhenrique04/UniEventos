@@ -630,6 +630,105 @@ def test_certificate_service_normalize_template_payload_restores_fixed_validatio
     assert by_id['qrcode']['type'] == 'qr'
 
 
+def test_certificate_service_normalize_template_payload_uses_configured_fixed_defaults(app):
+    with app.app_context():
+        app.config['CERTIFICATE_QR_DEFAULT_X_MM'] = 12
+        app.config['CERTIFICATE_QR_DEFAULT_Y_MM'] = 108
+        app.config['CERTIFICATE_QR_DEFAULT_SIZE_MM'] = 36
+        app.config['CERTIFICATE_HASH_DEFAULT_X_MM'] = 12
+        app.config['CERTIFICATE_HASH_DEFAULT_Y_MM'] = 150
+        app.config['CERTIFICATE_DATE_DEFAULT_X_MM'] = 12
+        app.config['CERTIFICATE_DATE_DEFAULT_Y_MM'] = 195
+
+        expected = {
+            item['id']: item
+            for item in CertificateService.get_fixed_validation_elements()
+        }
+        normalized = CertificateService.normalize_template_payload({
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': [],
+        })
+        by_id = {item['id']: item for item in normalized['elements']}
+
+        for item_id in ('date_fixed', 'hash', 'qrcode'):
+            assert by_id[item_id]['x'] == pytest.approx(expected[item_id]['x'])
+            assert by_id[item_id]['y'] == pytest.approx(expected[item_id]['y'])
+            assert by_id[item_id]['w'] == pytest.approx(expected[item_id]['w'])
+            assert by_id[item_id]['h'] == pytest.approx(expected[item_id]['h'])
+
+        assert by_id['qrcode']['size'] == expected['qrcode']['size']
+
+
+def test_certificate_service_generate_pdf_template_override_keeps_fixed_element_geometry(app, admin_user):
+    with app.app_context():
+        output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')
+        os.makedirs(output_dir, exist_ok=True)
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Layout Override',
+            descricao='Teste geometria',
+            tipo='RAPIDO',
+            data_inicio=date(2030, 8, 12),
+            hora_inicio=time(8, 0),
+        )
+        user = User(
+            username='cert_user_override',
+            role='student',
+            nome='Aluno Override',
+            cpf='10000000004',
+            email='override@example.com'
+        )
+        user.set_password('1234')
+
+        db.session.add(event)
+        db.session.add(user)
+        db.session.commit()
+
+        template_override = {
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': [
+                {'id': 'hash', 'type': 'text', 'text': '{{HASH}}', 'x': 17, 'y': 71, 'w': 18, 'h': 4, 'font': 16},
+                {'id': 'date_fixed', 'type': 'text', 'text': 'Data de Emissão: {{DATA}}', 'x': 16, 'y': 82, 'w': 25, 'h': 4, 'font': 11},
+                {'id': 'qrcode', 'type': 'qr', 'x': 22, 'y': 33, 'w': 11, 'h': 11},
+            ],
+        }
+
+        captured = {}
+        service = CertificateService()
+
+        def capture_qr(pdf_canvas, config, page_width, page_height, validation_url):
+            captured['qrcode'] = dict(config)
+
+        def capture_text(pdf_canvas, config, page_width, page_height, tags):
+            captured.setdefault('text', {})[config['id']] = dict(config)
+
+        service._draw_qr_element = capture_qr
+        service._draw_text_element = capture_text
+
+        pdf_path = service.generate_pdf(
+            event,
+            user,
+            activities=[],
+            total_hours=10,
+            template_override=template_override,
+            tag_overrides={'{{HASH}}': 'OVERRIDEHASH1234'},
+        )
+
+        assert os.path.exists(pdf_path)
+        assert captured['qrcode']['x'] == pytest.approx(22)
+        assert captured['qrcode']['y'] == pytest.approx(33)
+        assert captured['qrcode']['w'] == pytest.approx(11)
+        assert captured['qrcode']['h'] == pytest.approx(11)
+        assert captured['text']['hash']['x'] == pytest.approx(17)
+        assert captured['text']['hash']['y'] == pytest.approx(71)
+        assert captured['text']['hash']['w'] == pytest.approx(18)
+        assert captured['text']['date_fixed']['x'] == pytest.approx(16)
+        assert captured['text']['date_fixed']['y'] == pytest.approx(82)
+
+
 def _build_students_xlsx(rows, include_email=True):
     wb = Workbook()
     ws = wb.active

@@ -607,7 +607,7 @@
 
             <div class="glass-panel p-4 mb-4">
                 <h6 class="fw-bold mb-3">Validação do Layout</h6>
-                <div class="small text-muted mb-2">Status em tempo real dos campos essenciais.</div>
+                <div class="small text-muted mb-2">Status dos campos essenciais.</div>
                 <div id="variable-status-panel"></div>
             </div>
 
@@ -725,7 +725,6 @@
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jodit@3/build/jodit.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
     const designerMode = {{ (designer_mode or 'event')|tojson }};
     const entityId = {{ event.id }};
@@ -734,6 +733,9 @@
         : apiUrl('/api/certificates');
     const setupUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/setup` : `${apiBaseUrl}/setup/${entityId}`;
     const uploadAssetUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/upload_asset` : `${apiBaseUrl}/upload_asset/${entityId}`;
+    const previewLayoutUrl = designerMode === 'institutional'
+        ? `${apiBaseUrl}/${entityId}/preview_layout`
+        : `${apiBaseUrl}/preview_layout/${entityId}`;
     const sendBatchUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/send` : `${apiBaseUrl}/send_batch/${entityId}`;
     const sendBatchStatusBaseUrl = designerMode === 'institutional'
         ? apiUrl('/api/institutional_certificates/send/status')
@@ -743,6 +745,7 @@
     const guideV = document.getElementById('guideV');
     const guideH = document.getElementById('guideH');
     const persistedTemplateRaw = {{ (event.cert_template_json or '')|tojson }};
+    const fixedValidationElements = {{ (fixed_validation_elements or [])|tojson }};
 
     const A4_LANDSCAPE_MM = { w: 297, h: 210 };
     const W = 1000;
@@ -778,19 +781,55 @@
 
     const todayDateLabel = getTodayDateBrasilia();
     const defaultFixedDateText = `Data de Emissão: ${TAG_DATA}`;
-    const HASH_QR_GAP_PCT = 1.2;
+    const deepClone = (value) => JSON.parse(JSON.stringify(value));
+    const defaultTemplateElements = [];
+    if (designerMode === 'institutional') {
+        defaultTemplateElements.push({
+            id: 'txt1',
+            type: 'text',
+            text: 'CERTIFICADO INSTITUCIONAL',
+            x: 50,
+            y: 20,
+            w: 80,
+            h: 8,
+            font: 34,
+            color: '#1e293b',
+            align: 'center',
+            bold: true,
+            italic: false,
+            font_family: 'Helvetica',
+            zIndex: 1,
+            locked: false,
+            visible: true
+        });
+    }
+    defaultTemplateElements.push({
+        id: 'txt2',
+        type: 'text',
+        text: designerMode === 'institutional'
+            ? 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}} em {{EMISSION_DATE}}.'
+            : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.',
+        x: 50,
+        y: 50,
+        w: designerMode === 'institutional' ? 80 : 82,
+        h: 24,
+        font: 22,
+        color: '#334155',
+        align: 'center',
+        bold: false,
+        italic: false,
+        font_family: 'Helvetica',
+        zIndex: 2,
+        locked: false,
+        visible: true
+    });
+    defaultTemplateElements.push(...deepClone(fixedValidationElements));
 
     const defaultTemplate = {
         version: 2,
         document: { gridSize: 2, snap: true, guides: true },
         bg: "{{ event.cert_bg_path or '' }}",
-        elements: [
-            { id: 'txt1', type: 'text', text: designerMode === 'institutional' ? 'CERTIFICADO INSTITUCIONAL' : 'CERTIFICADO DE PARTICIPAÇÃO', x: 50, y: 20, w: 80, h: 8, font: 34, color: '#1e293b', align: 'center', bold: true, italic: false, font_family: 'Helvetica', zIndex: 1, locked: false, visible: true },
-            { id: 'txt2', type: 'text', text: designerMode === 'institutional' ? 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}} em {{EMISSION_DATE}}.' : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.', x: 50, y: 50, w: 82, h: 24, font: 22, color: '#334155', align: 'center', bold: false, italic: false, font_family: 'Helvetica', zIndex: 2, locked: false, visible: true },
-            { id: 'date_fixed', type: 'text', text: defaultFixedDateText, x: 50, y: 97, w: 70, h: 4, font: 11, color: '#64748b', align: 'center', bold: false, italic: false, font_family: 'Helvetica', zIndex: 3, locked: false, visible: true },
-            { id: 'hash', type: 'text', text: HASH_TAG, x: 88, y: 95, w: 12, h: 4, font: HASH_DEFAULT_FONT_SIZE, color: '#94a3b8', align: 'left', bold: false, italic: false, font_family: 'Courier', zIndex: 4, locked: false, visible: true },
-            { id: 'qrcode', type: 'qr', x: 88, y: 88, w: 12, h: 12, size: 80, zIndex: 5, locked: false, visible: true }
-        ]
+        elements: defaultTemplateElements
     };
 
     const FIXED_ELEMENT_IDS = ['qrcode', 'hash', 'date_fixed'];
@@ -807,7 +846,6 @@
     let joditInstance = null;
     let joditTargetObj = null;
     let _joditPendingContent = '';
-    let previewDesigner = null;
     let previewData = null;
     let previewPdfUrl = null;
     let isRenderingPreview = false;
@@ -1054,50 +1092,6 @@
         });
     }
 
-    function alignHashWithQr(forceRender = true) {
-        if (!designer) return;
-        const qrObj = designer.getObjects().find((o) => o.data?.id === 'qrcode');
-        const hashObj = designer.getObjects().find((o) => o.data?.id === 'hash');
-        if (!qrObj || !hashObj) return;
-
-        forceHashRules(hashObj);
-
-        const qrBounds = qrObj.getBoundingRect(true, true);
-        const hashHeight = Math.max(12, Number(hashObj.data?.blockHeight || hashObj.height || 24));
-        const gapPx = pctToPxY(HASH_QR_GAP_PCT);
-        const hashLeft = qrBounds.left;
-        const hashTop = qrBounds.top + qrBounds.height + gapPx + (hashHeight / 2);
-
-        const ctx = designer.getContext();
-        let measuredWidth = 160;
-        if (ctx) {
-            ctx.save();
-            ctx.font = `${HASH_DEFAULT_FONT_SIZE}px ${hashObj.data?.font_family || 'Courier'}`;
-            measuredWidth = Math.max(
-                ctx.measureText(HASH_TAG).width,
-                ctx.measureText(HASH_ONE_LINE_SAMPLE).width
-            ) + 24;
-            ctx.restore();
-        }
-
-        hashObj.data.blockWidth = Math.max(40, qrBounds.width, measuredWidth);
-        hashObj.data.blockHeight = Math.max(12, hashHeight);
-
-        hashObj.set({
-            left: hashLeft + (hashObj.data.blockWidth / 2),
-            top: hashTop,
-            width: hashObj.data.blockWidth,
-            originX: 'center',
-            originY: 'center',
-            scaleX: 1,
-            scaleY: 1
-        });
-
-        hashObj.setCoords();
-        clampTextObjectIntoCanvas(hashObj);
-        if (forceRender) designer.requestRenderAll();
-    }
-
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -1263,193 +1257,39 @@
         isRenderingPreview = true;
 
         try {
-
-            if (previewDesigner) {
-                previewDesigner.dispose();
-            }
-
-            const previewBufferCanvas = document.createElement('canvas');
-            previewBufferCanvas.width = W;
-            previewBufferCanvas.height = H;
-
-            previewDesigner = new fabric.StaticCanvas(previewBufferCanvas, {
-                width: W,
-                height: H,
-                selection: false,
-                renderOnAddRemove: false
-            });
-
             const snapshot = buildLiveSnapshotForPreview();
             const tags = previewData || buildRandomPreviewData();
             previewData = tags;
             updatePreviewDataPanel(tags);
-
-        if (designer?.backgroundImage) {
-            await new Promise((resolve) => {
-                designer.backgroundImage.clone((clonedBg) => {
-                    previewDesigner.setBackgroundImage(clonedBg, resolve);
-                });
+            const response = await fetch(previewLayoutUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template: snapshot,
+                    preview_data: tags
+                })
             });
-        } else if (snapshot.bg) {
-            const bgUrl = staticUrl(snapshot.bg);
-            await new Promise((resolve) => {
-                fabric.Image.fromURL(bgUrl, (img) => {
-                    if (!img) return resolve();
-                    const scale = Math.min(W / img.width, H / img.height);
-                    img.scale(scale);
-                    previewDesigner.setBackgroundImage(img, resolve);
-                }, { crossOrigin: 'anonymous' });
-            });
-        }
 
-        const pendingTextById = {};
-        const modalEl = document.getElementById('joditModal');
-        if (modalEl && modalEl.classList.contains('show') && joditInstance && joditTargetObj?.data?.id) {
-            pendingTextById[joditTargetObj.data.id] = htmlToPreviewText(normalizeRichTextHtml(joditInstance.value || ''));
-        }
-
-        const liveObjects = (designer?.getObjects() || [])
-            .filter((o) => !o.data?.isGrid && o.visible !== false);
-
-        const loaders = liveObjects.map((obj) => {
-            if (obj.data?.id === 'qrcode' || obj.data?.type === 'qr') {
-                return new Promise((resolve) => {
-                    const qrious = new QRious({
-                        value: `${validationBaseUrl}${tags[HASH_TAG]}`,
-                        size: 180,
-                        level: 'H'
-                    });
-                    fabric.Image.fromURL(qrious.toDataURL(), (img) => {
-                        if (!img) return resolve();
-                        img.set({
-                            left: obj.left,
-                            top: obj.top,
-                            originX: obj.originX,
-                            originY: obj.originY,
-                            scaleX: obj.scaleX,
-                            scaleY: obj.scaleY,
-                            angle: obj.angle,
-                            flipX: obj.flipX,
-                            flipY: obj.flipY,
-                            opacity: obj.opacity,
-                            selectable: false,
-                            evented: false
-                        });
-                        previewDesigner.add(img);
-                        resolve();
-                    });
-                });
-            }
-
-            if (obj.type === 'image') {
-                return new Promise((resolve) => {
-                    const src = obj.getSrc ? obj.getSrc() : (obj.data?.src ? staticUrl(obj.data.src) : null);
-                    if (!src) return resolve();
-                    fabric.Image.fromURL(src, (img) => {
-                        if (!img) return resolve();
-                        img.set({
-                            left: obj.left,
-                            top: obj.top,
-                            originX: obj.originX,
-                            originY: obj.originY,
-                            scaleX: obj.scaleX,
-                            scaleY: obj.scaleY,
-                            angle: obj.angle,
-                            flipX: obj.flipX,
-                            flipY: obj.flipY,
-                            opacity: obj.opacity,
-                            selectable: false,
-                            evented: false
-                        });
-                        previewDesigner.add(img);
-                        resolve();
-                    }, { crossOrigin: 'anonymous' });
-                });
-            }
-
-            if (obj.data?.type === 'text' || obj.type === 'textbox' || obj.type === 'i-text') {
-                const objectId = obj.data?.id;
-                const pendingText = objectId ? pendingTextById[objectId] : null;
-                const pendingHtml = (modalEl && modalEl.classList.contains('show') && joditInstance && joditTargetObj?.data?.id === objectId)
-                    ? normalizeRichTextHtml(joditInstance.value || '')
-                    : null;
-                const htmlSource = pendingHtml || (obj.data?.is_html ? (obj.data?.html_content || null) : null);
-
-                let renderedText = ' ';
-                let renderedStyles = {};
-                let renderedAlign = obj.textAlign || obj.data?.align || 'center';
-
-                if (htmlSource) {
-                    const htmlWithTags = applyTagsToHtml(htmlSource, tags);
-                    const richPreview = buildFabricTextPreview(htmlWithTags, {
-                        fontFamily: obj.data?.font_family || obj.fontFamily || 'Helvetica',
-                        fontSize: obj.data?.baseFontSize || obj.fontSize || 20,
-                        color: obj.data?.color || obj.fill || '#000000',
-                        align: obj.data?.align || obj.textAlign || 'center',
-                        bold: obj.fontWeight === 'bold',
-                        italic: obj.fontStyle === 'italic'
-                    });
-                    renderedText = richPreview.text || ' ';
-                    renderedStyles = richPreview.styles || {};
-                    renderedAlign = richPreview.textAlign || renderedAlign;
-                } else {
-                    const sourceText = pendingText || obj.data?.text || obj.text || '';
-                    renderedText = applyTagsToText(sourceText, tags) || ' ';
-                    renderedStyles = obj.styles || {};
+            if (!response.ok) {
+                let message = 'Nao foi possivel gerar o preview do PDF.';
+                try {
+                    const payload = await response.json();
+                    message = payload.erro || message;
+                } catch (error) {
+                    // Ignore JSON parse errors and keep fallback message.
                 }
-
-                const textObj = new fabric.Textbox(renderedText, {
-                    left: obj.left,
-                    top: obj.top,
-                    originX: obj.originX,
-                    originY: obj.originY,
-                    width: obj.width,
-                    scaleX: obj.scaleX,
-                    scaleY: obj.scaleY,
-                    angle: obj.angle,
-                    flipX: obj.flipX,
-                    flipY: obj.flipY,
-                    opacity: obj.opacity,
-                    fontSize: obj.fontSize,
-                    fill: obj.fill,
-                    textAlign: renderedAlign,
-                    fontStyle: obj.fontStyle,
-                    fontWeight: obj.fontWeight,
-                    fontFamily: obj.fontFamily,
-                    styles: renderedStyles,
-                    lineHeight: obj.lineHeight,
-                    charSpacing: obj.charSpacing,
-                    selectable: false,
-                    evented: false
-                });
-                previewDesigner.add(textObj);
+                throw new Error(message);
             }
 
-            return Promise.resolve();
-        });
-
-            await Promise.all(loaders);
-            previewDesigner.requestRenderAll();
-
-            const renderedImage = previewDesigner.toDataURL({
-                format: 'png',
-                multiplier: 2
-            });
-
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'mm',
-                format: 'a4',
-                compress: true
-            });
-            pdf.addImage(renderedImage, 'PNG', 0, 0, A4_LANDSCAPE_MM.w, A4_LANDSCAPE_MM.h, undefined, 'FAST');
-
+            const pdfBlob = await response.blob();
             if (previewPdfUrl) {
                 URL.revokeObjectURL(previewPdfUrl);
             }
-            previewPdfUrl = URL.createObjectURL(pdf.output('blob'));
+            previewPdfUrl = URL.createObjectURL(pdfBlob);
             pdfFrame.src = previewPdfUrl;
+        } catch (error) {
+            clearPreviewPdfFrame();
+            Toast.fire({ icon: 'error', title: error.message || 'Nao foi possivel gerar o preview do PDF.' });
         } finally {
             isRenderingPreview = false;
             if (previewRenderPending) {
@@ -1793,12 +1633,6 @@
     function updateTextBlockSizeFromInputs() {
         const selected = getActiveObjects();
         if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
-
-        if (selected[0].data?.id === 'hash') {
-            forceHashRules(selected[0]);
-            alignHashWithQr();
-            return;
-        }
 
         const widthInput = document.getElementById('blockWidthInput');
         const heightInput = document.getElementById('blockHeightInput');
@@ -2241,7 +2075,6 @@
 
         template.elements.forEach(addObjectFromTemplate);
         await Promise.all(loaders);
-        alignHashWithQr(false);
         updateElementsList();
         syncControlsFromTemplate();
         designer.requestRenderAll();
@@ -2421,19 +2254,19 @@
 
         const fixedValidationRules = {
             date_fixed: {
-                label: 'Data de emissao',
+                label: 'Data de emissão',
                 validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(TAG_DATA),
                 error: 'A data fixa precisa permanecer como texto dinâmico com {{DATA}}.'
             },
             hash: {
-                label: 'Hash de validacao',
+                label: 'Hash de validação',
                 validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(HASH_TAG),
-                error: 'O hash de validacao precisa permanecer como texto dinâmico com {{HASH}}.'
+                error: 'O hash de validação precisa permanecer como texto dinâmico com {{HASH}}.'
             },
             qrcode: {
-                label: 'QR Code de validacao',
+                label: 'QR Code de validação',
                 validate: (item) => item.type === 'qr',
-                error: 'O QR Code de validacao precisa permanecer como elemento do tipo QR.'
+                error: 'O QR Code de validação precisa permanecer como elemento do tipo QR.'
             }
         };
 
@@ -2540,7 +2373,7 @@
 
             const chip = document.createElement('span');
             chip.className = `var-chip ${item.status}`;
-            chip.innerText = item.status === 'ok' ? 'OK' : (item.status === 'warn' ? 'ATENCAO' : 'FALTANDO');
+            chip.innerText = item.status === 'ok' ? 'OK' : (item.status === 'warn' ? 'ATENÇÃO' : 'FALTANDO');
 
             row.appendChild(name);
             row.appendChild(chip);
@@ -2814,7 +2647,7 @@
 
         if (joditTargetObj.data?.id === 'hash') {
             forceHashRules(joditTargetObj);
-            alignHashWithQr();
+            designer.requestRenderAll();
             const instFixed = bootstrap.Modal.getInstance(document.getElementById('joditModal'));
             if (instFixed) instFixed.hide();
             joditTargetObj = null;
@@ -2907,7 +2740,7 @@
         if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
         if (selected[0].data?.id === 'hash') {
             forceHashRules(selected[0]);
-            alignHashWithQr();
+            designer.requestRenderAll();
             return;
         }
         pushHistory();
@@ -2942,7 +2775,7 @@
         if (selected.length !== 1 || selected[0].data?.type !== 'text') return;
         if (selected[0].data?.id === 'hash') {
             forceHashRules(selected[0]);
-            alignHashWithQr();
+            designer.requestRenderAll();
             return;
         }
         pushHistory();
@@ -3321,9 +3154,6 @@
                 }
             } else if (obj) {
                 clampObjectIntoCanvas(obj);
-            }
-            if (obj && (obj.data?.id === 'qrcode' || obj.data?.id === 'hash')) {
-                alignHashWithQr(false);
             }
             hideGuides();
             updateElementsList();

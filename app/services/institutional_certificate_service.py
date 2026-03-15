@@ -108,7 +108,7 @@ class InstitutionalCertificateService:
         raw = f"{certificate_id}|{recipient_name}|{recipient_email or ''}|{datetime.utcnow().isoformat()}"
         return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16].upper()
 
-    def generate_recipient_pdf(self, certificate, recipient):
+    def generate_recipient_pdf(self, certificate, recipient, template_override=None, tag_overrides=None):
         profile = self._recipient_effective_profile(recipient)
 
         if not recipient.cert_hash:
@@ -127,6 +127,8 @@ class InstitutionalCertificateService:
             data_inicio=data_inicio,
             cert_bg_path=certificate.cert_bg_path,
             cert_template_json=rendered_template_json,
+            designer_mode='institutional',
+            is_institutional_certificate=True,
         )
         fake_user = SimpleNamespace(
             nome=profile['nome'],
@@ -141,6 +143,8 @@ class InstitutionalCertificateService:
             [],
             certificate.categoria or '-',
             enrollment=fake_enrollment,
+            template_override=template_override,
+            tag_overrides=tag_overrides,
         )
 
     def queue_email(self, certificate, recipient, attachment_path):

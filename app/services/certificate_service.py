@@ -11,71 +11,188 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.services.notification_service import NotificationService
 from app.extensions import db
-from flask import current_app
+from flask import current_app, has_app_context
 from app.utils import build_absolute_app_url
 
 class CertificateService:
     """Service for managing, generating and distributing academic certificates."""
 
     SUPPORTED_FONT_FAMILIES = ('Helvetica', 'Times-Roman', 'Courier')
-    REQUIRED_TEMPLATE_ELEMENTS = (
-        {
-            'id': 'date_fixed',
-            'type': 'text',
-            'text': 'Data de Emissão: {{DATA}}',
-            'x': 50,
-            'y': 97,
-            'w': 70,
-            'h': 4,
-            'font': 11,
-            'color': '#64748b',
-            'align': 'center',
-            'bold': False,
-            'italic': False,
-            'font_family': 'Helvetica',
-            'zIndex': 3,
-            'locked': False,
-            'visible': True,
-            'auto_fit': True,
-        },
-        {
-            'id': 'hash',
-            'type': 'text',
-            'text': '{{HASH}}',
-            'x': 88,
-            'y': 95,
-            'w': 12,
-            'h': 4,
-            'font': 16,
-            'color': '#94a3b8',
-            'align': 'left',
-            'bold': False,
-            'italic': False,
-            'font_family': 'Courier',
-            'zIndex': 4,
-            'locked': False,
-            'visible': True,
-            'auto_fit': False,
-        },
-        {
-            'id': 'qrcode',
-            'type': 'qr',
-            'x': 88,
-            'y': 88,
-            'w': 12,
-            'h': 12,
-            'size': 80,
-            'zIndex': 5,
-            'locked': False,
-            'visible': True,
-        },
-    )
+    PAGE_WIDTH_MM = 297
+    PAGE_HEIGHT_MM = 210
+    DEFAULT_FIXED_LAYOUT_MM = {
+        'qr_x': 12.0,
+        'qr_y': 108.0,
+        'qr_size': 36.0,
+        'hash_x': 12.0,
+        'hash_y': 150.0,
+        'hash_w': 60.0,
+        'hash_h': 8.0,
+        'date_x': 12.0,
+        'date_y': 195.0,
+        'date_w': 78.0,
+        'date_h': 8.0,
+    }
     
     def __init__(self):
         self.event_repo = EventRepository()
         self.user_repo = UserRepository()
         self.activity_repo = ActivityRepository()
         self.notifier = NotificationService()
+
+    @classmethod
+    def _config_float(cls, key, default):
+        raw = current_app.config.get(key, default) if has_app_context() else default
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return float(default)
+
+    @classmethod
+    def _pct_x_from_mm(cls, value_mm):
+        return (float(value_mm) / cls.PAGE_WIDTH_MM) * 100
+
+    @classmethod
+    def _pct_y_from_mm(cls, value_mm):
+        return (float(value_mm) / cls.PAGE_HEIGHT_MM) * 100
+
+    @classmethod
+    def _px_from_mm_x(cls, value_mm, canvas_width_px=1000):
+        return (float(value_mm) / cls.PAGE_WIDTH_MM) * canvas_width_px
+
+    @classmethod
+    def _box_from_top_left_mm(cls, x_mm, y_mm, width_mm, height_mm):
+        return {
+            'x': cls._pct_x_from_mm(float(x_mm) + (float(width_mm) / 2)),
+            'y': cls._pct_y_from_mm(float(y_mm) + (float(height_mm) / 2)),
+            'w': cls._pct_x_from_mm(width_mm),
+            'h': cls._pct_y_from_mm(height_mm),
+        }
+
+    @classmethod
+    def _designer_mode_for_entity(cls, event):
+        mode = getattr(event, 'designer_mode', None)
+        if mode in {'event', 'institutional'}:
+            return mode
+        return 'institutional' if getattr(event, 'is_institutional_certificate', False) else 'event'
+
+    @classmethod
+    def get_fixed_validation_elements(cls):
+        layout = {
+            'qr_x': cls._config_float('CERTIFICATE_QR_DEFAULT_X_MM', cls.DEFAULT_FIXED_LAYOUT_MM['qr_x']),
+            'qr_y': cls._config_float('CERTIFICATE_QR_DEFAULT_Y_MM', cls.DEFAULT_FIXED_LAYOUT_MM['qr_y']),
+            'qr_size': cls._config_float('CERTIFICATE_QR_DEFAULT_SIZE_MM', cls.DEFAULT_FIXED_LAYOUT_MM['qr_size']),
+            'hash_x': cls._config_float('CERTIFICATE_HASH_DEFAULT_X_MM', cls.DEFAULT_FIXED_LAYOUT_MM['hash_x']),
+            'hash_y': cls._config_float('CERTIFICATE_HASH_DEFAULT_Y_MM', cls.DEFAULT_FIXED_LAYOUT_MM['hash_y']),
+            'hash_w': cls.DEFAULT_FIXED_LAYOUT_MM['hash_w'],
+            'hash_h': cls.DEFAULT_FIXED_LAYOUT_MM['hash_h'],
+            'date_x': cls._config_float('CERTIFICATE_DATE_DEFAULT_X_MM', cls.DEFAULT_FIXED_LAYOUT_MM['date_x']),
+            'date_y': cls._config_float('CERTIFICATE_DATE_DEFAULT_Y_MM', cls.DEFAULT_FIXED_LAYOUT_MM['date_y']),
+            'date_w': cls.DEFAULT_FIXED_LAYOUT_MM['date_w'],
+            'date_h': cls.DEFAULT_FIXED_LAYOUT_MM['date_h'],
+        }
+
+        date_box = cls._box_from_top_left_mm(layout['date_x'], layout['date_y'], layout['date_w'], layout['date_h'])
+        hash_box = cls._box_from_top_left_mm(layout['hash_x'], layout['hash_y'], layout['hash_w'], layout['hash_h'])
+        qr_box = cls._box_from_top_left_mm(layout['qr_x'], layout['qr_y'], layout['qr_size'], layout['qr_size'])
+        qr_canvas_size = int(round(cls._px_from_mm_x(layout['qr_size'])))
+
+        return [
+            {
+                'id': 'date_fixed',
+                'type': 'text',
+                'text': 'Data de Emissão: {{DATA}}',
+                **date_box,
+                'font': 11,
+                'color': '#64748b',
+                'align': 'left',
+                'bold': False,
+                'italic': False,
+                'font_family': 'Helvetica',
+                'zIndex': 3,
+                'locked': False,
+                'visible': True,
+                'auto_fit': True,
+            },
+            {
+                'id': 'hash',
+                'type': 'text',
+                'text': '{{HASH}}',
+                **hash_box,
+                'font': 16,
+                'color': '#94a3b8',
+                'align': 'left',
+                'bold': False,
+                'italic': False,
+                'font_family': 'Courier',
+                'zIndex': 4,
+                'locked': False,
+                'visible': True,
+                'auto_fit': False,
+            },
+            {
+                'id': 'qrcode',
+                'type': 'qr',
+                **qr_box,
+                'size': qr_canvas_size,
+                'zIndex': 5,
+                'locked': False,
+                'visible': True,
+            },
+        ]
+    
+    @classmethod
+    def build_default_template(cls, designer_mode='event', bg=''):
+        text_elements = []
+        if designer_mode == 'institutional':
+            text_elements.append({
+                'id': 'txt1',
+                'type': 'text',
+                'text': 'CERTIFICADO INSTITUCIONAL',
+                'x': 50,
+                'y': 20,
+                'w': 80,
+                'h': 8,
+                'font': 34,
+                'color': '#1e293b',
+                'align': 'center',
+                'bold': True,
+                'italic': False,
+                'font_family': 'Helvetica',
+                'zIndex': 1,
+                'locked': False,
+                'visible': True,
+            })
+
+        text_elements.append({
+            'id': 'txt2',
+            'type': 'text',
+            'text': (
+                'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}} em {{EMISSION_DATE}}.'
+                if designer_mode == 'institutional'
+                else 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.'
+            ),
+            'x': 50,
+            'y': 50,
+            'w': 82 if designer_mode == 'event' else 80,
+            'h': 24,
+            'font': 22,
+            'color': '#334155',
+            'align': 'center',
+            'bold': False,
+            'italic': False,
+            'font_family': 'Helvetica',
+            'zIndex': 2 if designer_mode == 'event' else 2,
+            'locked': False,
+            'visible': True,
+        })
+
+        return {
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'bg': str(bg or '').strip(),
+            'elements': text_elements + json.loads(json.dumps(cls.get_fixed_validation_elements())),
+        }
 
     @classmethod
     def normalize_font_family(cls, family):
@@ -163,6 +280,9 @@ class CertificateService:
         if not isinstance(raw_elements, list):
             raw_elements = []
 
+        fixed_elements = cls.get_fixed_validation_elements()
+        fixed_element_ids = {item['id'] for item in fixed_elements}
+        fixed_elements_by_id = {item['id']: item for item in fixed_elements}
         seen_fixed_ids = set()
         normalized_elements = []
 
@@ -171,8 +291,8 @@ class CertificateService:
                 continue
 
             element_id = str(element.get('id') or f'el_{idx}').strip() or f'el_{idx}'
-            is_fixed_validation_element = element_id in {'date_fixed', 'hash', 'qrcode'}
-            if element_id in {'date_fixed', 'hash', 'qrcode'}:
+            is_fixed_validation_element = element_id in fixed_element_ids
+            if element_id in fixed_element_ids:
                 if element_id in seen_fixed_ids:
                     continue
                 seen_fixed_ids.add(element_id)
@@ -234,10 +354,10 @@ class CertificateService:
                 'auto_fit': False if element_id == 'hash' else element.get('auto_fit', True) is not False,
             })
 
-        for required in cls.REQUIRED_TEMPLATE_ELEMENTS:
+        for required in fixed_elements:
             if any(element.get('id') == required['id'] for element in normalized_elements):
                 continue
-            normalized_elements.append(json.loads(json.dumps(required)))
+            normalized_elements.append(json.loads(json.dumps(fixed_elements_by_id[required['id']])))
 
         normalized_elements.sort(key=lambda item: item.get('zIndex', 0))
         for idx, element in enumerate(normalized_elements, start=1):
@@ -246,48 +366,47 @@ class CertificateService:
         normalized['elements'] = normalized_elements
         return normalized
 
-    def _parse_template_elements(self, event):
+    def _parse_template_elements(self, event, template_override=None):
         """Loads and normalizes template elements with legacy compatibility."""
-        legacy_defaults = {
-            'txt1': {'text': 'CERTIFICADO', 'x': 50, 'y': 20, 'w': 80, 'h': 10, 'font': 40, 'color': '#1e293b', 'align': 'center', 'bold': True, 'font_family': 'Helvetica'},
-            'txt2': {'text': 'Certificamos que {{NOME}} participou do evento {{EVENTO}}.', 'x': 50, 'y': 50, 'w': 70, 'h': 20, 'font': 20, 'color': '#475569', 'align': 'center', 'bold': False, 'font_family': 'Helvetica'},
-            'qrcode': {'x': 85, 'y': 85, 'size': 80}
-        }
+        designer_mode = self._designer_mode_for_entity(event)
+        if template_override is not None:
+            if isinstance(template_override, str):
+                try:
+                    template_override = json.loads(template_override)
+                except Exception:
+                    template_override = {}
+
+            normalized_override = self.normalize_template_payload(template_override or {})
+            return normalized_override.get('elements', []), (normalized_override.get('bg') or getattr(event, 'cert_bg_path', None))
+
+        default_template = self.build_default_template(designer_mode=designer_mode, bg=getattr(event, 'cert_bg_path', ''))
 
         if not event.cert_template_json:
-            normalized_legacy = {
-                'version': 2,
-                'document': {'gridSize': 2, 'snap': True, 'guides': True},
-                'elements': self._normalize_legacy_elements(legacy_defaults),
-            }
-            normalized = self.normalize_template_payload(normalized_legacy)
-            return normalized.get('elements', [])
+            normalized = self.normalize_template_payload(default_template)
+            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         try:
             template = json.loads(event.cert_template_json)
         except Exception:
-            normalized_legacy = {
-                'version': 2,
-                'document': {'gridSize': 2, 'snap': True, 'guides': True},
-                'elements': self._normalize_legacy_elements(legacy_defaults),
-            }
-            normalized = self.normalize_template_payload(normalized_legacy)
-            return normalized.get('elements', [])
+            normalized = self.normalize_template_payload(default_template)
+            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         if isinstance(template, dict) and isinstance(template.get('elements'), list):
             normalized = self.normalize_template_payload(template)
-            return normalized.get('elements', [])
+            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         if isinstance(template, dict):
             normalized_legacy = {
                 'version': 2,
                 'document': {'gridSize': 2, 'snap': True, 'guides': True},
+                'bg': getattr(event, 'cert_bg_path', ''),
                 'elements': self._normalize_legacy_elements(template),
             }
             normalized = self.normalize_template_payload(normalized_legacy)
-            return normalized.get('elements', [])
+            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
-        return self._normalize_legacy_elements(legacy_defaults)
+        normalized = self.normalize_template_payload(default_template)
+        return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
     def _normalize_legacy_elements(self, legacy_dict):
         """Converts old dictionary schema into list-based schema."""
@@ -499,21 +618,154 @@ class CertificateService:
             rich_markup = rich_markup.replace(tag, html.escape(str(val)))
         return rich_markup
 
-    def generate_pdf(self, event, user, activities, total_hours, enrollment=None):
-        """Generates a single certificate PDF for a user using professional layout blocks."""
-        import hashlib
+    def _build_template_tags(self, event, user, activities, total_hours, enrollment=None, tag_overrides=None):
+        activity = None
+        if activities:
+            activity = next((item for item in activities if item is not None), None)
+        if activity is None and enrollment and getattr(enrollment, 'activity', None):
+            activity = enrollment.activity
+
+        activity_name = activity.nome if activity and getattr(activity, 'nome', None) else ''
+        speaker_name = activity.palestrante if activity and getattr(activity, 'palestrante', None) else ''
+
+        tags = {
+            '{{NOME}}': str(getattr(user, 'nome', '') or '').upper(),
+            '{{EVENTO}}': str(getattr(event, 'nome', '') or ''),
+            '{{ATIVIDADE}}': activity_name,
+            '{{PALESTRANTE}}': speaker_name,
+            '{{HORAS}}': str(total_hours),
+            '{{DATA}}': event.data_inicio.strftime('%d/%m/%Y') if getattr(event, 'data_inicio', None) else "",
+            '{{CPF}}': str(getattr(user, 'cpf', '') or ''),
+        }
+
+        normalized_overrides = {}
+        for key, value in (tag_overrides or {}).items():
+            normalized_overrides[str(key)] = '' if value is None else str(value)
+
+        tags.update(normalized_overrides)
+        return tags
+
+    def _draw_qr_element(self, pdf_canvas, config, page_width, page_height, validation_url):
+        import qrcode
+        from io import BytesIO
+
+        qr = qrcode.QRCode(box_size=10, border=0)
+        qr.add_data(validation_url)
+        qr.make(fit=True)
+        img_qr = qr.make_image(fill_color="black", back_color="white")
+        qr_buffer = BytesIO()
+        img_qr.save(qr_buffer, format="PNG")
+        qr_buffer.seek(0)
+
+        abs_w = (config.get('w', 12) / 100) * page_width
+        abs_h = (config.get('h', 12) / 100) * page_height
+        abs_x_center = (config.get('x', 50) / 100) * page_width
+        abs_y_center = (1 - (config.get('y', 50) / 100)) * page_height
+        frame_x = abs_x_center - (abs_w / 2)
+        frame_y = abs_y_center - (abs_h / 2)
+        pdf_canvas.drawInlineImage(img_qr, frame_x, frame_y, width=abs_w, height=abs_h)
+
+    def _draw_image_element(self, pdf_canvas, config, page_width, page_height):
+        src = config.get('src')
+        if not src:
+            return
+
+        if src.startswith('/static/'):
+            image_path = os.path.join(current_app.root_path, 'static', src.replace('/static/', '', 1))
+        elif src.startswith('static/'):
+            image_path = os.path.join(current_app.root_path, src)
+        else:
+            image_path = os.path.join(current_app.root_path, 'static', src)
+
+        if not os.path.exists(image_path):
+            return
+
+        abs_w = (config.get('w', 15) / 100) * page_width
+        abs_h = (config.get('h', 15) / 100) * page_height
+        abs_x_center = (config.get('x', 50) / 100) * page_width
+        abs_y_center = (1 - (config.get('y', 50) / 100)) * page_height
+        frame_x = abs_x_center - (abs_w / 2)
+        frame_y = abs_y_center - (abs_h / 2)
+        pdf_canvas.drawImage(image_path, frame_x, frame_y, width=abs_w, height=abs_h, mask='auto')
+
+    def _draw_text_element(self, pdf_canvas, config, page_width, page_height, tags):
         from reportlab.lib.styles import ParagraphStyle
         from reportlab.platypus import Paragraph, Frame, KeepInFrame
         from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+
+        raw_text = config.get('text', '')
+        html_content = config.get('html_content') if config.get('is_html') else None
+        if not raw_text and not html_content:
+            return
+
+        final_text = raw_text
+        for tag, val in tags.items():
+            final_text = final_text.replace(tag, val)
+
+        family = config.get('font_family', 'Helvetica')
+        is_bold = config.get('bold', False)
+        is_italic = config.get('italic', False)
+        font_name = self._resolve_font_name(family, is_bold, is_italic)
+
+        abs_w = (config.get('w', 50) / 100) * page_width
+        abs_h = (config.get('h', 10) / 100) * page_height
+        abs_x_center = (config.get('x', 50) / 100) * page_width
+        abs_y_center = (1 - (config.get('y', 50) / 100)) * page_height
+        frame_x = abs_x_center - (abs_w / 2)
+        frame_y = abs_y_center - (abs_h / 2)
+
+        align_map = {'center': TA_CENTER, 'left': TA_LEFT, 'right': TA_RIGHT, 'justify': TA_JUSTIFY}
+        font_size = (config.get('font', 20) / 1000) * page_width
+
+        style = ParagraphStyle(
+            name=f"Style_{config.get('id') or 'text'}",
+            fontName=font_name,
+            fontSize=font_size,
+            textColor=config.get('color', '#000000'),
+            alignment=align_map.get(config.get('align', 'center'), TA_CENTER),
+            leading=font_size * 1.2
+        )
+
+        if html_content:
+            substituted_html = html_content
+            for tag_key, tag_value in tags.items():
+                substituted_html = substituted_html.replace(tag_key, html.escape(str(tag_value)))
+            paragraph_content = self._convert_jodit_html(substituted_html)
+        else:
+            text_styles = config.get('text_styles', {})
+            if isinstance(text_styles, dict) and text_styles:
+                paragraph_content = self._build_rich_text_markup(raw_text, text_styles, config, tags)
+            else:
+                paragraph_content = final_text
+
+        paragraph = Paragraph(paragraph_content, style)
+        story = [KeepInFrame(abs_w, abs_h, [paragraph], mode='shrink')]
+        frame = Frame(frame_x, frame_y, abs_w, abs_h, showBoundary=0, leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0)
+        frame.addFromList(story, pdf_canvas)
+
+    def generate_pdf(self, event, user, activities, total_hours, enrollment=None, template_override=None, tag_overrides=None):
+        """Generates a single certificate PDF for a user using professional layout blocks."""
+        import hashlib
+
+        tags = self._build_template_tags(
+            event,
+            user,
+            activities,
+            total_hours,
+            enrollment=enrollment,
+            tag_overrides=tag_overrides,
+        )
+        override_hash = str(tags.get('{{HASH}}') or '').strip()
         
         # 0. Handle Validation Hash
-        if enrollment and not enrollment.cert_hash:
+        if enrollment and not override_hash and not enrollment.cert_hash:
             raw = f"{event.id}-{user.cpf}-{secrets.token_hex(8)}"
             enrollment.cert_hash = hashlib.sha256(raw.encode()).hexdigest()[:16].upper()
             from app.extensions import db
             db.session.commit()
         
-        cert_hash = enrollment.cert_hash if enrollment else "VALID-SAMPLE-HASH"
+        cert_hash = override_hash or (enrollment.cert_hash if enrollment else "VALID-SAMPLE-HASH")
+        tags['{{HASH}}'] = cert_hash
         validation_url = build_absolute_app_url(f"/validar/{cert_hash}")
 
         output_dir = os.path.join(current_app.root_path, 'static', 'certificates', 'generated')
@@ -527,33 +779,11 @@ class CertificateService:
         c = canvas.Canvas(filepath, pagesize=(page_width, page_height))
         
         # 1. Draw Background
-        if event.cert_bg_path and os.path.exists(os.path.join(current_app.root_path, 'static', event.cert_bg_path)):
-            c.drawImage(os.path.join(current_app.root_path, 'static', event.cert_bg_path), 0, 0, width=page_width, height=page_height)
+        elements, background_path = self._parse_template_elements(event, template_override=template_override)
+        if background_path and os.path.exists(os.path.join(current_app.root_path, 'static', background_path)):
+            c.drawImage(os.path.join(current_app.root_path, 'static', background_path), 0, 0, width=page_width, height=page_height)
         
-        # 2. Parse Template
-        elements = self._parse_template_elements(event)
-        
-        # 3. Draw Elements
-        activity_name = ''
-        speaker_name = ''
-        if enrollment and getattr(enrollment, 'activity', None):
-            activity_name = enrollment.activity.nome or ''
-            speaker_name = enrollment.activity.palestrante or ''
-
-        user_name = str(getattr(user, 'nome', '') or '')
-        event_name = str(getattr(event, 'nome', '') or '')
-        user_cpf = str(getattr(user, 'cpf', '') or '')
-
-        tags = {
-            '{{NOME}}': user_name.upper(),
-            '{{EVENTO}}': event_name,
-            '{{ATIVIDADE}}': activity_name,
-            '{{PALESTRANTE}}': speaker_name,
-            '{{HORAS}}': str(total_hours),
-            '{{DATA}}': event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else "",
-            '{{CPF}}': user_cpf,
-            '{{HASH}}': cert_hash
-        }
+        # 2. Draw Elements
 
         ordered_elements = sorted(
             [e for e in elements if e.get('visible', True)],
@@ -565,105 +795,14 @@ class CertificateService:
             element_id = config.get('id', '')
 
             if element_type == 'qr' or element_id == 'qrcode':
-                import qrcode
-                from io import BytesIO
-                qr = qrcode.QRCode(box_size=10, border=0)
-                qr.add_data(validation_url)
-                qr.make(fit=True)
-                img_qr = qr.make_image(fill_color="black", back_color="white")
-                qr_buffer = BytesIO()
-                img_qr.save(qr_buffer, format="PNG")
-                qr_buffer.seek(0)
-                
-                abs_x = (config.get('x', 85) / 100) * page_width
-                abs_y = (1 - (config.get('y', 85) / 100)) * page_height
-                abs_w = (config.get('w', 12) / 100) * page_width
-                abs_h = (config.get('h', 12) / 100) * page_height
-                qr_size = config.get('size') or min(abs_w, abs_h)
-                c.drawInlineImage(img_qr, abs_x - (qr_size/2), abs_y - (qr_size/2), width=qr_size, height=qr_size)
+                self._draw_qr_element(c, config, page_width, page_height, validation_url)
                 continue
 
             if element_type == 'image' and config.get('src'):
-                src = config.get('src')
-                if src.startswith('/static/'):
-                    image_path = os.path.join(current_app.root_path, 'static', src.replace('/static/', '', 1))
-                elif src.startswith('static/'):
-                    image_path = os.path.join(current_app.root_path, src)
-                else:
-                    image_path = os.path.join(current_app.root_path, 'static', src)
-
-                if os.path.exists(image_path):
-                    abs_w = (config.get('w', 15) / 100) * page_width
-                    abs_h = (config.get('h', 15) / 100) * page_height
-                    abs_x_center = (config.get('x', 50) / 100) * page_width
-                    abs_y_center = (1 - (config.get('y', 50) / 100)) * page_height
-                    frame_x = abs_x_center - (abs_w / 2)
-                    frame_y = abs_y_center - (abs_h / 2)
-                    c.drawImage(image_path, frame_x, frame_y, width=abs_w, height=abs_h, mask='auto')
+                self._draw_image_element(c, config, page_width, page_height)
                 continue
 
-            raw_text = config.get('text', '')
-            html_content = config.get('html_content') if config.get('is_html') else None
-            if not raw_text and not html_content:
-                continue
-            
-            final_text = raw_text
-            for tag, val in tags.items():
-                final_text = final_text.replace(tag, val)
-            
-            # Font Construction
-            family = config.get('font_family', 'Helvetica')
-            is_bold = config.get('bold', False)
-            is_italic = config.get('italic', False)
-            font_name = self._resolve_font_name(family, is_bold, is_italic)
-
-            # Dimensions
-            w_perc = config.get('w', 50)
-            h_perc = config.get('h', 10)
-            abs_w = (w_perc / 100) * page_width
-            abs_h = (h_perc / 100) * page_height
-            
-            # Position (anchor at center)
-            abs_x_center = (config['x'] / 100) * page_width
-            abs_y_center = (1 - (config['y'] / 100)) * page_height
-            
-            frame_x = abs_x_center - (abs_w / 2)
-            frame_y = abs_y_center - (abs_h / 2)
-
-            align_map = {'center': TA_CENTER, 'left': TA_LEFT, 'right': TA_RIGHT, 'justify': TA_JUSTIFY}
-            
-            style = ParagraphStyle(
-                name=f"Style_{element_id or 'text'}",
-                fontName=font_name,
-                fontSize=(config.get('font', 20) / 1000) * page_width,
-                textColor=config.get('color', '#000000'),
-                alignment=align_map.get(config.get('align', 'center'), TA_CENTER),
-                leading=(config.get('font', 20) / 1000) * page_width * 1.2
-            )
-
-            # Determine paragraph content:
-            # 1. Jodit HTML (is_html) - rich HTML converted to ReportLab markup
-            # 2. Fabric.js per-character styles (text_styles)
-            # 3. Plain text fallback
-            if html_content:
-                substituted_html = html_content
-                for tag_k, tag_v in tags.items():
-                    substituted_html = substituted_html.replace(tag_k, html.escape(str(tag_v)))
-                paragraph_content = self._convert_jodit_html(substituted_html)
-            else:
-                text_styles = config.get('text_styles', {})
-                if isinstance(text_styles, dict) and text_styles:
-                    paragraph_content = self._build_rich_text_markup(raw_text, text_styles, config, tags)
-                else:
-                    paragraph_content = final_text
-
-            p = Paragraph(paragraph_content, style)
-            frame_y = abs_y_center - (abs_h / 2)
-
-            # Respect the configured block and shrink text content when it overflows.
-            story = [KeepInFrame(abs_w, abs_h, [p], mode='shrink')]
-            f = Frame(frame_x, frame_y, abs_w, abs_h, showBoundary=0, leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0)
-            f.addFromList(story, c)
+            self._draw_text_element(c, config, page_width, page_height, tags)
         
         c.showPage()
         try:
@@ -762,7 +901,7 @@ class CertificateService:
             
         if bg_path is not None:
             event.cert_bg_path = bg_path if bg_path != "" else None
-        if template_json:
+        if template_json is not None:
             event.cert_template_json = template_json
             
         self.event_repo.save(event)

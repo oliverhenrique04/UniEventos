@@ -46,13 +46,19 @@ def inscrever_via_link(token):
 def designer_certificado(event_id):
     """Page for visually designing and configuring certificates."""
     from app.models import Event
+    from app.services.certificate_service import CertificateService
     from app.services.event_service import EventService
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
     if not EventService.can_manage_event(current_user, event):
         return "Acesso negado", 403
-    return render_template('certificate_designer.html', user=current_user, event=event)
+    return render_template(
+        'certificate_designer.html',
+        user=current_user,
+        event=event,
+        fixed_validation_elements=CertificateService.get_fixed_validation_elements(),
+    )
 
 @bp.route('/gerenciar_entregas/<int:event_id>')
 @login_required
@@ -85,6 +91,7 @@ def designer_certificado_institucional(certificate_id):
         return "Acesso negado", 403
 
     from app.models import InstitutionalCertificate
+    from app.services.certificate_service import CertificateService
     cert = db.session.get(InstitutionalCertificate, certificate_id)
     if not cert:
         abort(404)
@@ -92,7 +99,13 @@ def designer_certificado_institucional(certificate_id):
     if current_user.role not in ['admin', 'gestor'] and cert.created_by_username != current_user.username:
         return "Acesso negado", 403
 
-    return render_template('certificate_designer.html', user=current_user, event=cert, designer_mode='institutional')
+    return render_template(
+        'certificate_designer.html',
+        user=current_user,
+        event=cert,
+        designer_mode='institutional',
+        fixed_validation_elements=CertificateService.get_fixed_validation_elements(),
+    )
 
 @bp.route('/usuarios')
 @login_required

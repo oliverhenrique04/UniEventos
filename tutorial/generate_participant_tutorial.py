@@ -78,7 +78,7 @@ CAPTURE_PLAN = [
         filename="05_dashboard_checkin.png",
         title="Dashboard com Presença Digital",
         what_user_sees="Inicio do painel do participante com destaque para o registro de presenca por QR Code.",
-        what_user_can_do="Abrir o leitor da camera, iniciar o check-in e acompanhar o feedback da validacao.",
+        what_user_can_do="Abrir o leitor da camera, iniciar o check-in e acompanhar o feedback da validação.",
     ),
     CaptureMeta(
         filename="06_dashboard_eventos.png",
@@ -132,7 +132,7 @@ CAPTURE_PLAN = [
         filename="14_perfil_certificados.png",
         title="Perfil - Certificados Emitidos",
         what_user_sees="Colecao de certificados disponiveis para download e preview.",
-        what_user_can_do="Baixar PDFs, abrir previews e conferir o hash publico de validacao.",
+        what_user_can_do="Baixar PDFs, abrir previews e conferir o hash publico de validação.",
     ),
     CaptureMeta(
         filename="15_modal_atualizar_dados.png",
@@ -149,13 +149,13 @@ CAPTURE_PLAN = [
     CaptureMeta(
         filename="17_checkin_confirmacao.png",
         title="Confirmação Segura de Presença",
-        what_user_sees="Tela segura aberta pelo QR Code dinamico, com dados da atividade e validacao geolocalizada.",
+        what_user_sees="Tela segura aberta pelo QR Code dinamico, com dados da atividade e validação geolocalizada.",
         what_user_can_do="Autorizar a localizacao e concluir o registro oficial de presenca na atividade.",
     ),
     CaptureMeta(
         filename="18_checkin_sucesso.png",
         title="Presença Confirmada",
-        what_user_sees="Mensagem de sucesso exibida imediatamente apos a validacao da presenca.",
+        what_user_sees="Mensagem de sucesso exibida imediatamente apos a validação da presenca.",
         what_user_can_do="Seguir para o perfil/certificados ou encerrar a tela com seguranca.",
     ),
 ]
