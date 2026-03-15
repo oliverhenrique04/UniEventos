@@ -58,6 +58,18 @@ class EventService:
         return hours
 
     @staticmethod
+    def can_create_events(user):
+        return bool(user and getattr(user, 'can_create_events', False))
+
+    @staticmethod
+    def can_access_event_management(user):
+        if not user:
+            return False
+        if user.role in ['admin', 'coordenador', 'gestor']:
+            return True
+        return EventService.can_create_events(user)
+
+    @staticmethod
     def can_view_event(user, event):
         if not user or not event:
             return False
@@ -65,10 +77,10 @@ class EventService:
             return True
         if user.role == 'gestor':
             return True
-        if user.role == 'professor':
-            return event.owner_username == user.username
         if user.role == 'coordenador':
             return bool(user.course_id and event.course_id and user.course_id == event.course_id)
+        if EventService.can_create_events(user):
+            return event.owner_username == user.username
         return False
 
     @staticmethod
@@ -77,12 +89,12 @@ class EventService:
             return False
         if user.role == 'admin':
             return True
-        if user.role == 'professor':
-            return event.owner_username == user.username
         if user.role == 'coordenador':
             return bool(user.course_id and event.course_id and user.course_id == event.course_id)
         if user.role == 'gestor':
             return bool(user.course_id and event.course_id and user.course_id == event.course_id)
+        if EventService.can_create_events(user):
+            return event.owner_username == user.username
         return False
 
     def create_event(self, owner_username, data):
@@ -343,18 +355,18 @@ class EventService:
     def get_events_for_user_paginated(self, user, page=1, per_page=12, filters=None):
         """Lists events visible to a specific user with chronological sorting and filters."""
         query = Event.query
-        if user.role == 'participante':
-            query = query.filter(Event.status == 'ABERTO')
-        elif user.role == 'professor':
-            query = query.filter_by(owner_username=user.username)
+        if user.role == 'admin':
+            pass
+        elif user.role == 'gestor':
+            # Gestor can consult events across courses.
+            pass
         elif user.role == 'coordenador':
             if user.course_id:
                 query = query.filter(Event.course_id == user.course_id)
             else:
                 query = query.filter(Event.id == -1)
-        elif user.role == 'gestor':
-            # Gestor can consult events across courses.
-            pass
+        elif self.can_create_events(user):
+            query = query.filter_by(owner_username=user.username)
         elif user.role != 'admin':
             query = query.filter(Event.id == -1)
         
@@ -375,8 +387,8 @@ class EventService:
         """Retrieves a paginated list of events with chronological sorting and filters."""
         query = Event.query
 
-        if user.role == 'professor':
-            query = query.filter(Event.owner_username == user.username)
+        if user.role == 'admin':
+            pass
         elif user.role == 'coordenador':
             if user.course_id:
                 query = query.filter(Event.course_id == user.course_id)
@@ -385,6 +397,8 @@ class EventService:
         elif user.role == 'gestor':
             # Gestor can consult all events; edition constraints are enforced elsewhere.
             pass
+        elif self.can_create_events(user):
+            query = query.filter(Event.owner_username == user.username)
         elif user.role != 'admin':
             query = query.filter(Event.id == -1)
 
@@ -404,6 +418,23 @@ class EventService:
                 parsed_date = self._parse_date(filters['data'])
                 if parsed_date:
                     query = query.filter(Event.data_inicio == parsed_date)
+
+        return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    def get_open_events_paginated(self, user, page=1, per_page=12, filters=None):
+        """Lists open enrollment events available to any authenticated user."""
+        query = Event.query.filter(Event.status == 'ABERTO')
+
+        if filters:
+            if filters.get('nome'):
+                query = query.filter(Event.nome.ilike(f"%{filters['nome']}%"))
+            if filters.get('data'):
+                parsed_date = self._parse_date(filters['data'])
+                if parsed_date:
+                    query = query.filter(Event.data_inicio == parsed_date)
+            if filters.get('curso'):
+                query = query.join(Course, Event.course_id == Course.id, isouter=True)
+                query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
 
         return query.order_by(Event.data_inicio.asc(), Event.hora_inicio.asc()).paginate(page=page, per_page=per_page, error_out=False)
 

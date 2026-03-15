@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.services.admin_service import AdminService
+from app.services.event_service import EventService
 from app.serializers import serialize_user
 from app.models import Activity, Event
 from app.extensions import db
@@ -234,7 +235,7 @@ def listar_usuarios():
 @bp.route('/buscar_participante', methods=['GET'])
 @login_required
 def buscar_participante():
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+    if not EventService.can_access_event_management(current_user):
         return jsonify([]), 403
     
     termo = request.args.get('q', '')
@@ -264,7 +265,7 @@ def deletar_usuario(username):
 @bp.route('/inscricao_manual', methods=['POST'])
 @login_required
 def inscricao_manual():
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+    if not EventService.can_access_event_management(current_user):
         return jsonify({"erro": "Negado"}), 403
     
     data = request.json
@@ -281,11 +282,8 @@ def inscricao_manual():
     if not event:
         return jsonify({"erro": "Evento não encontrado."}), 404
 
-    if current_user.role == 'professor' and event.owner_username != current_user.username:
+    if not EventService.can_manage_event(current_user, event):
         return jsonify({"erro": "Acesso negado para este evento."}), 403
-    if current_user.role in ['coordenador', 'gestor']:
-        if not current_user.course_id or not event.course_id or current_user.course_id != event.course_id:
-            return jsonify({"erro": "Acesso negado para este curso."}), 403
 
     success, msg = admin_service.manual_enroll(data.get('cpf'), activity_id)
     

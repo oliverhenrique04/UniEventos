@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, abort, current_
 from flask_login import current_user, login_required
 from datetime import datetime
 from app.extensions import db
+from app.services.event_service import EventService
 
 
 bp = Blueprint('main', __name__)
@@ -140,9 +141,17 @@ def confirmar_presenca_page(atv_id, token_hash):
 @login_required
 def gerenciar_eventos():
     """Page for full administrative event management CRUD and participant control."""
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+    if not EventService.can_access_event_management(current_user):
         return "Acesso negado", 403
     return render_template('events_admin.html', user=current_user)
+
+@bp.route('/analitico')
+@login_required
+def analitico_page():
+    """Dedicated page for the management analytics dashboard."""
+    if current_user.role not in ['admin', 'coordenador', 'gestor']:
+        return "Acesso negado", 403
+    return render_template('analytics.html', user=current_user)
 
 @bp.route('/perfil')
 @login_required
@@ -160,7 +169,7 @@ def meus_eventos():
 @login_required
 def criar_evento_page():
     """Dedicated page for creating new events with multiple activities."""
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+    if not EventService.can_create_events(current_user):
         return "Acesso negado", 403
     return render_template('event_create.html', user=current_user)
 
@@ -168,14 +177,11 @@ def criar_evento_page():
 @login_required
 def editar_evento_page(event_id):
     """Page for editing an existing event."""
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
-        return "Acesso negado", 403
     from app.models import Event
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
-    # Check permission
-    if current_user.role != 'admin' and event.owner_username != current_user.username:
+    if not EventService.can_manage_event(current_user, event):
         return "Acesso negado", 403
     return render_template('event_edit.html', user=current_user, event=event)
 

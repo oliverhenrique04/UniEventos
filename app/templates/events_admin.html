@@ -201,7 +201,7 @@
         <div>
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-calendar-check text-primary me-2"></i>Gestão de Eventos</h3>
         </div>
-        {% if user.role != 'gestor' or user.course_id %}
+        {% if user.can_create_events %}
         <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-primary shadow-sm">
             <i class="fa-solid fa-plus me-2"></i> Novo Evento
         </a>

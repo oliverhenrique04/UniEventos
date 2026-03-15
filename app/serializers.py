@@ -79,17 +79,13 @@ def serialize_event(event, current_user=None):
     if current_user:
         same_course = bool(current_user.course_id and event.course_id and current_user.course_id == event.course_id)
         is_owner = event.owner_username == current_user.username
+        can_manage_own_events = bool(getattr(current_user, 'can_create_events', False) and is_owner)
 
         if current_user.role == 'admin':
             can_edit = True
             can_delete = True
             can_manage_participants = True
             can_manage_certificates = True
-        elif current_user.role == 'professor':
-            can_edit = is_owner
-            can_delete = is_owner
-            can_manage_participants = is_owner
-            can_manage_certificates = is_owner
         elif current_user.role == 'coordenador':
             can_edit = same_course
             can_delete = same_course
@@ -100,6 +96,11 @@ def serialize_event(event, current_user=None):
             can_delete = same_course
             can_manage_participants = same_course
             can_manage_certificates = same_course
+        elif can_manage_own_events:
+            can_edit = True
+            can_delete = True
+            can_manage_participants = True
+            can_manage_certificates = True
 
     return {
         'id': event.id,

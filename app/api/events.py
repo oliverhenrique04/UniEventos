@@ -29,6 +29,14 @@ def _user_can_view_event(event):
     return event_service.can_view_event(current_user, event)
 
 
+def _user_can_create_events():
+    return event_service.can_create_events(current_user)
+
+
+def _user_can_access_event_management():
+    return event_service.can_access_event_management(current_user)
+
+
 def _enforce_role_course_for_creation(data):
     if current_user.role not in ['coordenador', 'gestor']:
         return None
@@ -95,6 +103,63 @@ def _apply_event_visibility_scope(base_query):
     return query
 
 
+def _build_dashboard_analytics_empty_payload(
+    *,
+    owner_options=None,
+    period_days=30,
+    course_id=None,
+    event_status=None,
+    event_type=None,
+    owner_username=None,
+    cutoff_date=None,
+    generated_at=None,
+):
+    return {
+        'summary': {
+            'total_events': 0,
+            'active_events': 0,
+            'closed_events': 0,
+            'total_courses': 0,
+            'total_enrollments': 0,
+            'unique_students': 0,
+            'presence_rate': 0,
+            'pending_certificate_events': 0,
+        },
+        'events_by_course': [],
+        'students_by_course': [],
+        'status_breakdown': [],
+        'certificate_pipeline': {
+            'with_certificate': 0,
+            'without_certificate': 0,
+        },
+        'pending_certificate_events': [],
+        'institutional_summary': {
+            'total_certificates': 0,
+            'draft_certificates': 0,
+            'sent_certificates': 0,
+            'archived_certificates': 0,
+            'total_recipients': 0,
+            'delivered_recipients': 0,
+            'pending_recipients': 0,
+            'delivery_rate': 0,
+        },
+        'institutional_by_category': [],
+        'institutional_pending': [],
+        'filter_options': {
+            'owners': owner_options or [],
+        },
+        'applied_filters': {
+            'period_days': period_days,
+            'course_id': course_id,
+            'event_status': event_status,
+            'event_type': event_type,
+            'owner_username': owner_username,
+            'cutoff_date': cutoff_date.isoformat() if cutoff_date else None,
+        },
+        'generated_at': generated_at or datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _get_user_institutional_recipients(user):
     recipient_filters = []
     if user.username:
@@ -125,9 +190,9 @@ def _get_user_institutional_recipients(user):
 def criar_evento():
     """
     Endpoint for creating a new event.
-    Only professors and admins can create events.
+    Creation is controlled by the explicit user permission flag.
     """
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+    if not _user_can_create_events():
         return jsonify({"erro": "Negado"}), 403
     
     data = request.json
@@ -195,7 +260,7 @@ def editar_evento():
 @login_required
 def listar_eventos_admin():
     """Paginated and filtered list of all events for administrative purposes."""
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
+    if not _user_can_access_event_management():
         return jsonify([]), 403
     
     page = request.args.get('page', 1, type=int)
@@ -222,11 +287,7 @@ def listar_eventos_admin():
 def notificar_participantes(event_id):
     """
     Sends a broadcast email notification to all participants of an event.
-    Only authorized personnel (admin, professor, coordinator) can call this.
     """
-    if current_user.role not in ['admin', 'professor', 'coordenador', 'gestor']:
-        return jsonify({"erro": "Acesso negado"}), 403
-
     event = event_service.get_event_by_id(event_id)
     if not event:
         return jsonify({"erro": "Evento não encontrado"}), 404
@@ -577,6 +638,26 @@ def listar_eventos():
     })
 
 
+@bp.route('/eventos_abertos', methods=['GET'])
+@login_required
+def listar_eventos_abertos():
+    """Endpoint for listing open enrollment events visible to any authenticated user."""
+    page = request.args.get('page', 1, type=int)
+    filters = {
+        'nome': request.args.get('nome'),
+        'data': request.args.get('data'),
+        'curso': request.args.get('curso')
+    }
+    pagination = event_service.get_open_events_paginated(current_user, page=page, filters=filters)
+
+    return jsonify({
+        "items": [serialize_event(e, current_user) for e in pagination.items],
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": pagination.page
+    })
+
+
 @bp.route('/dashboard/analytics', methods=['GET'])
 @login_required
 def dashboard_analytics():
@@ -601,12 +682,27 @@ def dashboard_analytics():
         event_type = None
 
     owner_username = (request.args.get('owner_username') or '').strip() or None
-    if current_user.role not in ['admin', 'gestor']:
+    if current_user.role not in ['admin', 'gestor', 'coordenador']:
         owner_username = None
 
-    today = datetime.utcnow().date()
+    now_utc = datetime.now(timezone.utc)
+    today = now_utc.date()
     cutoff_date = today - timedelta(days=period_days)
-    cutoff_datetime = datetime.utcnow() - timedelta(days=period_days)
+    cutoff_datetime = now_utc - timedelta(days=period_days)
+    generated_at = now_utc.isoformat()
+
+    if current_user.role == 'coordenador':
+        course_id = current_user.course_id if current_user.course_id else None
+        if not course_id:
+            return jsonify(_build_dashboard_analytics_empty_payload(
+                period_days=period_days,
+                course_id=course_id,
+                event_status=event_status,
+                event_type=event_type,
+                owner_username=owner_username,
+                cutoff_date=cutoff_date,
+                generated_at=generated_at,
+            ))
 
     scoped_events_query = _apply_event_visibility_scope(Event.query)
     scoped_events_query = scoped_events_query.filter(Event.data_inicio.isnot(None), Event.data_inicio >= cutoff_date)
@@ -648,54 +744,17 @@ def dashboard_analytics():
         if username
     ]
 
-    def _empty_payload():
-        return {
-            'summary': {
-                'total_events': 0,
-                'active_events': 0,
-                'closed_events': 0,
-                'total_courses': 0,
-                'total_enrollments': 0,
-                'unique_students': 0,
-                'presence_rate': 0,
-                'pending_certificate_events': 0,
-            },
-            'events_by_course': [],
-            'students_by_course': [],
-            'status_breakdown': [],
-            'certificate_pipeline': {
-                'with_certificate': 0,
-                'without_certificate': 0,
-            },
-            'pending_certificate_events': [],
-            'institutional_summary': {
-                'total_certificates': 0,
-                'draft_certificates': 0,
-                'sent_certificates': 0,
-                'archived_certificates': 0,
-                'total_recipients': 0,
-                'delivered_recipients': 0,
-                'pending_recipients': 0,
-                'delivery_rate': 0,
-            },
-            'institutional_by_category': [],
-            'institutional_pending': [],
-            'filter_options': {
-                'owners': owner_options,
-            },
-            'applied_filters': {
-                'period_days': period_days,
-                'course_id': course_id,
-                'event_status': event_status,
-                'event_type': event_type,
-                'owner_username': owner_username,
-                'cutoff_date': cutoff_date.isoformat(),
-            },
-            'generated_at': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-        }
-
     if not event_ids:
-        payload = _empty_payload()
+        payload = _build_dashboard_analytics_empty_payload(
+            owner_options=owner_options,
+            period_days=period_days,
+            course_id=course_id,
+            event_status=event_status,
+            event_type=event_type,
+            owner_username=owner_username,
+            cutoff_date=cutoff_date,
+            generated_at=generated_at,
+        )
     else:
         scoped_events_query = Event.query.filter(Event.id.in_(event_ids))
 
@@ -856,15 +915,6 @@ def dashboard_analytics():
             },
         }
 
-    institutional_query = InstitutionalCertificate.query
-    if current_user.role not in ['admin', 'gestor']:
-        institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == current_user.username)
-    elif owner_username:
-        institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == owner_username)
-    institutional_query = institutional_query.filter(InstitutionalCertificate.created_at >= cutoff_datetime)
-
-    institutional_ids = [cert_id for (cert_id,) in institutional_query.with_entities(InstitutionalCertificate.id).all()]
-
     institutional_summary = {
         'total_certificates': 0,
         'draft_certificates': 0,
@@ -877,13 +927,34 @@ def dashboard_analytics():
     }
     institutional_by_category = []
     institutional_pending = []
+    coordinator_course_scope = current_user.role == 'coordenador' and bool(course_id)
 
-    if institutional_ids:
-        institutional_scoped = InstitutionalCertificate.query.filter(InstitutionalCertificate.id.in_(institutional_ids))
-        institutional_summary['total_certificates'] = institutional_scoped.count()
-        institutional_summary['draft_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'RASCUNHO').count()
-        institutional_summary['sent_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'ENVIADO').count()
-        institutional_summary['archived_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'ARQUIVADO').count()
+    if coordinator_course_scope:
+        recipient_scope = (
+            InstitutionalCertificateRecipient.query
+            .join(InstitutionalCertificate, InstitutionalCertificate.id == InstitutionalCertificateRecipient.certificate_id)
+            .join(User, User.username == InstitutionalCertificateRecipient.user_username)
+            .filter(User.course_id == course_id)
+            .filter(InstitutionalCertificate.created_at >= cutoff_datetime)
+        )
+        if owner_username:
+            recipient_scope = recipient_scope.filter(InstitutionalCertificate.created_by_username == owner_username)
+
+        institutional_ids = [
+            cert_id for (cert_id,) in recipient_scope
+            .with_entities(InstitutionalCertificateRecipient.certificate_id)
+            .distinct()
+            .all()
+        ]
+    else:
+        institutional_query = InstitutionalCertificate.query
+        if current_user.role not in ['admin', 'gestor']:
+            institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == current_user.username)
+        elif owner_username:
+            institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == owner_username)
+        institutional_query = institutional_query.filter(InstitutionalCertificate.created_at >= cutoff_datetime)
+
+        institutional_ids = [cert_id for (cert_id,) in institutional_query.with_entities(InstitutionalCertificate.id).all()]
 
         recipient_scope = (
             InstitutionalCertificateRecipient.query
@@ -896,6 +967,13 @@ def dashboard_analytics():
                 .join(User, User.username == InstitutionalCertificateRecipient.user_username)
                 .filter(User.course_id == course_id)
             )
+
+    if institutional_ids:
+        institutional_scoped = InstitutionalCertificate.query.filter(InstitutionalCertificate.id.in_(institutional_ids))
+        institutional_summary['total_certificates'] = institutional_scoped.count()
+        institutional_summary['draft_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'RASCUNHO').count()
+        institutional_summary['sent_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'ENVIADO').count()
+        institutional_summary['archived_certificates'] = institutional_scoped.filter(InstitutionalCertificate.status == 'ARQUIVADO').count()
 
         total_recipients = recipient_scope.count()
         delivered_recipients = recipient_scope.filter(InstitutionalCertificateRecipient.cert_entregue.is_(True)).count()
@@ -925,22 +1003,47 @@ def dashboard_analytics():
             for category_name, certificates_count in categories_rows
         ]
 
-        pending_inst_rows = (
-            db.session.query(
-                InstitutionalCertificate.id,
-                InstitutionalCertificate.titulo,
-                InstitutionalCertificateCategory.nome.label('category_name'),
-                func.count(InstitutionalCertificateRecipient.id).label('recipients_count'),
-                func.sum(case((InstitutionalCertificateRecipient.cert_entregue.is_(True), 1), else_=0)).label('delivered_count'),
+        if coordinator_course_scope:
+            pending_inst_rows = (
+                db.session.query(
+                    InstitutionalCertificate.id,
+                    InstitutionalCertificate.titulo,
+                    InstitutionalCertificateCategory.nome.label('category_name'),
+                    func.count(InstitutionalCertificateRecipient.id).label('recipients_count'),
+                    func.sum(case((InstitutionalCertificateRecipient.cert_entregue.is_(True), 1), else_=0)).label('delivered_count'),
+                )
+                .select_from(InstitutionalCertificateRecipient)
+                .join(InstitutionalCertificate, InstitutionalCertificate.id == InstitutionalCertificateRecipient.certificate_id)
+                .join(User, User.username == InstitutionalCertificateRecipient.user_username)
+                .outerjoin(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
+                .filter(User.course_id == course_id)
+                .filter(InstitutionalCertificateRecipient.certificate_id.in_(institutional_ids))
             )
-            .select_from(InstitutionalCertificate)
-            .outerjoin(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
-            .outerjoin(InstitutionalCertificateRecipient, InstitutionalCertificateRecipient.certificate_id == InstitutionalCertificate.id)
-            .filter(InstitutionalCertificate.id.in_(institutional_ids))
-            .group_by(InstitutionalCertificate.id, InstitutionalCertificate.titulo, InstitutionalCertificateCategory.nome)
-            .order_by(InstitutionalCertificate.created_at.desc())
-            .all()
-        )
+            if owner_username:
+                pending_inst_rows = pending_inst_rows.filter(InstitutionalCertificate.created_by_username == owner_username)
+            pending_inst_rows = (
+                pending_inst_rows
+                .group_by(InstitutionalCertificate.id, InstitutionalCertificate.titulo, InstitutionalCertificateCategory.nome)
+                .order_by(InstitutionalCertificate.created_at.desc())
+                .all()
+            )
+        else:
+            pending_inst_rows = (
+                db.session.query(
+                    InstitutionalCertificate.id,
+                    InstitutionalCertificate.titulo,
+                    InstitutionalCertificateCategory.nome.label('category_name'),
+                    func.count(InstitutionalCertificateRecipient.id).label('recipients_count'),
+                    func.sum(case((InstitutionalCertificateRecipient.cert_entregue.is_(True), 1), else_=0)).label('delivered_count'),
+                )
+                .select_from(InstitutionalCertificate)
+                .outerjoin(InstitutionalCertificateCategory, InstitutionalCertificate.category_id == InstitutionalCertificateCategory.id)
+                .outerjoin(InstitutionalCertificateRecipient, InstitutionalCertificateRecipient.certificate_id == InstitutionalCertificate.id)
+                .filter(InstitutionalCertificate.id.in_(institutional_ids))
+                .group_by(InstitutionalCertificate.id, InstitutionalCertificate.titulo, InstitutionalCertificateCategory.nome)
+                .order_by(InstitutionalCertificate.created_at.desc())
+                .all()
+            )
         for row in pending_inst_rows:
             recipients_count = int(row.recipients_count or 0)
             delivered_count = int(row.delivered_count or 0)
@@ -971,6 +1074,6 @@ def dashboard_analytics():
         'owner_username': owner_username,
         'cutoff_date': cutoff_date.isoformat(),
     }
-    payload['generated_at'] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    payload['generated_at'] = generated_at
 
     return jsonify(payload)

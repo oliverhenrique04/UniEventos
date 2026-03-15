@@ -19,6 +19,16 @@ class AdminService:
         self.user_repo = UserRepository()
         self.notification_service = NotificationService()
 
+    @staticmethod
+    def _coerce_bool(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if value is None:
+            return False
+        return str(value).strip().lower() in {'1', 'true', 't', 'sim', 'yes', 'y', 'on'}
+
     def list_users_paginated(self, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of users with optional filtering.
         
@@ -86,7 +96,8 @@ class AdminService:
             cpf=data.get('cpf'),
             ra=data.get('ra'),
             curso=data.get('curso'),
-            role=data.get('role', 'participante')
+            role=data.get('role', 'participante'),
+            can_create_events=self._coerce_bool(data.get('can_create_events')),
         )
         cpf_default = normalize_cpf(data.get('cpf'))
         user.set_password(data.get('password') or cpf_default)
@@ -106,6 +117,8 @@ class AdminService:
         user.ra = data.get('ra', user.ra)
         user.curso = data.get('curso', user.curso)
         user.role = data.get('role', user.role)
+        if 'can_create_events' in data:
+            user.can_create_events = self._coerce_bool(data.get('can_create_events'))
         
         if data.get('password'):
             user.set_password(data['password'])

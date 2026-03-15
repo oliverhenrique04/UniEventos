@@ -654,10 +654,11 @@
 {% block content %}
 <div class="container fade-in-up">
 
-    {% if user.role in ['admin', 'professor', 'coordenador', 'gestor'] %}
+    {% if user.role in ['admin', 'coordenador', 'gestor'] or user.can_create_events %}
     <div class="row g-4">
 
-        {% if user.role in ['admin', 'gestor'] %}
+        {# Painel analítico movido para a página dedicada /analitico. #}
+        {% if false %}
         <div class="col-lg-12">
             <div class="glass-panel analytics-hero analytics-shell p-4 p-lg-5 shadow-sm">
                 <div class="analytics-header mb-4">
@@ -700,8 +701,12 @@
                     <div class="analytics-filters-grid">
                         <div class="analytics-filter-field">
                             <label for="analyticsCourseFilter">Curso</label>
-                            <select class="form-select form-select-sm" id="analyticsCourseFilter">
+                            <select class="form-select form-select-sm" id="analyticsCourseFilter" {% if user.role == 'coordenador' %}disabled{% endif %}>
+                                {% if user.role == 'coordenador' %}
+                                <option value="{{ user.course_id or '' }}" selected>{{ user.curso or 'Curso não vinculado' }}</option>
+                                {% else %}
                                 <option value="">Todos os cursos</option>
+                                {% endif %}
                             </select>
                         </div>
                         <div class="analytics-filter-field">
@@ -954,10 +959,10 @@
         <div class="col-lg-12">
             <div class="d-flex align-items-center justify-content-between mb-4 px-2 flex-wrap gap-2">
                 <h3 class="fw-bold text-gradient mb-0">
-                    <i class="fa-solid fa-calendar-days text-primary me-2"></i>Eventos sob Minha Coordenação
+                    <i class="fa-solid fa-calendar-days text-primary me-2"></i>Gestão de Eventos
                 </h3>
                 <div class="d-flex gap-2">
-                    {% if user.role != 'gestor' or user.course_id %}
+                    {% if user.can_create_events %}
                     <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-sm btn-primary shadow-sm">
                         <i class="fa-solid fa-plus me-1"></i> Criar Evento
                     </a>
@@ -1030,11 +1035,15 @@
                 
                 <div id="feedback" class="mt-4"></div>
             </div>
+        </div>
+    </div>
+    {% endif %}
 
-            <!-- Filters Section -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-12 col-xl-10">
             <div class="glass-panel p-3 p-md-4 bg-white shadow-sm border-top border-2 border-info text-start">
                 <h6 class="fw-bold mb-3 text-uppercase small text-muted">
-                    <i class="fa-solid fa-magnifying-glass me-2"></i>Localizar Eventos
+                    <i class="fa-solid fa-magnifying-glass me-2"></i>Localizar Eventos em Aberto
                 </h6>
 
                 <div class="row g-2">
@@ -1051,7 +1060,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 
@@ -1068,7 +1076,6 @@
             </nav>
         </div>
     </div>
-    {% endif %}
 </div>
 
 <div class="modal fade" id="modalRelatorio" tabindex="-1">
@@ -1306,6 +1313,9 @@
 <script>
     const userRole = "{{ user.role }}";
     const currentUsername = "{{ user.username if user else '' }}";
+    const currentUserCanCreateEvents = {{ (user.can_create_events if user else false)|tojson }};
+    const currentUserCourseId = {{ (user.course_id if user and user.course_id is not none else none)|tojson }};
+    const currentUserCourseName = {{ (user.curso if user and user.curso else none)|tojson }};
     let intervaloQR = null;
     let atividadeAtualID = null;
     let EVENTO_SELECIONADO_ID = null;
@@ -1316,7 +1326,7 @@
     let eventosAlunoLastQuery = '';
     const analyticsState = {
         periodDays: 30,
-        courseId: '',
+        courseId: userRole === 'coordenador' && currentUserCourseId !== null ? String(currentUserCourseId) : '',
         eventStatus: '',
         eventType: '',
         ownerUsername: '',
@@ -1331,13 +1341,13 @@
             carregarUsuarios();
             inicializarPainelLimpezaCertificados();
         }
-        if (['admin', 'gestor'].includes(userRole)) {
+        if (['admin', 'coordenador', 'gestor'].includes(userRole) && document.getElementById('btnRefreshGestorAnalytics')) {
             inicializarControlesAnalyticsGestor();
             carregarDashboardGestorAnalytics();
             document.getElementById('btnRefreshGestorAnalytics')?.addEventListener('click', () => carregarDashboardGestorAnalytics(true));
         }
-        if (userRole !== 'participante') carregarEventosGestor(1);
-        if (userRole === 'participante') carregarEventosAluno(1);
+        if (document.getElementById('listaEventosGestor')) carregarEventosGestor(1);
+        if (document.getElementById('listaEventosAluno')) carregarEventosAluno(1);
 
         const urlParams = new URLSearchParams(window.location.search);
         if (userRole === 'participante' && urlParams.get('open_checkin') === '1') {
@@ -1347,7 +1357,7 @@
             }
             setTimeout(() => iniciarScanner(), 250);
         }
-        if (userRole !== 'participante') {
+        if (document.getElementById('listaEventosGestor')) {
             const projectorEventId = Number(urlParams.get('open_projector'));
             if (Number.isInteger(projectorEventId) && projectorEventId > 0) {
                 pendingProjectorEventId = projectorEventId;
@@ -1375,8 +1385,8 @@
         document.getElementById('btnAddAtvCriar')?.addEventListener('click', () => addAtividade('containerAtividades'));
         document.getElementById('btnAddAtvEdit')?.addEventListener('click', (e) => { e.preventDefault(); addAtividade('containerAtividadesEdit'); });
 
-        // Filtros do participante (removeu inline oninput/onchange para evitar duplicidade)
-        if (userRole === 'participante') {
+        // Filtros dos eventos abertos (removeu inline oninput/onchange para evitar duplicidade)
+        if (document.getElementById('listaEventosAluno')) {
             const debounced = debounce(() => carregarEventosAluno(1), 350);
             document.getElementById('filtPartNome')?.addEventListener('input', debounced);
             document.getElementById('filtPartCurso')?.addEventListener('input', debounced);
@@ -1610,6 +1620,21 @@
         });
     }
 
+    function isAnalyticsCourseLocked() {
+        return userRole === 'coordenador';
+    }
+
+    function getLockedAnalyticsCourseId() {
+        if (!isAnalyticsCourseLocked() || currentUserCourseId === null || currentUserCourseId === undefined) {
+            return '';
+        }
+        return String(currentUserCourseId);
+    }
+
+    function getLockedAnalyticsCourseLabel() {
+        return currentUserCourseName || 'Curso não vinculado';
+    }
+
     async function carregarCursosAnalyticsFiltro() {
         const select = document.getElementById('analyticsCourseFilter');
         if (!select) return;
@@ -1619,11 +1644,24 @@
             const data = await parseJsonSafeResponse(res);
             if (!res.ok || !Array.isArray(data)) return;
 
+            if (isAnalyticsCourseLocked()) {
+                const lockedCourseId = getLockedAnalyticsCourseId();
+                const lockedCourse = data.find(c => String(c.id) === lockedCourseId);
+                const lockedCourseValue = lockedCourse ? String(lockedCourse.id) : lockedCourseId;
+                const lockedCourseLabel = lockedCourse?.nome || getLockedAnalyticsCourseLabel();
+
+                analyticsState.courseId = lockedCourseValue || '';
+                select.innerHTML = `<option value="${lockedCourseValue}" selected>${lockedCourseLabel}</option>`;
+                select.disabled = true;
+                return;
+            }
+
             const currentValue = analyticsState.courseId || '';
             const options = data
                 .map(c => `<option value="${c.id}">${c.nome}</option>`)
                 .join('');
             select.innerHTML = `<option value="">Todos os cursos</option>${options}`;
+            select.disabled = false;
             select.value = currentValue;
         } catch (_) {}
     }
@@ -1899,12 +1937,12 @@
 
         document.getElementById('btnClearAnalyticsFilters')?.addEventListener('click', () => {
             analyticsState.periodDays = 30;
-            analyticsState.courseId = '';
+            analyticsState.courseId = isAnalyticsCourseLocked() ? getLockedAnalyticsCourseId() : '';
             analyticsState.eventStatus = '';
             analyticsState.eventType = '';
             analyticsState.ownerUsername = '';
             setActivePeriodButton();
-            setSelectValueIfPresent('analyticsCourseFilter', '');
+            setSelectValueIfPresent('analyticsCourseFilter', analyticsState.courseId);
             setSelectValueIfPresent('analyticsStatusFilter', '');
             setSelectValueIfPresent('analyticsTypeFilter', '');
             setSelectValueIfPresent('analyticsOwnerFilter', '');
@@ -2378,7 +2416,7 @@
                 div.innerHTML = `
           <div class="col-12 text-center text-muted py-5 px-4 glass-panel border-dashed">
             <i class="fa-regular fa-calendar-plus fs-1 mb-3 text-slate-300"></i>
-            <p>Você ainda não criou nenhum evento. Use o formulário ao lado!</p>
+            <p>${currentUserCanCreateEvents ? 'Você ainda não criou nenhum evento.' : 'Nenhum evento disponível para consulta no seu perfil.'}</p>
           </div>
         `;
                 return;
@@ -2480,7 +2518,7 @@
         eventosAlunoAbort = new AbortController();
 
         const qs = buildQuery(getFilters(page));
-        const url = `/api/eventos?${qs}`;
+        const url = `/api/eventos_abertos?${qs}`;
         eventosAlunoLastQuery = qs;
 
         const cached = eventosAlunoCache.get(qs);

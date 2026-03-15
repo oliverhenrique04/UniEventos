@@ -27,7 +27,13 @@ class SystemTestCase(unittest.TestCase):
         u_admin = User(username='admin', role='admin', nome='Admin Teste', cpf='000.000.000-00')
         u_admin.set_password('admin')
         
-        u_prof = User(username='prof', role='professor', nome='Prof Teste', cpf='111.111.111-11')
+        u_prof = User(
+            username='prof',
+            role='professor',
+            nome='Prof Teste',
+            cpf='111.111.111-11',
+            can_create_events=True,
+        )
         u_prof.set_password('1234')
 
         db.session.add_all([u_admin, u_prof])

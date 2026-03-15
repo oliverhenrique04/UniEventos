@@ -5,6 +5,7 @@ from app.models import (
     Event,
     Activity,
     Enrollment,
+    Course,
     User,
     InstitutionalCertificateCategory,
     InstitutionalCertificate,
@@ -17,8 +18,12 @@ from app.api import admin as admin_api
 from app.api import certificates as certificates_api
 
 
+def _login_user(client, username, password='1234'):
+    client.post('/api/login', json={'username': username, 'password': password})
+
+
 def _login_admin(client):
-    client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
+    _login_user(client, 'admin_test')
 
 
 def _create_event_for_certs(app, owner_username='admin_test'):
@@ -95,7 +100,202 @@ def _seed_manual_enrollment_data(app, participant_email='manual_api@test.local')
 
 
 def _login_participant(client):
-    client.post('/api/login', json={'username': 'participant_test', 'password': '1234'})
+    _login_user(client, 'participant_test')
+
+
+def _seed_dashboard_analytics_data(app):
+    with app.app_context():
+        course_eng = Course(nome='Engenharia')
+        course_dir = Course(nome='Direito')
+        category = InstitutionalCertificateCategory(nome='Extensao')
+        db.session.add_all([course_eng, course_dir, category])
+        db.session.flush()
+
+        users = [
+            User(username='coord_analytics', role='coordenador', nome='Coord Analytics', cpf='20030040050', course_id=course_eng.id),
+            User(username='coord_sem_curso', role='coordenador', nome='Coord Sem Curso', cpf='20030040051'),
+            User(username='gestor_analytics', role='gestor', nome='Gestor Analytics', cpf='20030040052', course_id=course_eng.id),
+            User(username='prof_eng_a', role='professor', nome='Prof Eng A', cpf='20030040053', course_id=course_eng.id),
+            User(username='prof_eng_b', role='professor', nome='Prof Eng B', cpf='20030040054', course_id=course_eng.id),
+            User(username='prof_dir', role='professor', nome='Prof Dir', cpf='20030040055', course_id=course_dir.id),
+            User(username='participant_dashboard', role='participante', nome='Participante Dashboard', cpf='20030040056', course_id=course_eng.id),
+            User(username='student_eng_a', role='participante', nome='Aluno Eng A', cpf='20030040057', course_id=course_eng.id),
+            User(username='student_eng_b', role='participante', nome='Aluno Eng B', cpf='20030040058', course_id=course_eng.id),
+            User(username='student_dir', role='participante', nome='Aluno Dir', cpf='20030040059', course_id=course_dir.id),
+        ]
+        for user in users:
+            user.set_password('1234')
+        db.session.add_all(users)
+        db.session.flush()
+
+        today = date.today()
+        event_eng_a = Event(
+            owner_username='prof_eng_a',
+            nome='Evento Engenharia A',
+            descricao='Evento do curso de Engenharia',
+            tipo='PADRAO',
+            status='ABERTO',
+            data_inicio=today,
+            hora_inicio=time(9, 0),
+            course_id=course_eng.id,
+        )
+        event_eng_b = Event(
+            owner_username='prof_eng_b',
+            nome='Evento Engenharia B',
+            descricao='Evento do curso de Engenharia',
+            tipo='RAPIDO',
+            status='ENCERRADO',
+            data_inicio=today,
+            hora_inicio=time(14, 0),
+            course_id=course_eng.id,
+        )
+        event_dir = Event(
+            owner_username='prof_dir',
+            nome='Evento Direito',
+            descricao='Evento do curso de Direito',
+            tipo='PADRAO',
+            status='ABERTO',
+            data_inicio=today,
+            hora_inicio=time(16, 0),
+            course_id=course_dir.id,
+        )
+        db.session.add_all([event_eng_a, event_eng_b, event_dir])
+        db.session.flush()
+
+        activity_eng_a = Activity(
+            event_id=event_eng_a.id,
+            nome='Atividade Engenharia A',
+            descricao='Atividade do evento de Engenharia A',
+            data_atv=today,
+            hora_atv=time(9, 0),
+            carga_horaria=4,
+            vagas=50,
+        )
+        activity_eng_b = Activity(
+            event_id=event_eng_b.id,
+            nome='Atividade Engenharia B',
+            descricao='Atividade do evento de Engenharia B',
+            data_atv=today,
+            hora_atv=time(14, 0),
+            carga_horaria=3,
+            vagas=50,
+        )
+        activity_dir = Activity(
+            event_id=event_dir.id,
+            nome='Atividade Direito',
+            descricao='Atividade do evento de Direito',
+            data_atv=today,
+            hora_atv=time(16, 0),
+            carga_horaria=2,
+            vagas=50,
+        )
+        db.session.add_all([activity_eng_a, activity_eng_b, activity_dir])
+        db.session.flush()
+
+        db.session.add_all([
+            Enrollment(
+                activity_id=activity_eng_a.id,
+                user_cpf='20030040057',
+                nome='Aluno Eng A',
+                presente=True,
+                cert_hash='EVTENGA001',
+            ),
+            Enrollment(
+                activity_id=activity_eng_b.id,
+                user_cpf='20030040058',
+                nome='Aluno Eng B',
+                presente=False,
+            ),
+            Enrollment(
+                activity_id=activity_dir.id,
+                user_cpf='20030040059',
+                nome='Aluno Dir',
+                presente=True,
+                cert_hash='EVTDIR001',
+            ),
+        ])
+
+        cert_eng_a = InstitutionalCertificate(
+            created_by_username='prof_eng_a',
+            titulo='Certificado Engenharia A',
+            category_id=category.id,
+            descricao='Lote institucional Engenharia A',
+            data_emissao=today.isoformat(),
+            signer_name='Coord. Eng A',
+            status='ENVIADO',
+        )
+        cert_eng_b = InstitutionalCertificate(
+            created_by_username='prof_eng_b',
+            titulo='Certificado Engenharia B',
+            category_id=category.id,
+            descricao='Lote institucional Engenharia B',
+            data_emissao=today.isoformat(),
+            signer_name='Coord. Eng B',
+            status='RASCUNHO',
+        )
+        cert_dir = InstitutionalCertificate(
+            created_by_username='prof_dir',
+            titulo='Certificado Direito',
+            category_id=category.id,
+            descricao='Lote institucional Direito',
+            data_emissao=today.isoformat(),
+            signer_name='Coord. Direito',
+            status='ARQUIVADO',
+        )
+        db.session.add_all([cert_eng_a, cert_eng_b, cert_dir])
+        db.session.flush()
+
+        db.session.add_all([
+            InstitutionalCertificateRecipient(
+                certificate_id=cert_eng_a.id,
+                user_username='student_eng_a',
+                nome='Aluno Eng A',
+                email='eng_a@test.local',
+                cpf='20030040057',
+                cert_hash='INSTENGA001',
+                cert_entregue=True,
+            ),
+            InstitutionalCertificateRecipient(
+                certificate_id=cert_eng_a.id,
+                user_username='student_dir',
+                nome='Aluno Dir',
+                email='dir_mix@test.local',
+                cpf='20030040059',
+                cert_hash='INSTMIX001',
+                cert_entregue=False,
+            ),
+            InstitutionalCertificateRecipient(
+                certificate_id=cert_eng_b.id,
+                user_username='student_eng_b',
+                nome='Aluno Eng B',
+                email='eng_b@test.local',
+                cpf='20030040058',
+                cert_hash='INSTENGB001',
+                cert_entregue=False,
+            ),
+            InstitutionalCertificateRecipient(
+                certificate_id=cert_dir.id,
+                user_username='student_dir',
+                nome='Aluno Dir',
+                email='dir@test.local',
+                cpf='20030040059',
+                cert_hash='INSTDIR001',
+                cert_entregue=True,
+            ),
+        ])
+        db.session.commit()
+
+        return {
+            'course_eng_id': course_eng.id,
+            'course_dir_id': course_dir.id,
+            'coord_username': 'coord_analytics',
+            'coord_no_course_username': 'coord_sem_curso',
+            'gestor_username': 'gestor_analytics',
+            'prof_eng_a_username': 'prof_eng_a',
+            'prof_eng_b_username': 'prof_eng_b',
+            'prof_dir_username': 'prof_dir',
+            'participant_username': 'participant_dashboard',
+        }
 
 
 def _build_students_xlsx_for_api(rows, include_email=True):
@@ -197,6 +397,110 @@ def _seed_profile_history_data(app):
 
         db.session.commit()
 
+
+def _seed_flagged_event_creator(app, username='participant_creator', role='participante'):
+    with app.app_context():
+        course = Course(nome=f'Curso {username}')
+        db.session.add(course)
+        db.session.flush()
+
+        user = User(
+            username=username,
+            role=role,
+            nome='Criador de Eventos',
+            cpf='55566677788',
+            email=f'{username}@test.local',
+            course_id=course.id,
+            can_create_events=True,
+        )
+        user.set_password('1234')
+        db.session.add(user)
+        db.session.commit()
+
+        return {
+            'username': username,
+            'course_name': course.nome,
+            'course_id': course.id,
+        }
+
+
+def _seed_open_events_access_data(app):
+    with app.app_context():
+        course = Course(nome='Eventos Abertos')
+        db.session.add(course)
+        db.session.flush()
+
+        users = [
+            User(username='open_participant', role='participante', nome='Participante Aberto', cpf='90100000001', email='open_participant@test.local', course_id=course.id),
+            User(username='open_professor', role='professor', nome='Professor Aberto', cpf='90100000002', email='open_professor@test.local', course_id=course.id),
+            User(username='open_coord', role='coordenador', nome='Coordenador Aberto', cpf='90100000003', email='open_coord@test.local', course_id=course.id),
+            User(username='open_gestor', role='gestor', nome='Gestor Aberto', cpf='90100000004', email='open_gestor@test.local', course_id=course.id),
+            User(username='open_extensao', role='extensao', nome='Extensao Aberta', cpf='90100000005', email='open_extensao@test.local', course_id=course.id),
+        ]
+        for user in users:
+            user.set_password('1234')
+        db.session.add_all(users)
+        db.session.flush()
+
+        open_event = Event(
+            owner_username='admin_test',
+            nome='Evento Aberto Geral',
+            descricao='Disponivel para todos os perfis.',
+            tipo='PADRAO',
+            status='ABERTO',
+            token_publico='evento-aberto-geral',
+            data_inicio=date(2030, 8, 20),
+            hora_inicio=time(9, 0),
+            course_id=course.id,
+        )
+        closed_event = Event(
+            owner_username='admin_test',
+            nome='Evento Encerrado Geral',
+            descricao='Nao deve aparecer na lista aberta.',
+            tipo='PADRAO',
+            status='ENCERRADO',
+            token_publico='evento-encerrado-geral',
+            data_inicio=date(2030, 8, 21),
+            hora_inicio=time(10, 0),
+            course_id=course.id,
+        )
+        db.session.add_all([open_event, closed_event])
+        db.session.flush()
+
+        open_activity = Activity(
+            event_id=open_event.id,
+            nome='Atividade Aberta',
+            descricao='Atividade para inscricao ampla.',
+            data_atv=date(2030, 8, 20),
+            hora_atv=time(9, 0),
+            carga_horaria=2,
+            vagas=50,
+        )
+        closed_activity = Activity(
+            event_id=closed_event.id,
+            nome='Atividade Encerrada',
+            descricao='Nao deve aparecer.',
+            data_atv=date(2030, 8, 21),
+            hora_atv=time(10, 0),
+            carga_horaria=2,
+            vagas=50,
+        )
+        db.session.add_all([open_activity, closed_activity])
+        db.session.commit()
+
+        return {
+            'usernames': [
+                'open_participant',
+                'open_professor',
+                'open_coord',
+                'open_gestor',
+                'open_extensao',
+            ],
+            'open_activity_id': open_activity.id,
+            'open_event_name': open_event.nome,
+            'open_extensao_cpf': '90100000005',
+        }
+
 def test_login_api(client, admin_user):
     res = client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
     assert res.status_code == 200
@@ -206,14 +510,288 @@ def test_login_fail(client):
     res = client.post('/api/login', json={'username': 'wrong', 'password': '123'})
     assert res.status_code == 401
 
-def test_create_event_api(client, admin_user):
-    # Login first
+
+def test_dashboard_page_no_longer_renders_management_analytics(client, app, admin_user):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_admin(client)
+    admin_html = client.get('/').get_data(as_text=True)
+    assert 'Painel Analítico de Gestão' not in admin_html
+
+    client.get('/logout')
+    _login_user(client, seeded['gestor_username'])
+    gestor_html = client.get('/').get_data(as_text=True)
+    assert 'Painel Analítico de Gestão' not in gestor_html
+
+    client.get('/logout')
+    _login_user(client, seeded['coord_username'])
+    coord_html = client.get('/').get_data(as_text=True)
+    assert 'Painel Analítico de Gestão' not in coord_html
+
+    client.get('/logout')
+    _login_user(client, seeded['prof_eng_a_username'])
+    professor_html = client.get('/').get_data(as_text=True)
+    assert 'Painel Analítico de Gestão' not in professor_html
+
+    client.get('/logout')
+    _login_user(client, seeded['participant_username'])
+    participante_html = client.get('/').get_data(as_text=True)
+    assert 'Painel Analítico de Gestão' not in participante_html
+
+
+def test_analytics_page_visibility_by_role(client, app, admin_user):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_admin(client)
+    admin_res = client.get('/analitico')
+    admin_html = admin_res.get_data(as_text=True)
+    assert admin_res.status_code == 200
+    assert 'Painel Analítico de Gestão' in admin_html
+
+    client.get('/logout')
+    _login_user(client, seeded['gestor_username'])
+    gestor_res = client.get('/analitico')
+    gestor_html = gestor_res.get_data(as_text=True)
+    assert gestor_res.status_code == 200
+    assert 'Painel Analítico de Gestão' in gestor_html
+
+    client.get('/logout')
+    _login_user(client, seeded['coord_username'])
+    coord_res = client.get('/analitico')
+    coord_html = coord_res.get_data(as_text=True)
+    assert coord_res.status_code == 200
+    assert 'Painel Analítico de Gestão' in coord_html
+    assert 'id="analyticsCourseFilter" disabled' in coord_html
+
+    client.get('/logout')
+    _login_user(client, seeded['prof_eng_a_username'])
+    assert client.get('/analitico').status_code == 403
+
+    client.get('/logout')
+    _login_user(client, seeded['participant_username'])
+    assert client.get('/analitico').status_code == 403
+
+
+def test_dashboard_analytics_coordinator_is_scoped_to_own_course(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['coord_username'])
+    res = client.get(f"/api/dashboard/analytics?course_id={seeded['course_dir_id']}")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['applied_filters']['course_id'] == seeded['course_eng_id']
+    assert payload['summary']['total_events'] == 2
+    assert payload['summary']['total_courses'] == 1
+    assert payload['summary']['pending_certificate_events'] == 1
+    assert payload['events_by_course'] == [{'course': 'Engenharia', 'count': 2}]
+    assert payload['students_by_course'] == [{'course': 'Engenharia', 'count': 2}]
+    assert {item['username'] for item in payload['filter_options']['owners']} == {
+        seeded['prof_eng_a_username'],
+        seeded['prof_eng_b_username'],
+    }
+    assert payload['institutional_summary']['total_certificates'] == 2
+    assert payload['institutional_summary']['draft_certificates'] == 1
+    assert payload['institutional_summary']['sent_certificates'] == 1
+    assert payload['institutional_summary']['archived_certificates'] == 0
+    assert payload['institutional_summary']['total_recipients'] == 2
+    assert payload['institutional_summary']['delivered_recipients'] == 1
+    assert payload['institutional_summary']['pending_recipients'] == 1
+
+
+def test_dashboard_analytics_coordinator_owner_filter_stays_inside_course_scope(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['coord_username'])
+    res = client.get(f"/api/dashboard/analytics?owner_username={seeded['prof_eng_a_username']}")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['applied_filters']['course_id'] == seeded['course_eng_id']
+    assert payload['applied_filters']['owner_username'] == seeded['prof_eng_a_username']
+    assert payload['summary']['total_events'] == 1
+    assert payload['pending_certificate_events'] == []
+    assert payload['institutional_summary']['total_certificates'] == 1
+    assert payload['institutional_summary']['total_recipients'] == 1
+    assert payload['institutional_summary']['delivered_recipients'] == 1
+    assert payload['institutional_summary']['pending_recipients'] == 0
+
+
+def test_dashboard_analytics_coordinator_without_course_returns_empty_payload(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['coord_no_course_username'])
+    res = client.get(
+        f"/api/dashboard/analytics?course_id={seeded['course_eng_id']}&owner_username={seeded['prof_eng_a_username']}"
+    )
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['summary']['total_events'] == 0
+    assert payload['summary']['total_enrollments'] == 0
+    assert payload['institutional_summary']['total_certificates'] == 0
+    assert payload['applied_filters']['course_id'] is None
+    assert payload['applied_filters']['owner_username'] == seeded['prof_eng_a_username']
+    assert payload['filter_options']['owners'] == []
+
+
+def test_dashboard_analytics_gestor_behavior_remains_unchanged(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['gestor_username'])
+    res = client.get(f"/api/dashboard/analytics?course_id={seeded['course_dir_id']}")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['applied_filters']['course_id'] == seeded['course_dir_id']
+    assert payload['summary']['total_events'] == 1
+    assert payload['events_by_course'] == [{'course': 'Direito', 'count': 1}]
+    assert payload['institutional_summary']['total_certificates'] == 3
+
+
+def test_dashboard_analytics_professor_owner_filter_remains_disabled(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['prof_eng_a_username'])
+    res = client.get(f"/api/dashboard/analytics?owner_username={seeded['prof_eng_b_username']}")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['applied_filters']['owner_username'] is None
+    assert payload['summary']['total_events'] == 1
+
+
+def test_dashboard_analytics_participant_still_has_no_access(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_user(client, seeded['participant_username'])
+    res = client.get('/api/dashboard/analytics')
+    assert res.status_code == 403
+
+def test_user_crud_persists_can_create_events_flag(client, app, admin_user):
+    with app.app_context():
+        db.session.add(Course(nome='Curso Permissao'))
+        db.session.commit()
+
+    _login_admin(client)
+    create_res = client.post('/api/criar_usuario', json={
+        'username': 'user_flagged',
+        'password': '1234',
+        'nome': 'Usuario Flag',
+        'email': 'user_flagged@test.local',
+        'cpf': '12345678901',
+        'ra': 'RA-FLAG-01',
+        'curso': 'Curso Permissao',
+        'role': 'participante',
+        'can_create_events': True,
+    })
+
+    assert create_res.status_code == 200
+    with app.app_context():
+        created = db.session.get(User, 'user_flagged')
+        assert created is not None
+        assert created.can_create_events is True
+
+    edit_res = client.post('/api/editar_usuario', json={
+        'username_alvo': 'user_flagged',
+        'nome': 'Usuario Flag',
+        'email': 'user_flagged@test.local',
+        'cpf': '12345678901',
+        'ra': 'RA-FLAG-01',
+        'curso': 'Curso Permissao',
+        'role': 'participante',
+        'can_create_events': False,
+    })
+
+    assert edit_res.status_code == 200
+    with app.app_context():
+        updated = db.session.get(User, 'user_flagged')
+        assert updated.can_create_events is False
+
+
+def test_create_event_api_rejects_user_without_flag_even_if_admin(client, admin_user):
+    _login_admin(client)
+
+    res = client.post('/api/criar_evento', json={
+        'nome': 'API Event Blocked',
+        'descricao': 'Via API',
+        'is_rapido': True,
+        'data_inicio': '2030-01-01',
+        'hora_inicio': '10:00'
+    })
+
+    assert res.status_code == 403
+
+
+def test_flagged_participant_can_access_event_creation_and_management(client, app, admin_user):
+    seeded = _seed_flagged_event_creator(app)
+
+    _login_user(client, seeded['username'])
+
+    assert client.get('/criar_evento').status_code == 200
+    assert client.get('/eventos_admin').status_code == 200
+
+    res = client.post('/api/criar_evento', json={
+        'nome': 'Evento Criado por Participante',
+        'descricao': 'Criacao permitida pela flag.',
+        'curso': seeded['course_name'],
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-02-01',
+        'hora_inicio': '11:00'
+    })
+
+    assert res.status_code == 200
+    with app.app_context():
+        event = Event.query.filter_by(nome='Evento Criado por Participante').first()
+        assert event is not None
+        assert event.owner_username == seeded['username']
+        assert event.course_id == seeded['course_id']
+
+
+def test_dashboard_open_events_are_visible_and_enrollable_for_all_profiles(client, app, admin_user):
+    seeded = _seed_open_events_access_data(app)
+
+    for username in ['admin_test', *seeded['usernames']]:
+        client.get('/logout')
+        _login_user(client, username)
+        html = client.get('/').get_data(as_text=True)
+        assert 'Eventos em Aberto para Inscrição' in html
+
+    client.get('/logout')
+    _login_user(client, 'open_extensao')
+
+    open_events_res = client.get('/api/eventos_abertos')
+    assert open_events_res.status_code == 200
+    payload = open_events_res.get_json()
+    assert [item['nome'] for item in payload['items']] == [seeded['open_event_name']]
+
+    enrollment_res = client.post('/api/toggle_inscricao', json={
+        'activity_id': seeded['open_activity_id'],
+        'acao': 'inscrever',
+    })
+    assert enrollment_res.status_code == 200
+
+    with app.app_context():
+        enrollment = Enrollment.query.filter_by(
+            activity_id=seeded['open_activity_id'],
+            user_cpf=seeded['open_extensao_cpf'],
+        ).first()
+        assert enrollment is not None
+
+def test_create_event_api(client, app, admin_user):
+    with app.app_context():
+        admin = db.session.get(User, 'admin_test')
+        admin.can_create_events = True
+        db.session.commit()
+
     client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
     
     data = {
         'nome': 'API Event',
         'descricao': 'Via API',
         'is_rapido': True,
+        'carga_horaria_rapida': 2,
         'data_inicio': '2030-01-01',
         'hora_inicio': '10:00'
     }

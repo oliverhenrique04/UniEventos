@@ -1,0 +1,264 @@
+<div class="glass-panel analytics-hero analytics-shell p-4 p-lg-5 shadow-sm">
+    <div class="analytics-header mb-4">
+        <div>
+            <h3 class="fw-bold text-gradient mb-1">
+                <i class="fa-solid fa-chart-line text-primary me-2"></i>Painel Analítico de Gestão
+            </h3>
+            <br>
+            <span class="analytics-eyebrow mb-3">
+                <i class="fa-solid fa-chart-simple"></i>Inteligência Operacional
+            </span>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="metric-pill" id="analyticsLastUpdate">Atualizando insights...</span>
+            <button class="btn btn-sm btn-outline-primary" id="btnRefreshGestorAnalytics">
+                <i class="fa-solid fa-rotate me-1"></i>Atualizar
+            </button>
+        </div>
+    </div>
+
+    <div class="analytics-toolbar mb-4">
+        <div class="analytics-toolbar-header">
+            <div>
+                <div class="analytics-toolbar-title">Filtros dinâmicos do recorte analítico</div>
+                <div class="text-muted small">Refine o painel em tempo real por horizonte, curso, status, tipo de evento e responsável.</div>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" id="btnClearAnalyticsFilters">
+                <i class="fa-solid fa-filter-circle-xmark me-1"></i>Limpar filtros
+            </button>
+        </div>
+
+        <div class="analytics-period-strip" role="group" aria-label="Período analítico">
+            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="7">7d</button>
+            <button type="button" class="btn btn-primary analytics-period-btn" data-days="30">30d</button>
+            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="90">90d</button>
+            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="180">180d</button>
+            <button type="button" class="btn btn-outline-primary analytics-period-btn" data-days="365">365d</button>
+        </div>
+
+        <div class="analytics-filters-grid">
+            <div class="analytics-filter-field">
+                <label for="analyticsCourseFilter">Curso</label>
+                <select class="form-select form-select-sm" id="analyticsCourseFilter" {% if user.role == 'coordenador' %}disabled{% endif %}>
+                    {% if user.role == 'coordenador' %}
+                    <option value="{{ user.course_id or '' }}" selected>{{ user.curso or 'Curso não vinculado' }}</option>
+                    {% else %}
+                    <option value="">Todos os cursos</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div class="analytics-filter-field">
+                <label for="analyticsStatusFilter">Status do Evento</label>
+                <select class="form-select form-select-sm" id="analyticsStatusFilter">
+                    <option value="">Todos os status</option>
+                    <option value="ABERTO">Aberto</option>
+                    <option value="ENCERRADO">Encerrado</option>
+                </select>
+            </div>
+            <div class="analytics-filter-field">
+                <label for="analyticsTypeFilter">Tipo do Evento</label>
+                <select class="form-select form-select-sm" id="analyticsTypeFilter">
+                    <option value="">Todos os tipos</option>
+                    <option value="PADRAO">Padrão</option>
+                    <option value="RAPIDO">Rápido</option>
+                </select>
+            </div>
+            <div class="analytics-filter-field">
+                <label for="analyticsOwnerFilter">Responsável</label>
+                <select class="form-select form-select-sm" id="analyticsOwnerFilter">
+                    <option value="">Todos os responsáveis</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="analytics-toolbar-footer">
+            <div id="analyticsActiveFilters" class="analytics-active-filters"></div>
+            <div class="small text-muted" id="analyticsContextText">Consolidando o recorte executivo do período selecionado...</div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-9">
+            <div class="executive-brief h-100">
+                <div class="executive-brief-head">
+                    <span><i class="fa-solid fa-compass-drafting text-primary me-2"></i>Resumo Executivo</span>
+                    <small class="text-muted">Leitura orientada para decisão</small>
+                </div>
+                <div class="p-3 p-lg-4">
+                    <div id="analyticsExecutiveSummary" class="analytics-summary-text">Carregando leitura executiva do período...</div>
+                    <div class="analytics-mini-grid mt-3" id="analyticsStatusBreakdown">
+                        <div class="analytics-mini-card">
+                            <div class="analytics-mini-label">Eventos</div>
+                            <div class="analytics-mini-value">--</div>
+                            <small class="analytics-mini-caption">Aguardando dados</small>
+                        </div>
+                        <div class="analytics-mini-card">
+                            <div class="analytics-mini-label">Presença</div>
+                            <div class="analytics-mini-value">--</div>
+                            <small class="analytics-mini-caption">Aguardando dados</small>
+                        </div>
+                        <div class="analytics-mini-card">
+                            <div class="analytics-mini-label">Cobertura</div>
+                            <div class="analytics-mini-value">--</div>
+                            <small class="analytics-mini-caption">Aguardando dados</small>
+                        </div>
+                        <div class="analytics-mini-card">
+                            <div class="analytics-mini-label">Entrega</div>
+                            <div class="analytics-mini-value">--</div>
+                            <small class="analytics-mini-caption">Aguardando dados</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3">
+            <div class="insight-card h-100">
+                <div class="insight-head d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <span><i class="fa-solid fa-bullseye text-success me-2"></i>Metas e Alertas Proativos</span>
+                    <small class="text-muted">Acompanhe desvios operacionais com maior precisão</small>
+                </div>
+                <div class="p-3 p-lg-4">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small text-muted mb-1">Meta mínima de presença (%)</label>
+                            <input type="number" class="form-control form-control-sm" id="goalPresenceInput" min="1" max="100" value="75">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-muted mb-1">Meta mínima de emissão (%)</label>
+                            <input type="number" class="form-control form-control-sm" id="goalEmissionInput" min="1" max="100" value="85">
+                        </div>
+                    </div>
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-12 d-grid">
+                            <button class="btn btn-sm btn-success" id="btnSaveAnalyticsGoals">
+                                <i class="fa-solid fa-floppy-disk me-1"></i>Salvar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="analyticsAlerts" class="small text-muted">Aguardando análise de metas...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="gestorKpiGrid" class="kpi-grid mb-4">
+        <div class="kpi-card">
+            <div class="kpi-label">Eventos Monitorados</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+            <small class="kpi-note">Consolidação do período selecionado.</small>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Base de Participação</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+            <small class="kpi-note">Aguardando volume de inscrições.</small>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Eficiência de Presença</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+            <small class="kpi-note">Aguardando taxa operacional.</small>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Cobertura de Certificados</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-meta"><span class="kpi-meta-badge">Aguardando dados</span></div>
+            <small class="kpi-note">Aguardando pipeline de emissão.</small>
+        </div>
+    </div>
+
+    <div class="analytics-section-title">
+        <strong>Desempenho por agrupamento</strong>
+        <small>Volume de eventos e alunos por curso no recorte selecionado</small>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="insight-card h-100">
+                <div class="insight-head"><i class="fa-solid fa-graduation-cap text-primary me-2"></i>Eventos por Curso</div>
+                <ul class="rank-list" id="rankingEventosCurso">
+                    <li class="text-muted small">Carregando...</li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="insight-card h-100">
+                <div class="insight-head"><i class="fa-solid fa-users text-primary me-2"></i>Alunos Inscritos por Curso</div>
+                <ul class="rank-list" id="rankingAlunosCurso">
+                    <li class="text-muted small">Carregando...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="analytics-section-title">
+        <strong>Operação acadêmica institucional</strong>
+        <small>Entrega e pendências de certificados acadêmicos</small>
+    </div>
+    <div class="insight-card mb-4">
+        <div class="insight-head"><i class="fa-solid fa-school text-primary me-2"></i>Certificados Acadêmicos (Institucionais)</div>
+        <div class="p-3 p-lg-4">
+            <div class="row g-3 mb-3" id="academicoSummaryCards">
+                <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Certificados</div><div class="kpi-value">--</div></div></div>
+                <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Destinatários</div><div class="kpi-value">--</div></div></div>
+                <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Entregues</div><div class="kpi-value">--</div></div></div>
+                <div class="col-md-3"><div class="kpi-card"><div class="kpi-label">Taxa de Entrega</div><div class="kpi-value">--</div></div></div>
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="insight-card h-100">
+                        <div class="insight-head"><i class="fa-solid fa-tags text-info me-2"></i>Certificados por Categoria</div>
+                        <ul class="rank-list" id="rankingAcademicoCategoria">
+                            <li class="text-muted small">Carregando...</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 risk-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Certificado</th>
+                                    <th>Categoria</th>
+                                    <th>Destinatários</th>
+                                    <th>Pendentes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaPendenciasAcademicoGestor">
+                                <tr><td colspan="4" class="text-center text-muted py-3">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="analytics-section-title">
+        <strong>Risco operacional</strong>
+        <small>Eventos com maior passivo de certificados para priorização imediata</small>
+    </div>
+    <div class="insight-card">
+        <div class="insight-head d-flex flex-wrap gap-2 align-items-center justify-content-between">
+            <span><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Eventos com Pendência de Certificado</span>
+            <small class="text-muted">Priorize os eventos com maior volume pendente</small>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 risk-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Evento</th>
+                        <th>Curso</th>
+                        <th>Inscritos</th>
+                        <th>Presentes</th>
+                        <th>Certificados</th>
+                        <th>Pendentes</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaPendenciasCertificadosGestor">
+                    <tr><td colspan="6" class="text-center text-muted py-3">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
