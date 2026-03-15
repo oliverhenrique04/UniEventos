@@ -25,6 +25,14 @@ def _user_can_manage_event(event):
     return event_service.can_manage_event(current_user, event)
 
 
+def _user_can_manage_event_participants(event):
+    return event_service.can_manage_event_participants(current_user, event)
+
+
+def _user_can_notify_event_participants(event):
+    return event_service.can_notify_event_participants(current_user, event)
+
+
 def _user_can_view_event(event):
     return event_service.can_view_event(current_user, event)
 
@@ -291,7 +299,7 @@ def notificar_participantes(event_id):
     event = event_service.get_event_by_id(event_id)
     if not event:
         return jsonify({"erro": "Evento não encontrado"}), 404
-    if not _user_can_manage_event(event):
+    if not _user_can_notify_event_participants(event):
         return jsonify({"erro": "Acesso negado"}), 403
     
     data = request.json
@@ -316,7 +324,7 @@ def listar_participantes_evento(event_id):
     event = event_service.get_event_by_id(event_id)
     if not event:
         return jsonify({"erro": "Evento não encontrado"}), 404
-    if not _user_can_view_event(event):
+    if not _user_can_manage_event_participants(event):
         return jsonify({"erro": "Acesso negado"}), 403
 
     page = request.args.get('page', 1, type=int)
@@ -368,7 +376,7 @@ def alternar_presenca_manual(enrollment_id):
 
     activity = db.session.get(Activity, enrollment.activity_id)
     event = db.session.get(Event, activity.event_id) if activity else None
-    if not event or not _user_can_manage_event(event):
+    if not event or not _user_can_manage_event_participants(event):
         return jsonify({"erro": "Acesso negado"}), 403
 
     status = request.json.get('presente')
@@ -395,7 +403,7 @@ def remover_inscricao(enrollment_id):
 
     activity = db.session.get(Activity, enrollment.activity_id)
     event = db.session.get(Event, activity.event_id) if activity else None
-    if not event or not _user_can_manage_event(event):
+    if not event or not _user_can_manage_event_participants(event):
         return jsonify({"erro": "Acesso negado"}), 403
 
     db.session.delete(enrollment)

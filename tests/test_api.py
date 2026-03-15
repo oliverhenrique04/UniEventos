@@ -178,6 +178,16 @@ def _seed_certificate_management_data(app):
 
 def _seed_manual_enrollment_data(app, participant_email='manual_api@test.local'):
     with app.app_context():
+        extension_user = User(
+            username='manual_api_extensao',
+            role='extensao',
+            nome='Extensao Manual API',
+            cpf='22233344456',
+            email='manual_extensao@test.local',
+        )
+        extension_user.set_password('1234')
+        db.session.add(extension_user)
+
         participant = User(
             username='manual_api_user',
             role='participante',
@@ -218,6 +228,7 @@ def _seed_manual_enrollment_data(app, participant_email='manual_api@test.local')
             'cpf': participant.cpf,
             'activity_id': activity.id,
             'participant_name': participant.nome,
+            'extension_username': extension_user.username,
         }
 
 
@@ -808,7 +819,7 @@ def test_events_api_allows_coordinator_management_within_course_scope_without_de
     assert all(item['can_manage_certificates'] is True for item in payload['items'])
 
 
-def test_events_api_allows_extensao_event_certificate_access_without_event_management(client, app):
+def test_events_api_allows_extensao_participant_and_certificate_access_without_event_edit(client, app):
     seeded = _seed_dashboard_analytics_data(app)
 
     _login_user(client, seeded['extensao_username'])
@@ -821,7 +832,9 @@ def test_events_api_allows_extensao_event_certificate_access_without_event_manag
     assert payload['total'] == 3
     assert all(item['can_edit'] is False for item in payload['items'])
     assert all(item['can_delete'] is False for item in payload['items'])
-    assert all(item['can_manage_participants'] is False for item in payload['items'])
+    assert all(item['can_manage_participants'] is True for item in payload['items'])
+    assert all(item['can_add_participants'] is True for item in payload['items'])
+    assert all(item['can_notify_participants'] is False for item in payload['items'])
     assert all(item['can_manage_certificates'] is True for item in payload['items'])
 
 
@@ -1453,6 +1466,35 @@ def test_manual_enroll_api_sends_email_notification(client, app, admin_user, mon
         assert enrollment.presente is True
 
 
+def test_manual_enroll_api_allows_extensao_in_event_management(client, app, admin_user, monkeypatch):
+    seeded = _seed_manual_enrollment_data(app)
+    sent_payloads = []
+    monkeypatch.setattr(
+        admin_api.admin_service.notification_service,
+        'send_email_task',
+        lambda **kwargs: sent_payloads.append(kwargs) or True
+    )
+
+    _login_user(client, seeded['extension_username'])
+
+    search_res = client.get('/api/buscar_participante?q=Participante')
+    res = client.post('/api/inscricao_manual', json={
+        'cpf': seeded['cpf'],
+        'activity_id': seeded['activity_id'],
+    })
+
+    assert search_res.status_code == 200
+    assert any(item['cpf'] == seeded['cpf'] for item in search_res.get_json())
+    assert res.status_code == 200
+    assert res.get_json()['mensagem'] == 'Inscrição realizada com sucesso.'
+    assert len(sent_payloads) == 1
+
+    with app.app_context():
+        enrollment = Enrollment.query.filter_by(user_cpf=seeded['cpf'], activity_id=seeded['activity_id']).first()
+        assert enrollment is not None
+        assert enrollment.presente is True
+
+
 def test_manual_enroll_api_duplicate_does_not_send_email(client, app, admin_user, monkeypatch):
     seeded = _seed_manual_enrollment_data(app)
     with app.app_context():
@@ -1759,24 +1801,47 @@ def test_institutional_certificates_keep_gestor_read_only_for_foreign_records(cl
     assert designer_res.status_code == 403
 
 
-def test_institutional_certificates_allow_extensao_full_management_for_foreign_records(client, app):
+def test_institutional_certificates_allow_extensao_edit_but_only_delete_own_records(client, app):
     seeded = _seed_dashboard_analytics_data(app)
 
     with app.app_context():
         editable_cert = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_a_username']).first()
-        deletable_cert = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_b_username']).first()
+        foreign_cert = InstitutionalCertificate.query.filter_by(created_by_username=seeded['prof_eng_b_username']).first()
         assert editable_cert is not None
-        assert deletable_cert is not None
+        assert foreign_cert is not None
+
+        own_cert = InstitutionalCertificate(
+            created_by_username=seeded['extensao_username'],
+            titulo='Certificado Extensao',
+            category_id=editable_cert.category_id,
+            descricao='Lote institucional Extensao',
+            data_emissao=date.today().isoformat(),
+            signer_name='Coord. Extensao',
+            status='RASCUNHO',
+        )
+        db.session.add(own_cert)
+        db.session.commit()
+
         editable_cert_id = editable_cert.id
-        deletable_cert_id = deletable_cert.id
+        foreign_cert_id = foreign_cert.id
+        own_cert_id = own_cert.id
 
     _login_user(client, seeded['extensao_username'])
 
     list_res = client.get('/api/institutional_certificates')
     assert list_res.status_code == 200
     payload = list_res.get_json()
-    assert payload['total'] == 3
+    assert payload['total'] == 4
     assert all(item['can_edit'] is True for item in payload['items'])
+    can_delete_by_id = {item['id']: item['can_delete'] for item in payload['items']}
+    assert can_delete_by_id[editable_cert_id] is False
+    assert can_delete_by_id[foreign_cert_id] is False
+    assert can_delete_by_id[own_cert_id] is True
+
+    detail_res = client.get(f'/api/institutional_certificates/{foreign_cert_id}')
+    assert detail_res.status_code == 200
+    assert detail_res.get_json()['can_edit'] is True
+    assert detail_res.get_json()['can_delete'] is False
 
     designer_res = client.get(f'/designer_certificado_institucional/{editable_cert_id}')
     update_res = client.put(f'/api/institutional_certificates/{editable_cert_id}', json={
@@ -1787,17 +1852,21 @@ def test_institutional_certificates_allow_extensao_full_management_for_foreign_r
         'descricao': 'Atualizado pela extensao',
         'signer_name': 'Coord. Extensao',
     })
-    delete_res = client.delete(f'/api/institutional_certificates/{deletable_cert_id}')
+    delete_foreign_res = client.delete(f'/api/institutional_certificates/{foreign_cert_id}')
+    delete_own_res = client.delete(f'/api/institutional_certificates/{own_cert_id}')
 
     assert designer_res.status_code == 200
     assert update_res.status_code == 200
-    assert delete_res.status_code == 200
+    assert delete_foreign_res.status_code == 403
+    assert delete_own_res.status_code == 200
 
     with app.app_context():
         updated_cert = db.session.get(InstitutionalCertificate, editable_cert_id)
-        deleted_cert = db.session.get(InstitutionalCertificate, deletable_cert_id)
+        preserved_foreign_cert = db.session.get(InstitutionalCertificate, foreign_cert_id)
+        deleted_own_cert = db.session.get(InstitutionalCertificate, own_cert_id)
         assert updated_cert.titulo == 'Certificado Engenharia A - Ajustado'
-        assert deleted_cert is None
+        assert preserved_foreign_cert is not None
+        assert deleted_own_cert is None
 
 
 def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
@@ -1877,7 +1946,7 @@ def test_certificate_management_endpoints_allow_admin_owner_course_coordinator_a
         assert res.status_code == 403
 
 
-def test_event_certificate_pages_allow_extensao_but_not_participant_management(client, app, admin_user):
+def test_event_management_allows_extensao_participants_but_blocks_notifications(client, app, admin_user):
     seeded = _seed_certificate_management_data(app)
 
     _login_user(client, seeded['extension_username'])
@@ -1885,17 +1954,25 @@ def test_event_certificate_pages_allow_extensao_but_not_participant_management(c
     designer_res = client.get(f"/designer_certificado/{seeded['event_id']}")
     delivery_res = client.get(f"/gerenciar_entregas/{seeded['event_id']}")
     list_res = client.get(f"/api/certificates/list_delivery/{seeded['event_id']}")
+    participants_res = client.get(f"/api/participantes_evento/{seeded['event_id']}")
+    toggle_res = client.post(f"/api/alternar_presenca/{seeded['enrollment_id']}", json={'presente': False})
+    remove_res = client.delete(f"/api/remover_inscricao/{seeded['enrollment_id']}")
     notify_res = client.post(f"/api/notificar_participantes/{seeded['event_id']}", json={
         'assunto': 'Teste',
         'mensagem': 'Mensagem',
     })
-    participants_res = client.get(f"/api/participantes_evento/{seeded['event_id']}")
 
     assert designer_res.status_code == 200
     assert delivery_res.status_code == 200
     assert list_res.status_code == 200
+    assert participants_res.status_code == 200
+    assert toggle_res.status_code == 200
+    assert remove_res.status_code == 200
     assert notify_res.status_code == 403
-    assert participants_res.status_code == 403
+
+    with app.app_context():
+        enrollment = db.session.get(Enrollment, seeded['enrollment_id'])
+        assert enrollment is None
 
 
 def test_certificate_send_batch_denies_participant(client, app, admin_user):

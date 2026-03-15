@@ -517,6 +517,7 @@
 <script>
     let EVENTO_SELECIONADO_ID = null;
     let EVENTO_SELECIONADO_CAN_MANAGE = false;
+    let EVENTO_SELECIONADO_CAN_ADD = false;
     const EVENTOS_GESTAO_CACHE = new Map();
     let ATIVIDADES_EVENTO_ATUAL = [];
     let intervaloProjetorGestao = null;
@@ -602,7 +603,7 @@
                             <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-users-viewfinder text-primary"></i>
                             </button>
-                            <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>
+                            <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_notify_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
                             ${ev.can_manage_certificates ? `
@@ -749,13 +750,14 @@
 
         const ev = EVENTOS_GESTAO_CACHE.get(eventId);
         EVENTO_SELECIONADO_CAN_MANAGE = !!(ev && ev.can_manage_participants);
+        EVENTO_SELECIONADO_CAN_ADD = !!(ev && ev.can_add_participants);
         if (ev && Array.isArray(ev.atividades)) {
             ATIVIDADES_EVENTO_ATUAL = ev.atividades;
         }
 
         const btnMostrarAdicao = document.querySelector('#modalParticipantes .modal-header .btn-primary');
         if (btnMostrarAdicao) {
-            btnMostrarAdicao.style.display = EVENTO_SELECIONADO_CAN_MANAGE ? '' : 'none';
+            btnMostrarAdicao.style.display = EVENTO_SELECIONADO_CAN_ADD ? '' : 'none';
         }
         
         const selAtv = document.getElementById('addPartAtividade');
@@ -786,7 +788,7 @@
 
     function abrirModalNotificacao(id, nome) {
         const ev = EVENTOS_GESTAO_CACHE.get(id);
-        if (!ev || !ev.can_manage_participants) {
+        if (!ev || !ev.can_notify_participants) {
             Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
             return;
         }
@@ -798,6 +800,11 @@
     }
 
     async function enviarNotificacao() {
+        const ev = EVENTOS_GESTAO_CACHE.get(EVENTO_SELECIONADO_ID);
+        if (!ev || !ev.can_notify_participants) {
+            Swal.fire('Acesso restrito', 'Seu perfil não pode notificar participantes deste evento.', 'warning');
+            return;
+        }
         const subject = document.getElementById('notifAssunto').value;
         const message = document.getElementById('notifMensagem').value;
         
@@ -822,7 +829,7 @@
     }
 
     function mostrarAreaAdicao() {
-        if (!EVENTO_SELECIONADO_CAN_MANAGE) {
+        if (!EVENTO_SELECIONADO_CAN_ADD) {
             Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
             return;
         }
@@ -890,7 +897,7 @@
     }
 
     async function executarInscricaoManual() {
-        if (!EVENTO_SELECIONADO_CAN_MANAGE) {
+        if (!EVENTO_SELECIONADO_CAN_ADD) {
             Swal.fire('Acesso restrito', 'Você tem permissão apenas de consulta para este evento.', 'warning');
             return;
         }

@@ -345,7 +345,7 @@ def inscricao_manual():
     if not event:
         return jsonify({"erro": "Evento não encontrado."}), 404
 
-    if not EventService.can_manage_event(current_user, event):
+    if not EventService.can_add_event_participants(current_user, event):
         return jsonify({"erro": "Acesso negado para este evento."}), 403
 
     success, msg = admin_service.manual_enroll(data.get('cpf'), activity_id)

@@ -128,10 +128,30 @@ class EventService:
         return EventService.can_manage_event(user, event)
 
     @staticmethod
+    def can_manage_event_participants(user, event):
+        if not user or not event:
+            return False
+        if user.role in ['admin', 'extensao']:
+            return True
+        return EventService.can_manage_event(user, event)
+
+    @staticmethod
+    def can_add_event_participants(user, event):
+        if not user or not event:
+            return False
+        if user.role in ['admin', 'extensao']:
+            return True
+        return EventService.can_manage_event(user, event)
+
+    @staticmethod
+    def can_notify_event_participants(user, event):
+        return EventService.can_manage_event(user, event)
+
+    @staticmethod
     def can_access_event_management(user):
         if not user:
             return False
-        if user.role in ['admin', 'coordenador', 'gestor']:
+        if user.role in ['admin', 'coordenador', 'gestor', 'extensao']:
             return True
         return EventService.can_create_events(user)
 
@@ -185,8 +205,6 @@ class EventService:
             return False
         if user.role == 'admin':
             return True
-        if user.role == 'coordenador':
-            return EventService.is_same_course_event(user, event)
         return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
 
     @staticmethod

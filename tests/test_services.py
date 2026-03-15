@@ -103,7 +103,16 @@ def test_event_service_can_manage_event_allows_coordinator_course_scope_but_keep
         )
         coordenador.set_password('1234')
 
-        db.session.add_all([admin, owner, gestor, coordenador])
+        extensao = User(
+            username='ext_scope',
+            role='extensao',
+            nome='Ext Scope',
+            cpf='10020030044',
+            course_id=course.id,
+        )
+        extensao.set_password('1234')
+
+        db.session.add_all([admin, owner, gestor, coordenador, extensao])
         db.session.flush()
 
         event = Event(
@@ -125,6 +134,10 @@ def test_event_service_can_manage_event_allows_coordinator_course_scope_but_keep
         assert EventService.can_view_event(coordenador, event) is True
         assert EventService.can_manage_event(coordenador, event) is True
         assert EventService.can_delete_event(coordenador, event) is False
+        assert EventService.can_manage_event(extensao, event) is False
+        assert EventService.can_manage_event_participants(extensao, event) is True
+        assert EventService.can_add_event_participants(extensao, event) is True
+        assert EventService.can_notify_event_participants(extensao, event) is False
         assert EventService.can_manage_event(owner, event) is True
         assert EventService.can_delete_event(owner, event) is True
         assert EventService.can_manage_event(admin, event) is True

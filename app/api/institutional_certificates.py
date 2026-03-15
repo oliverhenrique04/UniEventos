@@ -51,6 +51,14 @@ def _can_edit_institutional_certificate(cert):
     return False
 
 
+def _can_delete_institutional_certificate(cert):
+    if current_user.role == 'admin':
+        return True
+    if current_user.role in ['extensao', 'gestor']:
+        return cert.created_by_username == current_user.username
+    return False
+
+
 def _parse_date_iso(date_str):
     try:
         datetime.strptime(date_str, '%Y-%m-%d')
@@ -221,6 +229,17 @@ def _get_managed_certificate_or_error(certificate_id):
     if not _can_view_institutional_certificates():
         return None, (jsonify({'erro': 'Permissao negada'}), 403)
     if not _can_edit_institutional_certificate(cert):
+        return None, (jsonify({'erro': 'Acesso negado'}), 403)
+    return cert, None
+
+
+def _get_deletable_certificate_or_error(certificate_id):
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        return None, (jsonify({'erro': 'Nao encontrado'}), 404)
+    if not _can_view_institutional_certificates():
+        return None, (jsonify({'erro': 'Permissao negada'}), 403)
+    if not _can_delete_institutional_certificate(cert):
         return None, (jsonify({'erro': 'Acesso negado'}), 403)
     return cert, None
 
@@ -492,6 +511,7 @@ def list_institutional_certificates():
                 'created_by_name': item.creator.nome if item.creator else None,
                 'created_at': item.created_at.isoformat() if item.created_at else None,
                 'can_edit': _can_edit_institutional_certificate(item),
+                'can_delete': _can_delete_institutional_certificate(item),
             }
             for item in pagination.items
         ],
@@ -579,6 +599,7 @@ def get_institutional_certificate(certificate_id):
         'created_by_username': cert.created_by_username,
         'created_by_name': cert.creator.nome if cert.creator else None,
         'can_edit': _can_edit_institutional_certificate(cert),
+        'can_delete': _can_delete_institutional_certificate(cert),
     })
 
 
@@ -770,7 +791,7 @@ def duplicate_institutional_certificate(certificate_id):
 @bp.route('/<int:certificate_id>', methods=['DELETE'])
 @login_required
 def delete_institutional_certificate(certificate_id):
-    cert, error = _get_managed_certificate_or_error(certificate_id)
+    cert, error = _get_deletable_certificate_or_error(certificate_id)
     if error:
         return error
 
