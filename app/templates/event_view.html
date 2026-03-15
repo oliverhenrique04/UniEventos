@@ -119,7 +119,7 @@
 {% block scripts %}
 <script>
     const eventId = {{ event.id }};
-    const isParticipant = {{ 'true' if user.role == 'participante' else 'false' }};
+    const isParticipant = {{ 'true' if user.is_authenticated and user.role == 'participante' else 'false' }};
     const isAuthenticated = {{ 'true' if user.is_authenticated else 'false' }};
     const pendingEnrollmentActions = new Set();
 
@@ -127,14 +127,14 @@
     const activitiesData = [
         {% for a in event.activities %}
     {
-        id: { { a.id } },
-        nome: { { (a.nome or '')| tojson } },
-        horas: { { a.carga_horaria if a.carga_horaria is not none else 0 } },
-        local: { { (a.local or '')| tojson } },
-        palestrante: { { (a.palestrante or '')| tojson } },
-        vagas: { { a.vagas if a.vagas is not none else -1 } },
-        total_inscritos: { { a.enrollments | length } },
-        inscrito: { { 'true' if user.is_authenticated and(a.enrollments | selectattr('user_cpf', 'equalto', user.cpf) | list | length > 0) else 'false' } }
+        id: {{ a.id }},
+        nome: {{ (a.nome or '') | tojson }},
+        horas: {{ a.carga_horaria if a.carga_horaria is not none else 0 }},
+        local: {{ (a.local or '') | tojson }},
+        palestrante: {{ (a.palestrante or '') | tojson }},
+        vagas: {{ a.vagas if a.vagas is not none else -1 }},
+        total_inscritos: {{ a.enrollments | length }},
+        inscrito: {{ 'true' if user.is_authenticated and (a.enrollments | selectattr('user_cpf', 'equalto', user.cpf) | list | length > 0) else 'false' }}
     } {% if not loop.last %}, {% endif %}
     {% endfor %}
   ];
@@ -288,4 +288,3 @@
     }
 </script>
 {% endblock %}
-

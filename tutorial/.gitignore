@@ -1,0 +1,21 @@
+# Configuration with credentials
+config.json
+
+# Generated screenshots
+screenshots/*.png
+
+# Generated documentation
+*.md
+!README.md
+!IMPLEMENTATION_NOTES.md
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial do Participante - UniEventos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a237e;
+            --secondary: #0d47a1;
+            --accent: #ffd600;
+            --text-dark: #333;
+            --text-light: #666;
+            --bg-light: #f4f7f9;
+            --white: #ffffff;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--white);
+            padding: 20px 0;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logos {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logos img {
+            height: 50px;
+            object-fit: contain;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--white);
+            padding: 60px 0;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .hero p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .summary-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: -40px;
+            box-shadow: var(--shadow);
+            border-left: 5px solid var(--accent);
+        }
+
+        .summary-card h2 {
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .credentials {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            background: #fff9c4;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .steps-container {
+            margin: 40px 0;
+        }
+
+        .step-card {
+            background: var(--white);
+            border-radius: 15px;
+            margin-bottom: 40px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .step-header {
+            padding: 20px 25px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .step-number {
+            background: var(--primary);
+            color: var(--white);
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            margin-right: 10px;
+            font-size: 0.9rem;
+        }
+
+        .step-content {
+            padding: 25px;
+        }
+
+        .screenshot-wrapper {
+            background: #eee;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .screenshot-wrapper img {
+            width: 100%;
+            display: block;
+            height: auto;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .info-box h4 {
+            color: var(--primary);
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-box p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+        }
+
+        footer {
+            background: var(--primary);
+            color: var(--white);
+            padding: 40px 0;
+            text-align: center;
+            margin-top: 60px;
+        }
+
+        .footer-logos {
+            margin-bottom: 20px;
+            filter: brightness(0) invert(1);
+            opacity: 0.8;
+        }
+
+        /* CONFIGURAÇÕES DE IMPRESSÃO */
+        @media print {
+            body {
+                background-color: white;
+            }
+
+            header {
+                position: static;
+                box-shadow: none;
+                border-bottom: 1px solid #ddd;
+            }
+
+            .hero {
+                padding: 30px 0;
+                background: var(--primary) !important;
+                -webkit-print-color-adjust: exact;
+            }
+
+            .summary-card {
+                margin-top: 20px;
+                box-shadow: none;
+                border: 1px solid #ddd;
+                border-left: 5px solid var(--accent) !important;
+                /* Faz o resumo e introdução ficarem na primeira página */
+                break-after: page;
+            }
+
+            .step-card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+                margin-bottom: 0;
+                /* FORÇA CADA CARD A COMEÇAR EM UMA NOVA PÁGINA */
+                break-before: page;
+                break-inside: avoid;
+            }
+
+            .step-header {
+                background: #f8f9fa !important;
+                -webkit-print-color-adjust: exact;
+            }
+
+            .credentials {
+                background: #fff9c4 !important;
+                -webkit-print-color-adjust: exact;
+            }
+
+            .summary-card.final {
+                break-before: page;
+            }
+
+            footer {
+                break-before: auto;
+                background: var(--primary) !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="container header-content">
+            <div class="logos">
+                <img src="screenshots/logo_unieuro.png" alt="UniEuro">
+                <img src="screenshots/logo_nuted.png" alt="NUTED">
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-light); text-align: right;">
+                <strong>NUTED</strong><br>
+                Núcleo de Tecnologia Educacional
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Tutorial do Participante</h1>
+            <p>EuroEventos - Guia Passo a Passo</p>
+            <span style="font-size: 0.8rem; opacity: 0.7;">Gerado em: 15/03/2026</span>
+        </div>
+    </section>
+
+    <main class="container">
+        <div class="summary-card" style="margin-top: 10px;">
+            <h2>Resumo do Cenário</h2>
+            <p>Este material orienta o participante desde o acesso inicial até a emissão de certificados no evento
+                <strong>Oficina de Check-in e Inscrição</strong>.
+            </p>
+
+            <div class="credentials">
+                <div>🔑 Usuário: CPF (Apenas Números)</div>
+                <div>🔒 Senha: CPF (Apenas Números)</div>
+            </div>
+        </div>
+
+        <div class="steps-container">
+
+            <article class="step-card">
+                <div class="step-header">
+                    <h3><span class="step-number">01</span> Login</h3>
+                </div>
+                <div class="step-content">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/01_login.png" alt="Tela de Login">
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <h4>O que você vê</h4>
+                            <p>Tela inicial com acesso ao sistema por CPF e senha.</p>
+                        </div>
+                        <div class="info-box">
+                            <h4>O que você pode fazer</h4>
+                            <p>Autenticar-se, alternar visualização da senha e iniciar recuperação.</p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="step-card">
+                <div class="step-header">
+                    <h3><span class="step-number">02</span> Cadastro</h3>
+                </div>
+                <div class="step-content">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/02_cadastro.png" alt="Tela de Cadastro">
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <h4>O que você vê</h4>
+                            <p>Formulário de criação de conta para novos participantes.</p>
+                        </div>
+                        <div class="info-box">
+                            <h4>O que você pode fazer</h4>
+                            <p>Informar nome, e-mail, CPF e senha para criar acesso.</p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="step-card" style="border: 2px solid var(--secondary);">
+                <div class="step-header">
+                    <h3><span class="step-number">05</span> Dashboard com Presença Digital</h3>
+                </div>
+                <div class="step-content">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/05_dashboard_checkin.png" alt="Presença Digital">
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <h4>O que você vê</h4>
+                            <p>Destaque para o registro de presença por QR Code.</p>
+                        </div>
+                        <div class="info-box">
+                            <h4>O que você pode fazer</h4>
+                            <p>Abrir a câmera, iniciar check-in e ver feedback da validação.</p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="step-card">
+                <div class="step-header">
+                    <h3><span class="step-number">07</span> Detalhes do Evento</h3>
+                </div>
+                <div class="step-content">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/07_evento_detalhes.png" alt="Detalhes do Evento">
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <h4>O que você vê</h4>
+                            <p>Página com descrição, cronograma e botões de inscrição.</p>
+                        </div>
+                        <div class="info-box">
+                            <h4>O que você pode fazer</h4>
+                            <p>Ler informações, comparar atividades e decidir participar.</p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="step-card">
+                <div class="step-header">
+                    <h3><span class="step-number">11</span> Perfil com Estatísticas</h3>
+                </div>
+                <div class="step-content">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/11_perfil_visao_geral.png" alt="Perfil">
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <h4>O que você vê</h4>
+                            <p>Resumo com dados cadastrais e horas acumuladas.</p>
+                        </div>
+                        <div class="info-box">
+                            <h4>O que você pode fazer</h4>
+                            <p>Acompanhar evolução acadêmica e acessar histórico rápido.</p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="step-card">
+                <div class="step-header">
+                    <h3><span class="step-number">17</span> Confirmação Segura de Presença</h3>
+                </div>
+                <div class="step-content">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/17_checkin_confirmacao.png" alt="Confirmação Segura">
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <h4>O que você vê</h4>
+                            <p>Tela aberta pelo QR Code dinâmico com geolocalização.</p>
+                        </div>
+                        <div class="info-box">
+                            <h4>O que você pode fazer</h4>
+                            <p>Autorizar a localização e concluir o registro oficial.</p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+        </div>
+
+        <div class="summary-card final" style="border-left-color: #4caf50; margin-bottom: 60px; margin-top: 10px;">
+            <h2>Encerramento</h2>
+            <p>Com este guia, você está pronto para explorar o sistema <strong>EuroEventos</strong>. Localize seus
+                eventos, participe ativamente e mantenha seus certificados sempre em mãos.</p>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-logos">
+                <img src="screenshots/logo_unieuro.png" alt="UniEuro" height="40">
+                <img src="screenshots/logo_nuted.png" alt="NUTED" height="40">
+            </div>
+            <p>&copy; 2026 UniEuro - Núcleo de Tecnologia Educacional (NUTED)</p>
+            <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.6;">EuroEventos - Versão do Participante</p>
+        </div>
+    </footer>
+
+</body>
+
+</html>
