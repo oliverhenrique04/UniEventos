@@ -2977,7 +2977,29 @@
     }
 
     function setupKeyboardShortcuts() {
+        function isTextInputLike(target) {
+            const modalEl = document.getElementById('joditModal');
+            if (modalEl && modalEl.classList.contains('show')) return true;
+
+            if (!target) return false;
+
+            const element = target.nodeType === Node.ELEMENT_NODE
+                ? target
+                : target.parentElement;
+            if (!element) return false;
+
+            const tagName = (element.tagName || '').toLowerCase();
+            if (['input', 'textarea', 'select'].includes(tagName)) return true;
+            if (element.isContentEditable) return true;
+            if (element.closest('[contenteditable="true"], .jodit-container, .jodit-wysiwyg, .jodit-workplace')) return true;
+            return false;
+        }
+
         document.addEventListener('keydown', (e) => {
+            if (isTextInputLike(e.target)) {
+                return;
+            }
+
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
                 undoAction();
