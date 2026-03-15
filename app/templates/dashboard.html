@@ -648,13 +648,158 @@
             grid-template-columns: 1fr;
         }
     }
+
+    .role-scope-card {
+        height: 100%;
+        border-top: 4px solid #0b6cb8;
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.08), transparent 30%),
+            linear-gradient(145deg, #ffffff 0%, #f7fbff 55%, #f8fcf8 100%);
+    }
+
+    .role-scope-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        background: rgba(11, 108, 184, 0.08);
+        color: #0b5c99;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .role-scope-header {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .role-scope-icon {
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        color: #1d4ed8;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container fade-in-up">
+    {% set can_access_events_dashboard = user.role in ['admin', 'coordenador', 'gestor', 'extensao'] or user.can_create_events %}
+    {% set can_access_analytics_dashboard = user.role in ['admin', 'coordenador', 'gestor'] %}
+    {% set can_access_academics_dashboard = user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
 
-    {% if user.role in ['admin', 'coordenador', 'gestor'] or user.can_create_events %}
+    {% if can_access_events_dashboard or can_access_analytics_dashboard or can_access_academics_dashboard %}
+    <div class="row g-4 mb-4">
+        {% if can_access_events_dashboard %}
+        <div class="col-12 col-lg-4">
+            <div class="glass-panel role-scope-card p-4 shadow-sm">
+                <span class="role-scope-badge mb-3">
+                    <i class="fa-solid fa-calendar-check"></i>Eventos
+                </span>
+                <div class="role-scope-header mb-3">
+                    <div class="role-scope-icon">
+                        <i class="fa-solid fa-calendar-days"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-2">Gestão de Eventos</h4>
+                        <p class="text-muted mb-0">
+                            {% if user.role == 'admin' %}
+                            Acesso completo à operação de eventos, participantes e certificados.
+                            {% elif user.role == 'extensao' %}
+                            Operação de participantes e certificados de eventos, sem editar o cadastro do evento.
+                            {% elif user.role == 'coordenador' %}
+                            Gestão dos eventos vinculados ao seu curso.
+                            {% elif user.role == 'gestor' %}
+                            Leitura ampla dos eventos, com gestão restrita aos registros próprios.
+                            {% else %}
+                            Criação e acompanhamento dos eventos sob sua responsabilidade.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <a href="{{ url_for('main.gerenciar_eventos') }}" class="btn btn-primary btn-lg w-100">
+                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar Eventos
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if can_access_analytics_dashboard %}
+        <div class="col-12 col-lg-4">
+            <div class="glass-panel role-scope-card p-4 shadow-sm">
+                <span class="role-scope-badge mb-3">
+                    <i class="fa-solid fa-chart-line"></i>Analítico
+                </span>
+                <div class="role-scope-header mb-3">
+                    <div class="role-scope-icon">
+                        <i class="fa-solid fa-chart-simple"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-2">Painel Analítico</h4>
+                        <p class="text-muted mb-0">
+                            {% if user.role == 'coordenador' %}
+                            Indicadores filtrados automaticamente para o seu curso.
+                            {% elif user.role == 'gestor' %}
+                            Monitoramento institucional consolidado de cursos, eventos e emissões.
+                            {% else %}
+                            Visão executiva completa dos indicadores operacionais da plataforma.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <a href="{{ url_for('main.analitico_page') }}" class="btn btn-outline-primary btn-lg w-100">
+                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar Analítico
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if can_access_academics_dashboard %}
+        <div class="col-12 col-lg-4">
+            <div class="glass-panel role-scope-card p-4 shadow-sm">
+                <span class="role-scope-badge mb-3">
+                    <i class="fa-solid fa-certificate"></i>Acadêmicos
+                </span>
+                <div class="role-scope-header mb-3">
+                    <div class="role-scope-icon">
+                        <i class="fa-solid fa-school"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-2">Certificados Acadêmicos</h4>
+                        <p class="text-muted mb-0">
+                            {% if user.role == 'coordenador' %}
+                            Consulta em somente leitura para os usuários vinculados ao seu curso.
+                            {% elif user.role == 'gestor' %}
+                            Consulta institucional ampla, com edição e exclusão apenas dos seus próprios registros.
+                            {% elif user.role == 'admin' %}
+                            Gestão completa dos certificados institucionais.
+                            {% else %}
+                            Operação institucional acadêmica com acesso aos certificados e entregas relacionados.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <a href="{{ url_for('main.certificados_institucionais_page') }}" class="btn btn-outline-dark btn-lg w-100">
+                    <i class="fa-solid fa-arrow-right me-2"></i>
+                    {% if user.role == 'coordenador' %}Acessar Consulta Acadêmica{% else %}Acessar Acadêmicos{% endif %}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if can_access_events_dashboard %}
     <div class="row g-4">
 
         {# Painel analítico movido para a página dedicada /analitico. #}
@@ -958,9 +1103,24 @@
 
         <div class="col-lg-12">
             <div class="d-flex align-items-center justify-content-between mb-4 px-2 flex-wrap gap-2">
-                <h3 class="fw-bold text-gradient mb-0">
-                    <i class="fa-solid fa-calendar-days text-primary me-2"></i>Gestão de Eventos
-                </h3>
+                <div>
+                    <h3 class="fw-bold text-gradient mb-1" id="dashboard-eventos">
+                        <i class="fa-solid fa-calendar-days text-primary me-2"></i>Gestão de Eventos
+                    </h3>
+                    <p class="text-muted mb-0">
+                        {% if user.role == 'extensao' %}
+                        Acompanhe participantes, entregas e certificados de eventos sem alterar o cadastro principal.
+                        {% elif user.role == 'coordenador' %}
+                        Visualize e gerencie os eventos vinculados ao seu curso.
+                        {% elif user.role == 'gestor' %}
+                        Monitore todos os eventos e atue diretamente apenas nos registros sob sua autoria.
+                        {% elif user.can_create_events and user.role != 'admin' %}
+                        Centralize a criação e o acompanhamento dos seus eventos em um único painel.
+                        {% else %}
+                        Centralize cursos, participantes, certificados e operação dos eventos em um único fluxo.
+                        {% endif %}
+                    </p>
+                </div>
                 <div class="d-flex gap-2">
                     {% if user.can_create_events %}
                     <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-sm btn-primary shadow-sm">
@@ -991,8 +1151,8 @@
     </div>
     {% endif %}
 
-    {% if user.role in ['extensao', 'coordenador'] %}
-    <div class="row justify-content-center">
+    {% if false %}
+    <div class="row">
         <div class="col-lg-8">
             <div class="glass-panel bg-white p-4 p-md-5 shadow-sm border-top border-4 border-primary">
                 <h4 class="fw-bold mb-2">
@@ -1020,7 +1180,6 @@
     </div>
     {% endif %}
 
-    {% if user.role == 'participante' %}
     <div class="row justify-content-center mb-5">
         <div class="col-12 col-md-10 col-lg-6 text-center">
             <!-- Scanner Section -->
@@ -1030,7 +1189,13 @@
                         <i class="fa-solid fa-qrcode fa-3x text-primary"></i>
                     </div>
                     <h2 class="fw-bold">Registro de Presença Digital</h2>
-                    <p class="text-muted">Direcione a câmera do dispositivo ao código QR para confirmar sua presença.</p>
+                    <p class="text-muted">
+                        {% if user.role == 'participante' %}
+                        Direcione a câmera do dispositivo ao código QR para confirmar sua presença.
+                        {% else %}
+                        Utilize o leitor abaixo para validar presença digital sempre que atuar em atividades presenciais.
+                        {% endif %}
+                    </p>
                 </div>
                 
                 <div id="scanControl">
@@ -1050,7 +1215,6 @@
             </div>
         </div>
     </div>
-    {% endif %}
 
     <div class="row justify-content-center mb-4">
         <h4 class="fw-bold mb-4 px-2 text-primary">
@@ -1362,7 +1526,7 @@
         if (document.getElementById('listaEventosAluno')) carregarEventosAluno(1);
 
         const urlParams = new URLSearchParams(window.location.search);
-        if (userRole === 'participante' && urlParams.get('open_checkin') === '1') {
+        if (urlParams.get('open_checkin') === '1') {
             const checkinSection = document.getElementById('checkin-digital');
             if (checkinSection) {
                 checkinSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
