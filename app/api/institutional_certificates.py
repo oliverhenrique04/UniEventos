@@ -525,8 +525,16 @@ def create_institutional_certificate():
     if not _parse_date_iso(data_emissao):
         return jsonify({'erro': 'data_emissao deve estar no formato YYYY-MM-DD'}), 400
 
+    bg_path = (data.get('cert_bg_path') or '').strip() or 'file/fundo_padrao.png'
+    raw_template = data.get('template')
+    if not raw_template:
+        raw_template = CertificateService.build_default_template(
+            designer_mode='institutional',
+            bg=bg_path,
+        )
+
     normalized_template, template_error = _normalize_template(
-        json.dumps(data.get('template') or {}, ensure_ascii=False),
+        json.dumps(raw_template, ensure_ascii=False),
         designer_mode='institutional',
     )
     if template_error:
@@ -539,7 +547,7 @@ def create_institutional_certificate():
         descricao=(data.get('descricao') or '').strip() or None,
         data_emissao=data_emissao,
         signer_name=(data.get('signer_name') or '').strip() or None,
-        cert_bg_path=(data.get('cert_bg_path') or '').strip() or 'file/fundo_padrao.png',
+        cert_bg_path=bg_path,
         cert_template_json=normalized_template,
         status='RASCUNHO',
     )

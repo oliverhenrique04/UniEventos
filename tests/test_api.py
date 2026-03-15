@@ -507,6 +507,27 @@ def test_institutional_certificate_preview_layout_returns_pdf(client, app, admin
     assert res.data.startswith(b'%PDF')
 
 
+def test_create_institutional_certificate_persists_default_template_when_missing(client, app, admin_user):
+    _login_admin(client)
+
+    res = client.post('/api/institutional_certificates', json={
+        'titulo': 'Certificado Institucional Base',
+        'categoria': 'Reconhecimento',
+        'data_emissao': '2030-01-10',
+    })
+
+    assert res.status_code == 201
+    certificate_id = res.json['id']
+
+    with app.app_context():
+        cert = db.session.get(InstitutionalCertificate, certificate_id)
+        saved = json.loads(cert.cert_template_json)
+        by_id = {item['id']: item for item in saved['elements']}
+
+        assert {'txt1', 'txt2', 'name_fixed', 'date_fixed', 'hash', 'qrcode'}.issubset(by_id.keys())
+        assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.'
+
+
 def test_certificate_send_batch_starts_background_job(client, app, admin_user, monkeypatch):
     event_id = _create_event_for_certs(app)
 

@@ -172,33 +172,14 @@ class CertificateService:
     @classmethod
     def build_default_template(cls, designer_mode='event', bg=''):
         text_elements = []
-        if designer_mode == 'institutional':
-            text_elements.append({
-                'id': 'txt1',
-                'type': 'text',
-                'text': 'CERTIFICADO INSTITUCIONAL',
-                'x': 50,
-                'y': 20,
-                'w': 80,
-                'h': 8,
-                'font': 34,
-                'color': '#1e293b',
-                'align': 'center',
-                'bold': True,
-                'italic': False,
-                'font_family': 'Helvetica',
-                'zIndex': 1,
-                'locked': False,
-                'visible': True,
-            })
 
         text_elements.append({
         'id': 'txt2',
         'type': 'text',
         'text': (
-            'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.'
+            'Certificamos que {{RECIPIENT_NAME}} participou como {{CATEGORY}} do curso {{CURSO_USUARIO}}, com carga horária de {{CARGA_HORARIA}} horas.'
             if designer_mode == 'institutional'
-            else 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}}.'
+            else 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}} horas.'
         ),
         'x': 50,
         'y': 50,
@@ -400,6 +381,17 @@ class CertificateService:
     def _parse_template_elements(self, event, template_override=None):
         """Loads and normalizes template elements with legacy compatibility."""
         designer_mode = self._designer_mode_for_entity(event)
+        fixed_element_ids = {
+            item['id']
+            for item in self.get_fixed_validation_elements(designer_mode=designer_mode)
+        }
+
+        def _has_custom_elements(elements):
+            return any(
+                isinstance(element, dict) and element.get('id') not in fixed_element_ids
+                for element in (elements or [])
+            )
+
         if template_override is not None:
             if isinstance(template_override, str):
                 try:
@@ -424,14 +416,21 @@ class CertificateService:
 
         if isinstance(template, dict) and isinstance(template.get('elements'), list):
             normalized = self.normalize_template_payload(template, designer_mode=designer_mode)
+            if designer_mode == 'institutional' and not _has_custom_elements(normalized.get('elements', [])):
+                normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
             return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         if isinstance(template, dict):
+            legacy_elements = self._normalize_legacy_elements(template)
+            if designer_mode == 'institutional' and not _has_custom_elements(legacy_elements):
+                normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
+                return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+
             normalized_legacy = {
                 'version': 2,
                 'document': {'gridSize': 2, 'snap': True, 'guides': True},
                 'bg': getattr(event, 'cert_bg_path', ''),
-                'elements': self._normalize_legacy_elements(template),
+                'elements': legacy_elements,
             }
             normalized = self.normalize_template_payload(normalized_legacy, designer_mode=designer_mode)
             return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))

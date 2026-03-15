@@ -778,6 +778,28 @@ def test_institutional_certificate_service_generate_recipient_pdf_injects_defaul
     assert captured['tag_overrides']['{{HASH}}'] == 'HASH1234567890AB'
 
 
+def test_certificate_service_parse_template_elements_restores_default_institutional_content_when_only_fixed_elements():
+    service = CertificateService()
+    fake_certificate = SimpleNamespace(
+        cert_template_json=json.dumps({
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': CertificateService.get_fixed_validation_elements(designer_mode='institutional'),
+        }),
+        cert_bg_path='',
+        designer_mode='institutional',
+        is_institutional_certificate=True,
+    )
+
+    elements, background = service._parse_template_elements(fake_certificate)
+    by_id = {item['id']: item for item in elements}
+
+    assert background == ''
+    assert 'txt1' in by_id
+    assert 'txt2' in by_id
+    assert by_id['txt2']['text'] == 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}}.'
+
+
 def test_certificate_service_generate_pdf_template_override_keeps_fixed_element_geometry(app, admin_user):
     with app.app_context():
         output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')

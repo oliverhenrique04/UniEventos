@@ -2354,11 +2354,12 @@
             : [
                 { label: '{{ "{{NOME}}" }}', description: 'Nome completo do participante.' },
                 { label: '{{ "{{CPF}}" }}', description: 'CPF do participante.' },
-                { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento.' },
+                { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento/atividade.' },
+                { label: '{{ "{{DATA_REALIZACAO}}" }}', description: 'Data de realização do evento.' },
                 {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },{% endif %}
                 {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Nome do palestrante ou responsável pela atividade.' },{% endif %}
                 { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
-                { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' }
+                { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' },
             ];
 
         variableChecks.forEach(({ label, description }) => {
