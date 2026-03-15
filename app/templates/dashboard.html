@@ -1026,6 +1026,13 @@
             linear-gradient(145deg, #ffffff 0%, #f7fbff 55%, #f8fcf8 100%);
     }
 
+    .open-events-filter-card {
+        border-top: 4px solid #044d84;
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.08), transparent 30%),
+            linear-gradient(145deg, #ffffff 0%, #f7fbff 58%, #f8fcf8 100%);
+    }
+
     .role-scope-badge {
         display: inline-flex;
         align-items: center;
@@ -1068,18 +1075,14 @@
     {% set can_access_analytics_dashboard = user.role in ['admin', 'coordenador', 'gestor'] %}
     {% set can_access_academics_dashboard = user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
 
-    {% if show_events_management or can_access_analytics_dashboard or can_access_academics_dashboard %}
     <div class="row g-4 mb-4">
         {% if show_events_management %}
-        <div class="col-12 col-lg-4">
+        <div class="col-12 col-md-6 col-xl">
             <div class="glass-panel role-scope-card p-4 shadow-sm">
                 <span class="role-scope-badge mb-3">
                     <i class="fa-solid fa-calendar-check"></i>Eventos
                 </span>
                 <div class="role-scope-header mb-3">
-                    <div class="role-scope-icon">
-                        <i class="fa-solid fa-calendar-days"></i>
-                    </div>
                     <div>
                         <h4 class="fw-bold mb-2">Gestão de Eventos</h4>
                         <p class="text-muted mb-0">
@@ -1105,15 +1108,12 @@
         {% endif %}
 
         {% if can_access_analytics_dashboard %}
-        <div class="col-12 col-lg-4">
+        <div class="col-12 col-md-6 col-xl">
             <div class="glass-panel role-scope-card p-4 shadow-sm">
                 <span class="role-scope-badge mb-3">
                     <i class="fa-solid fa-chart-line"></i>Analítico
                 </span>
                 <div class="role-scope-header mb-3">
-                    <div class="role-scope-icon">
-                        <i class="fa-solid fa-chart-line"></i>
-                    </div>
                     <div>
                         <h4 class="fw-bold mb-2">Painel Analítico</h4>
                         <p class="text-muted mb-0">
@@ -1135,15 +1135,12 @@
         {% endif %}
 
         {% if can_access_academics_dashboard %}
-        <div class="col-12 col-lg-4">
+        <div class="col-12 col-md-6 col-xl">
             <div class="glass-panel role-scope-card p-4 shadow-sm">
                 <span class="role-scope-badge mb-3">
-                    <i class="fa-solid fa-certificate"></i>Acadêmicos
+                    <i class="fa-solid fa-school"></i>Acadêmicos
                 </span>
                 <div class="role-scope-header mb-3">
-                    <div class="role-scope-icon">
-                        <i class="fa-solid fa-school"></i>
-                    </div>
                     <div>
                         <h4 class="fw-bold mb-2">Certificados Acadêmicos</h4>
                         <p class="text-muted mb-0">
@@ -1166,8 +1163,30 @@
             </div>
         </div>
         {% endif %}
+
+        <div class="col-12 col-md-6 col-xl">
+            <div id="checkin-digital" class="glass-panel role-scope-card p-4 shadow-sm">
+                <span class="role-scope-badge mb-3">
+                    <i class="fa-solid fa-qrcode"></i>Presença
+                </span>
+                <div class="role-scope-header mb-3">
+                    <div>
+                        <h4 class="fw-bold mb-2">Registro de Presença</h4>
+                        <p class="text-muted mb-0">
+                            {% if user.role == 'participante' %}
+                            Abra o leitor e confirme sua presença sem perder espaço na dashboard.
+                            {% else %}
+                            Abra o leitor para validar presença em atividades presenciais.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm w-100" onclick="abrirModalCheckin()">
+                    <i class="fa-solid fa-camera me-2"></i>Abrir leitor
+                </button>
+            </div>
+        </div>
     </div>
-    {% endif %}
 
     {% if show_events_management %}
     <div class="row g-4">
@@ -1551,43 +1570,11 @@
     {% endif %}
 
     <div class="row justify-content-center mb-4">
-        <div class="col-12 col-xl-10">
-            <div id="checkin-digital" class="glass-panel checkin-quick-card shadow-sm">
-                <div class="checkin-quick-layout">
-                    <div class="checkin-quick-copy">
-                        <div class="checkin-quick-icon">
-                            <i class="fa-solid fa-qrcode"></i>
-                        </div>
-                        <div>
-                            <span class="checkin-kicker">
-                                <i class="fa-solid fa-bolt"></i>Acesso rápido
-                            </span>
-                            <h4 class="checkin-quick-title">Registro de Presença Digital</h4>
-                            <p class="checkin-quick-text">
-                                {% if user.role == 'participante' %}
-                                Abra o leitor e confirme sua presença sem perder espaço na dashboard.
-                                {% else %}
-                                Abra o leitor para validar presença em atividades presenciais.
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="d-grid d-md-block">
-                        <button type="button" class="btn btn-primary btn-sm checkin-open-btn" onclick="abrirModalCheckin()">
-                            <i class="fa-solid fa-camera me-2"></i>Abrir leitor
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row justify-content-center mb-4">
         <h4 class="fw-bold mb-4 px-2 text-primary">
             <i class="fa-solid fa-bolt me-2 text-primary"></i>Eventos em Aberto para Inscrição
         </h4>
         <div class="col-12 col-xl-10">
-            <div class="glass-panel p-3 p-md-4 bg-white shadow-sm border-top border-2 border-info text-start">
+            <div class="glass-panel open-events-filter-card p-3 p-md-4 shadow-sm text-start">
                 <h6 class="fw-bold mb-3 text-uppercase small text-muted">
                     <i class="fa-solid fa-magnifying-glass me-2"></i>Localizar Eventos em Aberto
                 </h6>
