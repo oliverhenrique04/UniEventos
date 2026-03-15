@@ -371,60 +371,32 @@
     </div>
 </div>
 
-<!-- Modal Import CSV -->
-<div class="modal fade" id="modalImportCsv" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header bg-modal-import-csv border-0 bg-primary text-white rounded-top-4">
-                <h5 class="modal-title fw-bold">
-                    <i class="fa-solid fa-file-csv me-2"></i>Importar Usuários (CSV)
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="alert alert-info rounded-3 border-0" role="alert">
-                    <i class="fa-solid fa-circle-info me-2"></i>
-                    <strong>Estrutura do CSV:</strong><br>
-                    <code class="small mt-1 d-block bg-white p-2 rounded-3">username,email,nome,cpf,role,curso_nome,can_create_events</code>
-                </div>
-                <label class="form-label small fw-bold text-muted">Selecione o arquivo CSV</label>
-                <input type="file" id="fileCsv" class="form-control rounded-3" accept=".csv">
-            </div>
-            <div class="modal-footer border-0 bg-light rounded-bottom-4 p-3">
-                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancelar</button>
-                <button onclick="enviarCsv()" class="btn btn-primary rounded-3 px-4">
-                    <i class="fa-solid fa-upload me-1"></i>Importar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Import XLSX -->
+<!-- Modal Importação -->
 <div class="modal fade" id="modalImportXlsx" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header border-0 bg-success text-white rounded-top-4">
                 <h5 class="modal-title fw-bold">
-                    <i class="fa-solid fa-file-excel me-2"></i>Importar Alunos (XLSX)
+                    <i id="impModalIcon" class="fa-solid fa-file-excel me-2"></i><span id="impModalTitle">Importar Alunos (XLSX)</span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="card border-0 shadow-sm rounded-3 mb-4">
                     <div class="card-body p-3 p-md-4">
-                        <div class="alert alert-success border-0 rounded-3 mb-3" role="alert">
+                        <div id="impExpectedAlert" class="alert alert-success border-0 rounded-3 mb-3" role="alert">
                             <i class="fa-solid fa-circle-check me-2"></i>
-                            <strong>Estrutura esperada:</strong> ALUNO_NOME, CURSO, EMAIL, CPF e RA.
+                            <strong>Estrutura esperada:</strong> <span id="impExpectedText">ALUNO_NOME, CURSO, EMAIL, CPF e RA.</span>
+                            <small id="impExpectedHelp" class="d-block mt-2 text-muted"></small>
                         </div>
                         <div class="row g-3 align-items-center">
                             <div class="col-12 col-md-9">
-                                <label class="form-label small fw-bold text-muted">Selecione o arquivo Excel</label>
+                                <label id="impFileLabel" class="form-label small fw-bold text-muted">Selecione o arquivo Excel</label>
                                 <input type="file" id="fileXlsx" class="form-control form-control-lg rounded-3" accept=".xlsx">
                             </div>
                             <div class="col-12 col-md-3 d-grid">
-                                <button id="btnStartImportXlsx" onclick="enviarXlsx()" class="btn btn-success btn-lg rounded-3 shadow-sm">
-                                    <i class="fa-solid fa-upload me-2"></i>Iniciar Importação
+                                <button id="btnStartImportXlsx" onclick="iniciarImportacaoArquivo()" class="btn btn-success btn-lg rounded-3 shadow-sm">
+                                    <i class="fa-solid fa-upload me-2"></i><span id="btnStartImportText">Iniciar Importação</span>
                                 </button>
                             </div>
                         </div>
@@ -485,7 +457,7 @@
                                 <select id="impFilterField" class="form-select form-select-sm rounded-3" onchange="aplicarFiltroImportacao()">
                                     <option value="all">Todos os campos</option>
                                     <option value="row_number">Linha</option>
-                                    <option value="nome">Aluno</option>
+                                    <option value="nome">Nome</option>
                                     <option value="cpf">CPF</option>
                                     <option value="curso">Curso</option>
                                     <option value="ra">RA</option>
@@ -512,7 +484,7 @@
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-3 rounded-start-3">Linha</th>
-                                <th>Aluno</th>
+                                <th>Nome</th>
                                 <th>CPF</th>
                                 <th>Curso</th>
                                 <th>RA</th>
@@ -631,10 +603,42 @@
     const IMPORT_PER_PAGE = 10;
     let IMPORT_FILTER_FIELD = 'all';
     let IMPORT_FILTER_QUERY = '';
+    let IMPORT_SOURCE = 'xlsx';
+    const IMPORT_MODE_CONFIG = {
+        xlsx: {
+            title: 'Importar Alunos (XLSX)',
+            iconClass: 'fa-file-excel',
+            expectedText: 'ALUNO_NOME, CURSO, EMAIL, CPF e RA.',
+            expectedHelp: '',
+            fileLabel: 'Selecione o arquivo Excel',
+            accept: '.xlsx',
+            emptySelectionMessage: 'Selecione um arquivo XLSX.',
+            startEndpoint: '/api/importar_alunos_xlsx/start',
+            statusEndpoint: (jobId) => `/api/importar_alunos_xlsx/status/${jobId}`,
+            idleButtonText: 'Iniciar Importação',
+            loadingButtonText: 'Iniciando...',
+            reusedMessage: 'Já existe uma importação em andamento para este usuário.',
+        },
+        csv: {
+            title: 'Importar Usuários (CSV)',
+            iconClass: 'fa-file-csv',
+            expectedText: 'nome, email, cpf, ra, role, curso, can_create_events e password.',
+            expectedHelp: 'Obrigatórios: nome e cpf. O username é gerado automaticamente pelo CPF, usuários existentes são atualizados pelo CPF, o curso deve existir e can_create_events aceita 1/0, true/false ou sim/nao.',
+            fileLabel: 'Selecione o arquivo CSV',
+            accept: '.csv,text/csv',
+            emptySelectionMessage: 'Selecione um arquivo CSV.',
+            startEndpoint: '/api/importar_usuarios_csv/start',
+            statusEndpoint: (jobId) => `/api/importar_usuarios_csv/status/${jobId}`,
+            idleButtonText: 'Iniciar Importação',
+            loadingButtonText: 'Iniciando...',
+            reusedMessage: 'Já existe uma importação em andamento para este usuário.',
+        },
+    };
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarCursosSelect();
         carregarUsuarios(1);
+        configurarModalImportacao('xlsx');
         if (!IS_READ_ONLY) {
             carregarEventosParaInscricao();
         }
@@ -659,6 +663,62 @@
 
     function gerarUsernamePorCpf(cpf) {
         return String(cpf || '').replace(/\D/g, '');
+    }
+
+    function getImportConfig() {
+        return IMPORT_MODE_CONFIG[IMPORT_SOURCE] || IMPORT_MODE_CONFIG.xlsx;
+    }
+
+    function atualizarBotaoImportacao(disabled, loading = false) {
+        const btn = document.getElementById('btnStartImportXlsx');
+        const config = getImportConfig();
+        btn.disabled = disabled;
+        if (loading) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span><span id="btnStartImportText">' + config.loadingButtonText + '</span>';
+            return;
+        }
+        btn.innerHTML = '<i class="fa-solid fa-upload me-2"></i><span id="btnStartImportText">' + config.idleButtonText + '</span>';
+    }
+
+    function configurarModalImportacao(mode) {
+        IMPORT_SOURCE = IMPORT_MODE_CONFIG[mode] ? mode : 'xlsx';
+        const config = getImportConfig();
+        const icon = document.getElementById('impModalIcon');
+        icon.className = `fa-solid ${config.iconClass} me-2`;
+        document.getElementById('impModalTitle').innerText = config.title;
+        document.getElementById('impExpectedText').innerText = config.expectedText;
+        document.getElementById('impExpectedHelp').innerText = config.expectedHelp || '';
+        document.getElementById('impExpectedHelp').classList.toggle('d-none', !config.expectedHelp);
+        document.getElementById('impFileLabel').innerText = config.fileLabel;
+        document.getElementById('fileXlsx').setAttribute('accept', config.accept);
+        atualizarBotaoImportacao(false, false);
+    }
+
+    function resetarEstadoImportacao() {
+        document.getElementById('fileXlsx').value = '';
+        document.getElementById('impFilterField').value = 'all';
+        document.getElementById('impFilterQuery').value = '';
+        IMPORT_JOB_ID = null;
+        IMPORT_PAGE = 1;
+        IMPORT_FILTER_FIELD = 'all';
+        IMPORT_FILTER_QUERY = '';
+        if (IMPORT_POLL_TIMER) {
+            clearInterval(IMPORT_POLL_TIMER);
+            IMPORT_POLL_TIMER = null;
+        }
+        atualizarResumoImportacao({
+            total_rows: 0,
+            processed_rows: 0,
+            created: 0,
+            updated: 0,
+            unchanged: 0,
+            errors_count: 0,
+            status: 'idle',
+            message: 'Aguardando arquivo para iniciar.'
+        });
+        renderTabelaImportacao([]);
+        renderPaginacaoImportacao(1, 1);
+        atualizarBotaoImportacao(false, false);
     }
 
     async function carregarCursosSelect() {
@@ -890,14 +950,14 @@
         }
     }
 
-    // --- CSV IMPORT ---
     function abrirModalImportar() {
         if (IS_READ_ONLY) {
             Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
             return;
         }
-        document.getElementById('fileCsv').value = '';
-        new bootstrap.Modal(document.getElementById('modalImportCsv')).show();
+        configurarModalImportacao('csv');
+        resetarEstadoImportacao();
+        new bootstrap.Modal(document.getElementById('modalImportXlsx')).show();
     }
 
     function abrirModalImportarXlsx() {
@@ -905,86 +965,54 @@
             Swal.fire('Acesso restrito', 'Seu perfil possui permissão apenas de consulta.', 'warning');
             return;
         }
-        document.getElementById('fileXlsx').value = '';
-        document.getElementById('impFilterField').value = 'all';
-        document.getElementById('impFilterQuery').value = '';
-        IMPORT_JOB_ID = null;
-        IMPORT_PAGE = 1;
-        IMPORT_FILTER_FIELD = 'all';
-        IMPORT_FILTER_QUERY = '';
-        if (IMPORT_POLL_TIMER) {
-            clearInterval(IMPORT_POLL_TIMER);
-            IMPORT_POLL_TIMER = null;
-        }
-        atualizarResumoImportacao({
-            total_rows: 0,
-            processed_rows: 0,
-            created: 0,
-            updated: 0,
-            unchanged: 0,
-            errors_count: 0,
-            status: 'idle',
-            message: 'Aguardando arquivo para iniciar.'
-        });
-        renderTabelaImportacao([]);
-        renderPaginacaoImportacao(1, 1);
+        configurarModalImportacao('xlsx');
+        resetarEstadoImportacao();
         new bootstrap.Modal(document.getElementById('modalImportXlsx')).show();
     }
 
     async function enviarCsv() {
-        const fileInput = document.getElementById('fileCsv');
-        if (!fileInput.files[0]) return;
-
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-
-        const res = await fetch(apiUrl('/api/importar_usuarios_csv'), {
-            method: 'POST',
-            body: formData
-        });
-
-        const json = await res.json();
-        if (res.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('modalImportCsv')).hide();
-            carregarUsuarios(1);
-            Swal.fire('Sucesso', json.mensagem, 'success');
-        } else {
-            Swal.fire('Erro', json.erro || 'Falha na importação', 'error');
-        }
+        await iniciarImportacaoArquivo();
     }
 
     async function enviarXlsx() {
+        await iniciarImportacaoArquivo();
+    }
+
+    async function iniciarImportacaoArquivo() {
+        const config = getImportConfig();
+
         if (IMPORT_JOB_ID && IMPORT_POLL_TIMER) {
-            Swal.fire('Importação em andamento', 'Já existe uma importação XLSX em processamento.', 'info');
+            Swal.fire('Importação em andamento', config.reusedMessage, 'info');
             return;
         }
 
         const fileInput = document.getElementById('fileXlsx');
         if (!fileInput.files[0]) {
-            Swal.fire('Atenção', 'Selecione um arquivo XLSX.', 'warning');
+            Swal.fire('Atenção', config.emptySelectionMessage, 'warning');
             return;
         }
 
-        const btn = document.getElementById('btnStartImportXlsx');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Iniciando...';
+        atualizarBotaoImportacao(true, true);
 
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
 
-        const res = await fetch(apiUrl('/api/importar_alunos_xlsx/start'), {
+        const res = await fetch(apiUrl(config.startEndpoint), {
             method: 'POST',
             body: formData
         });
 
         const json = await res.json();
         if (!res.ok) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-upload me-2"></i>Iniciar Importação';
-            Swal.fire('Erro', json.erro || 'Falha ao iniciar importação XLSX', 'error');
+            atualizarBotaoImportacao(false, false);
+            Swal.fire('Erro', json.erro || 'Falha ao iniciar importação', 'error');
             return;
         }
 
+        if (json.import_type && json.import_type !== IMPORT_SOURCE) {
+            configurarModalImportacao(json.import_type);
+        }
+        atualizarBotaoImportacao(true, true);
         IMPORT_JOB_ID = json.job_id;
         IMPORT_PAGE = 1;
         IMPORT_FILTER_FIELD = (document.getElementById('impFilterField').value || 'all');
@@ -1132,19 +1160,24 @@
             field: IMPORT_FILTER_FIELD,
             q: IMPORT_FILTER_QUERY,
         });
-        const res = await fetch(apiUrl(`/api/importar_alunos_xlsx/status/${IMPORT_JOB_ID}?${params.toString()}`));
+        const res = await fetch(apiUrl(`${getImportConfig().statusEndpoint(IMPORT_JOB_ID)}?${params.toString()}`));
         const json = await res.json();
         if (!res.ok) {
             if (IMPORT_POLL_TIMER) {
                 clearInterval(IMPORT_POLL_TIMER);
                 IMPORT_POLL_TIMER = null;
             }
-            document.getElementById('btnStartImportXlsx').disabled = false;
-            document.getElementById('btnStartImportXlsx').innerHTML = '<i class="fa-solid fa-upload me-2"></i>Iniciar Importação';
+            atualizarBotaoImportacao(false, false);
             Swal.fire('Erro', json.erro || 'Falha ao obter status da importação', 'error');
             return;
         }
 
+        if (json.import_type && json.import_type !== IMPORT_SOURCE) {
+            configurarModalImportacao(json.import_type);
+        }
+        if (!json.completed) {
+            atualizarBotaoImportacao(true, true);
+        }
         atualizarResumoImportacao(json);
         renderTabelaImportacao(json.rows || []);
         const pag = json.pagination || {};
@@ -1156,8 +1189,7 @@
                 IMPORT_POLL_TIMER = null;
             }
 
-            document.getElementById('btnStartImportXlsx').disabled = false;
-            document.getElementById('btnStartImportXlsx').innerHTML = '<i class="fa-solid fa-upload me-2"></i>Iniciar Importação';
+            atualizarBotaoImportacao(false, false);
 
             if (json.status === 'completed') {
                 carregarUsuarios(1);
@@ -1259,4 +1291,3 @@
     }
 </script>
 {% endblock %}
-

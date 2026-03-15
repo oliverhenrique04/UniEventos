@@ -113,10 +113,13 @@ def _append_job_row(job_id, row_result):
         _persist_job(job)
 
 
-def _run_xlsx_import_job(job_id, file_content, app_obj):
+def _run_tabular_import_job(job_id, file_content, app_obj, parse_method_name, process_method_name):
     with app_obj.app_context():
         try:
-            parsed = admin_service.parse_students_xlsx(BytesIO(file_content))
+            parse_method = getattr(admin_service, parse_method_name)
+            process_method = getattr(admin_service, process_method_name)
+
+            parsed = parse_method(BytesIO(file_content))
             if not parsed.get('ok'):
                 _update_job(
                     job_id,
@@ -152,7 +155,7 @@ def _run_xlsx_import_job(job_id, file_content, app_obj):
             )
 
             for row_data in rows:
-                row_result = admin_service.process_student_record(row_data)
+                row_result = process_method(row_data)
                 _append_job_row(job_id, row_result)
 
             _update_job(
@@ -168,6 +171,14 @@ def _run_xlsx_import_job(job_id, file_content, app_obj):
                 completed=True,
                 message=f'Falha ao processar importação: {str(exc)}',
             )
+
+
+def _run_xlsx_import_job(job_id, file_content, app_obj):
+    _run_tabular_import_job(job_id, file_content, app_obj, 'parse_students_xlsx', 'process_student_record')
+
+
+def _run_users_csv_import_job(job_id, file_content, app_obj):
+    _run_tabular_import_job(job_id, file_content, app_obj, 'parse_users_csv', 'process_user_csv_record')
 
 
 def _apply_import_rows_filter(rows, field, query):
@@ -195,6 +206,58 @@ def _apply_import_rows_filter(rows, field, query):
         return any(q in str(value).lower() for value in searchable)
 
     return [row for row in rows if match_row(row)]
+
+
+def _build_import_job_payload(job_id, page, per_page, filter_field, filter_query):
+    page = max(page, 1)
+    per_page = max(min(per_page, 100), 5)
+
+    with _IMPORT_JOBS_LOCK:
+        memory_job = _IMPORT_JOBS.get(job_id)
+        file_job = _load_job(job_id)
+        job = _best_job_state(memory_job, file_job)
+        if not job:
+            return None
+
+        _IMPORT_JOBS[job_id] = job
+
+        rows = list(job.get('rows', []))
+        filtered_rows = _apply_import_rows_filter(rows, filter_field, filter_query)
+        total_items = len(filtered_rows)
+        pages = max(1, ceil(total_items / per_page))
+        if page > pages:
+            page = pages
+
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_items = filtered_rows[start:end]
+
+        return {
+            'job_id': job['job_id'],
+            'import_type': job.get('import_type'),
+            'status': job['status'],
+            'completed': job['completed'],
+            'message': job['message'],
+            'total_rows': job['total_rows'],
+            'processed_rows': job['processed_rows'],
+            'created': job['created'],
+            'updated': job['updated'],
+            'unchanged': job['unchanged'],
+            'errors_count': job['errors_count'],
+            'ignored_columns': job['ignored_columns'],
+            'rows': page_items,
+            'filters': {
+                'field': filter_field,
+                'q': filter_query,
+                'filtered_total_items': total_items,
+            },
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'pages': pages,
+                'total_items': total_items,
+            },
+        }
 
 
 def _cert_generated_dir() -> Path:
@@ -318,12 +381,18 @@ def importar_usuarios_csv():
     file = request.files['file']
     if file.filename == '':
         return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
-        
-    success_count, errors = admin_service.import_users_csv(file)
-    
+
+    try:
+        result = admin_service.import_users_csv(file)
+    except Exception as exc:
+        return jsonify({"erro": f"Falha ao processar CSV: {str(exc)}"}), 400
+
+    imported_count = int(result.get('created', 0)) + int(result.get('updated', 0))
     return jsonify({
-        "mensagem": f"{success_count} usuários importados.",
-        "erros": errors
+        "mensagem": result.get('message', 'Importação concluída.'),
+        "importados": imported_count,
+        "erros": result.get('errors', []),
+        **result,
     })
 
 @bp.route('/importar_alunos_xlsx', methods=['POST'])
@@ -364,6 +433,7 @@ def importar_alunos_xlsx_start():
         if active_job:
             return jsonify({
                 'job_id': active_job['job_id'],
+                'import_type': active_job.get('import_type'),
                 'message': 'Já existe uma importação em andamento para este usuário.',
                 'reused': True,
             }), 202
@@ -374,6 +444,7 @@ def importar_alunos_xlsx_start():
     with _IMPORT_JOBS_LOCK:
         _IMPORT_JOBS[job_id] = {
             'job_id': job_id,
+            'import_type': 'xlsx',
             'status': 'queued',
             'completed': False,
             'message': 'Importação iniciada.',
@@ -394,7 +465,60 @@ def importar_alunos_xlsx_start():
     worker = Thread(target=_run_xlsx_import_job, args=(job_id, file_content, app_obj), daemon=True)
     worker.start()
 
-    return jsonify({'job_id': job_id, 'message': 'Importação em processamento.'})
+    return jsonify({'job_id': job_id, 'import_type': 'xlsx', 'message': 'Importação em processamento.'})
+
+
+@bp.route('/importar_usuarios_csv/start', methods=['POST'])
+@login_required
+def importar_usuarios_csv_start():
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+
+    with _IMPORT_JOBS_LOCK:
+        active_job = _get_active_job_for_user(current_user.username)
+        if active_job:
+            return jsonify({
+                'job_id': active_job['job_id'],
+                'import_type': active_job.get('import_type'),
+                'message': 'Já existe uma importação em andamento para este usuário.',
+                'reused': True,
+            }), 202
+
+    job_id = uuid4().hex
+    file_content = file.read()
+
+    with _IMPORT_JOBS_LOCK:
+        _IMPORT_JOBS[job_id] = {
+            'job_id': job_id,
+            'import_type': 'csv',
+            'status': 'queued',
+            'completed': False,
+            'message': 'Importação iniciada.',
+            'created_by': current_user.username,
+            'updated_at': time.time(),
+            'total_rows': 0,
+            'processed_rows': 0,
+            'created': 0,
+            'updated': 0,
+            'unchanged': 0,
+            'errors_count': 0,
+            'ignored_columns': [],
+            'rows': [],
+        }
+        _persist_job(_IMPORT_JOBS[job_id])
+
+    app_obj = current_app._get_current_object()
+    worker = Thread(target=_run_users_csv_import_job, args=(job_id, file_content, app_obj), daemon=True)
+    worker.start()
+
+    return jsonify({'job_id': job_id, 'import_type': 'csv', 'message': 'Importação em processamento.'})
 
 
 @bp.route('/importar_alunos_xlsx/status/<job_id>', methods=['GET'])
@@ -407,56 +531,25 @@ def importar_alunos_xlsx_status(job_id):
     per_page = request.args.get('per_page', 10, type=int)
     filter_field = request.args.get('field', 'all', type=str)
     filter_query = request.args.get('q', '', type=str)
-    page = max(page, 1)
-    per_page = max(min(per_page, 100), 5)
+    payload = _build_import_job_payload(job_id, page, per_page, filter_field, filter_query)
+    if not payload:
+        return jsonify({'erro': 'Job não encontrado.'}), 404
+    return jsonify(payload)
 
-    with _IMPORT_JOBS_LOCK:
-        memory_job = _IMPORT_JOBS.get(job_id)
-        file_job = _load_job(job_id)
-        job = _best_job_state(memory_job, file_job)
-        if not job:
-            return jsonify({'erro': 'Job não encontrado.'}), 404
 
-        # Keep local cache synchronized with the freshest state to avoid oscillation.
-        _IMPORT_JOBS[job_id] = job
+@bp.route('/importar_usuarios_csv/status/<job_id>', methods=['GET'])
+@login_required
+def importar_usuarios_csv_status(job_id):
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
 
-        rows = list(job.get('rows', []))
-        filtered_rows = _apply_import_rows_filter(rows, filter_field, filter_query)
-        total_items = len(filtered_rows)
-        pages = max(1, ceil(total_items / per_page))
-        if page > pages:
-            page = pages
-
-        start = (page - 1) * per_page
-        end = start + per_page
-        page_items = filtered_rows[start:end]
-
-        payload = {
-            'job_id': job['job_id'],
-            'status': job['status'],
-            'completed': job['completed'],
-            'message': job['message'],
-            'total_rows': job['total_rows'],
-            'processed_rows': job['processed_rows'],
-            'created': job['created'],
-            'updated': job['updated'],
-            'unchanged': job['unchanged'],
-            'errors_count': job['errors_count'],
-            'ignored_columns': job['ignored_columns'],
-            'rows': page_items,
-            'filters': {
-                'field': filter_field,
-                'q': filter_query,
-                'filtered_total_items': total_items,
-            },
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'pages': pages,
-                'total_items': total_items,
-            },
-        }
-
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    filter_field = request.args.get('field', 'all', type=str)
+    filter_query = request.args.get('q', '', type=str)
+    payload = _build_import_job_payload(job_id, page, per_page, filter_field, filter_query)
+    if not payload:
+        return jsonify({'erro': 'Job não encontrado.'}), 404
     return jsonify(payload)
 
 @bp.route('/atualizar_permissoes', methods=['POST'])
@@ -502,8 +595,8 @@ def cleanup_generated_certificates_cache():
     except (TypeError, ValueError):
         return jsonify({"erro": "older_than_days inválido"}), 400
 
-    if older_than_days < 1 or older_than_days > 3650:
-        return jsonify({"erro": "older_than_days deve estar entre 1 e 3650"}), 400
+    if older_than_days < 0 or older_than_days > 3650:
+        return jsonify({"erro": "older_than_days deve estar entre 0 e 3650"}), 400
 
     target_dir = _cert_generated_dir()
     if not target_dir.exists():

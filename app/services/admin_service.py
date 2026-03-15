@@ -1,7 +1,7 @@
 from app.models import User, Enrollment, Activity, Event, Course, db
 from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from flask import current_app
 from datetime import datetime
 import csv
@@ -28,6 +28,40 @@ class AdminService:
         if value is None:
             return False
         return str(value).strip().lower() in {'1', 'true', 't', 'sim', 'yes', 'y', 'on'}
+
+    @staticmethod
+    def _normalize_import_header(header_name):
+        normalized = str(header_name or '').strip().lstrip('\ufeff').lower()
+        aliases = {
+            'curso_nome': 'curso',
+            'perfil': 'role',
+            'senha': 'password',
+            'nome_completo': 'nome',
+            'permitir_criar_eventos': 'can_create_events',
+            'permissao_criar_eventos': 'can_create_events',
+            'pode_criar_eventos': 'can_create_events',
+        }
+        return aliases.get(normalized, normalized)
+
+    @staticmethod
+    def _normalize_import_role(value):
+        normalized = str(value or '').strip().lower()
+        aliases = {
+            'admin': 'admin',
+            'professor': 'professor',
+            'prof': 'professor',
+            'coordenador': 'coordenador',
+            'coordenacao': 'coordenador',
+            'coordenação': 'coordenador',
+            'coord': 'coordenador',
+            'gestor': 'gestor',
+            'extensao': 'extensao',
+            'extensão': 'extensao',
+            'participante': 'participante',
+            'aluno': 'participante',
+            'discente': 'participante',
+        }
+        return aliases.get(normalized, normalized)
 
     def list_users_paginated(self, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of users with optional filtering.
@@ -86,21 +120,26 @@ class AdminService:
 
     def create_user(self, data):
         """Creates a new user manually."""
-        if db.session.get(User, data.get('username')) or User.query.filter_by(cpf=data.get('cpf')).first():
+        cpf = normalize_cpf(data.get('cpf'))
+        if not cpf or len(cpf) != 11:
+            return None, "CPF inválido. Informe 11 dígitos."
+
+        username = cpf
+
+        if db.session.get(User, username) or User.query.filter_by(cpf=cpf).first():
             return None, "Usuário ou CPF já cadastrado."
             
         user = User(
-            username=data.get('username'),
+            username=username,
             nome=data.get('nome'),
             email=data.get('email'),
-            cpf=data.get('cpf'),
+            cpf=cpf,
             ra=data.get('ra'),
             curso=data.get('curso'),
             role=data.get('role', 'participante'),
             can_create_events=self._coerce_bool(data.get('can_create_events')),
         )
-        cpf_default = normalize_cpf(data.get('cpf'))
-        user.set_password(data.get('password') or cpf_default)
+        user.set_password(data.get('password') or cpf)
         db.session.add(user)
         db.session.commit()
         return user, "Usuário criado com sucesso."
@@ -211,56 +250,280 @@ class AdminService:
             },
         )
 
-    def import_users_csv(self, file_stream):
-        """
-        Imports users from a CSV file.
-        Expected format: username,email,nome,cpf,role,curso_nome
-        """
-        stream = io.StringIO(file_stream.read().decode("UTF8"), newline=None)
+    def parse_users_csv(self, file_stream):
+        """Parses CSV rows for user import and returns normalized row records."""
+        try:
+            content = file_stream.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            return {
+                'ok': False,
+                'message': 'Falha ao ler CSV.',
+                'rows': [],
+                'errors': ['Salve o arquivo CSV em UTF-8 e tente novamente.'],
+                'ignored_columns': [],
+            }
+
+        stream = io.StringIO(content, newline=None)
         csv_input = csv.DictReader(stream)
-        
-        success_count = 0
-        errors = []
-        
-        for row in csv_input:
-            try:
-                username = row.get('username')
-                cpf = row.get('cpf')
-                
-                if not username or not cpf:
-                    continue
-                    
-                # Check if user exists
-                if self.user_repo.get_by_username(username) or self.user_repo.get_by_cpf(cpf):
-                    errors.append(f"Usuário {username} ou CPF {cpf} já existe.")
-                    continue
-                
-                # Resolve course if provided
-                course_obj = None
-                curso_nome = row.get('curso_nome')
-                if curso_nome:
-                    course_obj = Course.query.filter(Course.nome.ilike(curso_nome)).first()
-                
-                user = User(
-                    username=username,
-                    email=row.get('email'),
-                    nome=row.get('nome'),
-                    cpf=cpf,
-                    role=row.get('role', 'participante'),
-                    curso=curso_nome,
-                    course_id=course_obj.id if course_obj else None,
-                    can_create_events=(row.get('can_create_events', '0') == '1')
-                )
-                cpf_default = normalize_cpf(cpf)
-                user.set_password(row.get('password') or cpf_default)
-                
-                db.session.add(user)
-                success_count += 1
-            except Exception as e:
-                errors.append(f"Erro na linha {username}: {str(e)}")
-        
+        if not csv_input.fieldnames:
+            return {
+                'ok': False,
+                'message': 'CSV inválido.',
+                'rows': [],
+                'errors': ['Cabeçalho não encontrado no CSV.'],
+                'ignored_columns': [],
+            }
+
+        csv_input.fieldnames = [self._normalize_import_header(field) for field in csv_input.fieldnames]
+        required_headers = {'nome', 'cpf'}
+        missing_headers = sorted(required_headers - set(csv_input.fieldnames))
+        if missing_headers:
+            return {
+                'ok': False,
+                'message': 'Cabeçalho inválido.',
+                'rows': [],
+                'errors': [f"Colunas obrigatórias ausentes: {', '.join(missing_headers)}"],
+                'ignored_columns': [],
+            }
+
+        supported_headers = {'nome', 'email', 'cpf', 'ra', 'role', 'curso', 'can_create_events', 'password'}
+        ignored_columns = [field for field in csv_input.fieldnames if field not in supported_headers]
+        present_fields = {field: field in csv_input.fieldnames for field in supported_headers}
+
+        parsed_rows = []
+        for row_number, row in enumerate(csv_input, start=2):
+            normalized_row = {
+                self._normalize_import_header(key): (value or '').strip()
+                for key, value in row.items()
+                if key is not None
+            }
+            if not any(normalized_row.values()):
+                continue
+
+            parsed_rows.append({
+                'row_number': row_number,
+                'nome': normalized_row.get('nome', ''),
+                'email': normalized_row.get('email', ''),
+                'cpf_raw': normalized_row.get('cpf', ''),
+                'ra': normalized_row.get('ra', ''),
+                'role_raw': normalized_row.get('role', ''),
+                'curso_nome': normalized_row.get('curso', ''),
+                'can_create_events_raw': normalized_row.get('can_create_events', ''),
+                'password': normalized_row.get('password', ''),
+                'has_email': present_fields['email'],
+                'has_ra': present_fields['ra'],
+                'has_role': present_fields['role'],
+                'has_course': present_fields['curso'],
+                'has_can_create_events': present_fields['can_create_events'],
+                'has_password': present_fields['password'],
+            })
+
+        return {
+            'ok': True,
+            'message': 'Arquivo lido com sucesso.',
+            'rows': parsed_rows,
+            'errors': [],
+            'ignored_columns': ignored_columns,
+        }
+
+    def process_user_csv_record(self, row_data):
+        """Processes one CSV user row and commits per-row for real-time progress updates."""
+        row_number = row_data.get('row_number')
+        nome = (row_data.get('nome') or '').strip()
+        email = (row_data.get('email') or '').strip().lower() or None
+        cpf_raw = row_data.get('cpf_raw', '')
+        ra = (row_data.get('ra') or '').strip() or None
+        role_raw = row_data.get('role_raw', '')
+        role = self._normalize_import_role(role_raw) if str(role_raw or '').strip() else None
+        curso_nome = (row_data.get('curso_nome') or '').strip()
+        can_create_events = self._coerce_bool(row_data.get('can_create_events_raw'))
+        password = row_data.get('password') or ''
+
+        has_email = bool(row_data.get('has_email'))
+        has_ra = bool(row_data.get('has_ra'))
+        has_role = bool(row_data.get('has_role'))
+        has_course = bool(row_data.get('has_course'))
+        has_can_create_events = bool(row_data.get('has_can_create_events'))
+        has_password = bool(row_data.get('has_password'))
+
+        cpf_digits = self._normalize_cpf_digits(cpf_raw)
+        cpf_masked = self._format_cpf_mask(cpf_digits)
+
+        base_payload = {
+            'row_number': row_number,
+            'nome': nome,
+            'cpf': cpf_masked or cpf_raw,
+            'curso': curso_nome,
+            'ra': ra,
+        }
+
+        if len(cpf_digits) != 11 or not cpf_masked:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': f"CPF inválido ({cpf_raw}).",
+            }
+
+        if not nome:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': 'NOME ausente.',
+            }
+
+        allowed_roles = {'admin', 'professor', 'coordenador', 'gestor', 'extensao', 'participante'}
+        if has_role and role_raw and role not in allowed_roles:
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'error',
+                'message': f"Perfil inválido ({role_raw}).",
+            }
+
+        course_obj = None
+        if has_course and curso_nome:
+            course_obj = Course.query.filter(Course.nome.ilike(curso_nome)).first()
+            if not course_obj:
+                db.session.rollback()
+                return {
+                    **base_payload,
+                    'status': 'error',
+                    'message': f"Curso não encontrado ({curso_nome}).",
+                }
+
+        existing = self._find_user_by_cpf_flexible(cpf_masked)
+        existing_username = existing.username if existing else None
+
+        if email:
+            email_owner = User.query.filter(func.lower(User.email) == email).first()
+            if email_owner and email_owner.username != existing_username:
+                db.session.rollback()
+                return {
+                    **base_payload,
+                    'status': 'error',
+                    'message': f"E-mail {email} já pertence a outro usuário.",
+                }
+
+        if ra:
+            ra_owner = User.query.filter_by(ra=ra).first()
+            if ra_owner and ra_owner.username != existing_username:
+                db.session.rollback()
+                return {
+                    **base_payload,
+                    'status': 'error',
+                    'message': f"RA {ra} já pertence a outro usuário.",
+                }
+
+        if existing:
+            changed = False
+
+            if existing.nome != nome:
+                existing.nome = nome
+                changed = True
+
+            if has_email and email and (existing.email or '').strip().lower() != email:
+                existing.email = email
+                changed = True
+
+            if has_ra and ra and existing.ra != ra:
+                existing.ra = ra
+                changed = True
+
+            if has_role and role and existing.role != role:
+                existing.role = role
+                changed = True
+
+            if has_course and curso_nome and course_obj and existing.course_id != course_obj.id:
+                existing.course_id = course_obj.id
+                changed = True
+
+            if has_can_create_events and existing.can_create_events != can_create_events:
+                existing.can_create_events = can_create_events
+                changed = True
+
+            if has_password and password:
+                existing.set_password(password)
+                changed = True
+
+            if changed:
+                db.session.commit()
+                return {
+                    **base_payload,
+                    'status': 'updated',
+                    'message': f"Usuário {existing.username} atualizado.",
+                }
+
+            db.session.rollback()
+            return {
+                **base_payload,
+                'status': 'unchanged',
+                'message': f"Usuário {existing.username} sem alteração.",
+            }
+
+        user = User(
+            username=cpf_digits,
+            email=email,
+            nome=nome,
+            cpf=cpf_masked,
+            ra=ra,
+            role=role or 'participante',
+            course_id=course_obj.id if course_obj else None,
+            can_create_events=can_create_events if has_can_create_events else False,
+        )
+        user.set_password(password or cpf_digits)
+        db.session.add(user)
         db.session.commit()
-        return success_count, errors
+        return {
+            **base_payload,
+            'status': 'created',
+            'message': f"Usuário {user.username} criado.",
+        }
+
+    def import_users_csv(self, file_stream):
+        """Imports and upserts users from CSV using CPF as the stable key."""
+        parsed = self.parse_users_csv(file_stream)
+        if not parsed.get('ok'):
+            return {
+                'message': parsed.get('message', 'Falha ao ler CSV.'),
+                'total_rows': 0,
+                'processed_rows': 0,
+                'created': 0,
+                'updated': 0,
+                'unchanged': 0,
+                'errors': parsed.get('errors', []),
+                'ignored_columns': parsed.get('ignored_columns', []),
+            }
+
+        created = 0
+        updated = 0
+        unchanged = 0
+        errors = []
+        processed_rows = len(parsed.get('rows', []))
+
+        for row_data in parsed.get('rows', []):
+            outcome = self.process_user_csv_record(row_data)
+            status = outcome.get('status')
+            if status == 'created':
+                created += 1
+            elif status == 'updated':
+                updated += 1
+            elif status == 'unchanged':
+                unchanged += 1
+            else:
+                errors.append(f"Linha {outcome.get('row_number')}: {outcome.get('message')}")
+
+        return {
+            'message': f"Processadas {processed_rows} linhas.",
+            'total_rows': processed_rows,
+            'processed_rows': processed_rows,
+            'created': created,
+            'updated': updated,
+            'unchanged': unchanged,
+            'errors': errors,
+            'ignored_columns': parsed.get('ignored_columns', []),
+        }
 
     @staticmethod
     def _normalize_cpf_digits(cpf):

@@ -688,12 +688,12 @@ def test_user_crud_persists_can_create_events_flag(client, app, admin_user):
 
     assert create_res.status_code == 200
     with app.app_context():
-        created = db.session.get(User, 'user_flagged')
+        created = db.session.get(User, '12345678901')
         assert created is not None
         assert created.can_create_events is True
 
     edit_res = client.post('/api/editar_usuario', json={
-        'username_alvo': 'user_flagged',
+        'username_alvo': '12345678901',
         'nome': 'Usuario Flag',
         'email': 'user_flagged@test.local',
         'cpf': '12345678901',
@@ -705,8 +705,259 @@ def test_user_crud_persists_can_create_events_flag(client, app, admin_user):
 
     assert edit_res.status_code == 200
     with app.app_context():
-        updated = db.session.get(User, 'user_flagged')
+        updated = db.session.get(User, '12345678901')
         assert updated.can_create_events is False
+
+
+def test_import_users_csv_accepts_model_compatible_headers(client, app, admin_user):
+    with app.app_context():
+        db.session.add(Course(nome='Curso CSV Modelo'))
+        db.session.commit()
+
+    _login_admin(client)
+    csv_content = (
+        "nome,email,cpf,ra,role,curso,can_create_events,password\n"
+        "Usuario CSV,csv_model@test.local,123.456.789-01,RA-CSV-01,professor,Curso CSV Modelo,sim,senha-segura\n"
+    )
+
+    res = client.post(
+        '/api/importar_usuarios_csv',
+        data={'file': (BytesIO(csv_content.encode('utf-8')), 'usuarios.csv')},
+        content_type='multipart/form-data',
+    )
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['importados'] == 1
+    assert payload['erros'] == []
+
+    with app.app_context():
+        imported = db.session.get(User, '12345678901')
+        assert imported is not None
+        assert imported.nome == 'Usuario CSV'
+        assert imported.email == 'csv_model@test.local'
+        assert imported.cpf == '12345678901'
+        assert imported.ra == 'RA-CSV-01'
+        assert imported.role == 'professor'
+        assert imported.curso == 'Curso CSV Modelo'
+        assert imported.can_create_events is True
+        assert imported.check_password('senha-segura') is True
+
+
+def test_import_users_csv_keeps_legacy_aliases_and_reports_row_validation_errors(client, app, admin_user):
+    with app.app_context():
+        course = Course(nome='Curso CSV Legado')
+        db.session.add(course)
+        db.session.flush()
+
+        existing = User(
+            username='existing_csv_user',
+            role='participante',
+            nome='Usuario Existente',
+            cpf='11122233344',
+            email='duplicado@test.local',
+            ra='RA-EXISTENTE',
+            course_id=course.id,
+        )
+        existing.set_password('1234')
+        db.session.add(existing)
+        db.session.commit()
+
+    _login_admin(client)
+    csv_content = (
+        "username,nome,email,cpf,ra,perfil,curso_nome,permitir_criar_eventos,senha\n"
+        "legacy_ok,Usuario Legado,legacy_ok@test.local,98765432100,RA-LEGADO,coordenacao,Curso CSV Legado,1,senha-legado\n"
+        "duplicate_email,Duplicado,duplicado@test.local,22233344455,RA-DUP,participante,Curso CSV Legado,0,\n"
+        "invalid_role,Perfil Invalido,perfil@test.local,33344455566,RA-ROLE,invalido,Curso CSV Legado,0,\n"
+        "missing_course,Curso Faltante,curso@test.local,44455566677,RA-CURSO,participante,Curso Inexistente,0,\n"
+    )
+
+    res = client.post(
+        '/api/importar_usuarios_csv',
+        data={'file': (BytesIO(csv_content.encode('utf-8')), 'usuarios_legado.csv')},
+        content_type='multipart/form-data',
+    )
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['importados'] == 1
+    assert len(payload['erros']) == 3
+    assert any('duplicado@test.local' in error.lower() and 'outro usuário' in error.lower() for error in payload['erros'])
+    assert any('perfil inválido' in error.lower() and 'invalido' in error.lower() for error in payload['erros'])
+    assert any('curso não encontrado' in error.lower() and 'curso inexistente' in error.lower() for error in payload['erros'])
+
+    with app.app_context():
+        imported = db.session.get(User, '98765432100')
+        assert imported is not None
+        assert imported.role == 'coordenador'
+        assert imported.curso == 'Curso CSV Legado'
+        assert imported.can_create_events is True
+        assert imported.check_password('senha-legado') is True
+
+
+def test_import_users_csv_updates_existing_user_by_cpf(client, app, admin_user):
+    with app.app_context():
+        old_course = Course(nome='Curso CSV Antigo')
+        new_course = Course(nome='Curso CSV Atualizado')
+        db.session.add_all([old_course, new_course])
+        db.session.flush()
+
+        existing = User(
+            username='legacy_existing_user',
+            role='participante',
+            nome='Usuario Antigo',
+            cpf='22233344455',
+            email='old_csv@test.local',
+            ra='RA-OLD',
+            course_id=old_course.id,
+            can_create_events=False,
+        )
+        existing.set_password('1234')
+        db.session.add(existing)
+        db.session.commit()
+
+    _login_admin(client)
+    csv_content = (
+        "nome,email,cpf,ra,role,curso,can_create_events,password\n"
+        "Usuario Atualizado,new_csv@test.local,222.333.444-55,RA-NEW,professor,Curso CSV Atualizado,sim,nova-senha\n"
+    )
+
+    res = client.post(
+        '/api/importar_usuarios_csv',
+        data={'file': (BytesIO(csv_content.encode('utf-8')), 'usuarios_update.csv')},
+        content_type='multipart/form-data',
+    )
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['importados'] == 1
+    assert payload['created'] == 0
+    assert payload['updated'] == 1
+    assert payload['unchanged'] == 0
+    assert payload['erros'] == []
+
+    with app.app_context():
+        updated = db.session.get(User, 'legacy_existing_user')
+        assert updated is not None
+        assert updated.nome == 'Usuario Atualizado'
+        assert updated.email == 'new_csv@test.local'
+        assert updated.ra == 'RA-NEW'
+        assert updated.role == 'professor'
+        assert updated.curso == 'Curso CSV Atualizado'
+        assert updated.can_create_events is True
+        assert updated.check_password('nova-senha') is True
+
+
+def test_users_admin_page_reuses_rich_csv_import_flow(client, admin_user):
+    _login_admin(client)
+
+    res = client.get('/usuarios')
+
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert 'Importar Usuários (CSV)' in html
+    assert '/api/importar_usuarios_csv/start' in html
+    assert '/api/importar_usuarios_csv/status/${jobId}' in html
+    assert 'Criadas' in html
+    assert 'Atualizadas' in html
+
+
+def test_importar_usuarios_csv_start_and_status_update_existing_user(client, app, admin_user, monkeypatch):
+    with app.app_context():
+        course = Course(nome='Curso CSV Async')
+        db.session.add(course)
+        db.session.flush()
+
+        existing = User(
+            username='legacy_async_user',
+            role='participante',
+            nome='Usuario Async Antigo',
+            cpf='99988877766',
+            email='async_old@test.local',
+            ra='RA-ASYNC-OLD',
+            course_id=course.id,
+            can_create_events=False,
+        )
+        existing.set_password('1234')
+        db.session.add(existing)
+        db.session.commit()
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=None, daemon=None):
+            self.target = target
+            self.args = args or ()
+
+        def start(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(admin_api, 'Thread', ImmediateThread)
+
+    _login_admin(client)
+    csv_content = (
+        "nome,email,cpf,ra,role,curso,can_create_events,password\n"
+        "Usuario Async Atualizado,async_new@test.local,999.888.777-66,RA-ASYNC-NEW,coordenacao,Curso CSV Async,1,senha-async\n"
+        "Novo Usuario Async,new_async@test.local,123.123.123-12,RA-ASYNC-02,participante,Curso CSV Async,0,\n"
+    )
+
+    start_res = client.post(
+        '/api/importar_usuarios_csv/start',
+        data={'file': (BytesIO(csv_content.encode('utf-8')), 'usuarios_async.csv')},
+        content_type='multipart/form-data',
+    )
+
+    assert start_res.status_code == 200
+    start_payload = start_res.get_json()
+    assert start_payload['job_id']
+    assert start_payload['import_type'] == 'csv'
+
+    status_res = client.get(f"/api/importar_usuarios_csv/status/{start_payload['job_id']}?page=1&per_page=10")
+
+    assert status_res.status_code == 200
+    payload = status_res.get_json()
+    assert payload['completed'] is True
+    assert payload['status'] == 'completed'
+    assert payload['import_type'] == 'csv'
+    assert payload['created'] == 1
+    assert payload['updated'] == 1
+    assert payload['unchanged'] == 0
+    assert payload['errors_count'] == 0
+    assert payload['pagination']['total_items'] == 2
+    assert {row['status'] for row in payload['rows']} == {'created', 'updated'}
+
+    with app.app_context():
+        updated = db.session.get(User, 'legacy_async_user')
+        created = db.session.get(User, '12312312312')
+
+        assert updated is not None
+        assert updated.nome == 'Usuario Async Atualizado'
+        assert updated.email == 'async_new@test.local'
+        assert updated.ra == 'RA-ASYNC-NEW'
+        assert updated.role == 'coordenador'
+        assert updated.can_create_events is True
+        assert updated.check_password('senha-async') is True
+
+        assert created is not None
+        assert created.nome == 'Novo Usuario Async'
+        assert created.role == 'participante'
+        assert created.curso == 'Curso CSV Async'
+
+
+def test_create_user_admin_endpoint_uses_cpf_as_username(client, admin_user):
+    _login_admin(client)
+
+    res = client.post('/api/criar_usuario', json={
+        'username': 'nao-deve-ser-usado',
+        'password': '1234',
+        'nome': 'Criado via Admin',
+        'email': 'criado_admin@test.local',
+        'cpf': '555.444.333-22',
+        'role': 'participante',
+    })
+
+    assert res.status_code == 200
+
+    created_login = client.post('/api/login', json={'username': '55544433322', 'password': '1234'})
+    assert created_login.status_code == 200
 
 
 def test_create_event_api_rejects_user_without_flag_even_if_admin(client, admin_user):
