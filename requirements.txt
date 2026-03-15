@@ -13,3 +13,4 @@ reportlab
 Werkzeug
 python-dotenv
 openpyxl
+playwright

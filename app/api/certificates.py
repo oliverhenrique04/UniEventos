@@ -80,6 +80,12 @@ def _can_manage_certificates(event):
     return _can_manage_event(event)
 
 
+def _can_access_own_certificate(enrollment):
+    if not enrollment or not current_user.is_authenticated:
+        return False
+    return bool(current_user.cpf and enrollment.user_cpf == current_user.cpf)
+
+
 def _sanitize_html_content(html_content):
     """Strips dangerous tags and event-handler attributes to prevent XSS."""
     if not html_content or not isinstance(html_content, str):
@@ -403,7 +409,7 @@ def download_single(enrollment_id):
     # ... (Keep existing download_single code)
     enrollment = _get_or_404(Enrollment, enrollment_id)
     event = _event_from_enrollment(enrollment)
-    if not _can_manage_certificates(event):
+    if not (_can_manage_certificates(event) or _can_access_own_certificate(enrollment)):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
@@ -419,7 +425,7 @@ def preview_single(enrollment_id):
     """Generates and serves a certificate PDF for inline viewing (preview)."""
     enrollment = _get_or_404(Enrollment, enrollment_id)
     event = _event_from_enrollment(enrollment)
-    if not _can_manage_certificates(event):
+    if not (_can_manage_certificates(event) or _can_access_own_certificate(enrollment)):
         return "Acesso negado", 403
 
     user = User.query.filter_by(cpf=enrollment.user_cpf).first()
