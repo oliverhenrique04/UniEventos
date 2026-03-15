@@ -137,7 +137,7 @@
                     {% if user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
                     <a href="{{ url_for('main.certificados_institucionais_page') }}"
                         class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.certificados_institucionais_page' %}active{% endif %}">
-                        <i class="fa-solid fa-user-graduate me-1"></i> Acadêmicos
+                        <i class="fa-solid fa-school me-1"></i> Acadêmicos
                     </a>
                     {% endif %}
 
@@ -214,6 +214,10 @@
         (function () {
             const scriptRoot = {{ request.script_root| tojson
         }} || '';
+        const isAuthenticatedUser = {{ (user is defined and user is not none)|tojson }};
+        const sessionTimeoutMs = {{ ((config['SESSION_TIMEOUT_MINUTES'] if config.get('SESSION_TIMEOUT_MINUTES') else 0) * 60 * 1000)|int }};
+        let sessionRedirectInProgress = false;
+        let sessionLogoutTimerId = null;
 
         function withScriptRoot(url) {
             if (typeof url !== 'string') return url;
@@ -246,12 +250,38 @@
             return url;
         }
 
+        function redirectToLogin() {
+            if (sessionRedirectInProgress) return;
+            sessionRedirectInProgress = true;
+            window.location.assign(withScriptRoot('{{ url_for('main.logout') }}'));
+        }
+
+        function resetSessionLogoutTimer() {
+            if (!isAuthenticatedUser || !sessionTimeoutMs) return;
+            if (sessionLogoutTimerId) clearTimeout(sessionLogoutTimerId);
+            sessionLogoutTimerId = window.setTimeout(() => {
+                redirectToLogin();
+            }, sessionTimeoutMs);
+        }
+
         const originalFetch = window.fetch.bind(window);
-        window.fetch = function (input, init) {
+        window.fetch = async function (input, init) {
             if (typeof input === 'string') {
-                return originalFetch(withScriptRoot(input), init);
+                const response = await originalFetch(withScriptRoot(input), init);
+                if (response.headers.get('X-Session-Expired') === '1') {
+                    redirectToLogin();
+                    return response;
+                }
+                resetSessionLogoutTimer();
+                return response;
             }
-            return originalFetch(input, init);
+            const response = await originalFetch(input, init);
+            if (response.headers.get('X-Session-Expired') === '1') {
+                redirectToLogin();
+                return response;
+            }
+            resetSessionLogoutTimer();
+            return response;
         };
 
         const originalOpen = window.open.bind(window);
@@ -262,6 +292,7 @@
         window.withScriptRoot = withScriptRoot;
         window.apiUrl = withScriptRoot;
         window.pathUrl = withScriptRoot;
+        window.redirectToLogin = redirectToLogin;
 
         function rewriteAttributeIfNeeded(el, attrName) {
             if (!el.hasAttribute(attrName)) return;
@@ -309,6 +340,7 @@
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 rewriteDomAbsolutePaths();
+                resetSessionLogoutTimer();
                 observer.observe(document.body, {
                     childList: true,
                     subtree: true,
@@ -318,6 +350,7 @@
             });
         } else {
             rewriteDomAbsolutePaths();
+            resetSessionLogoutTimer();
             observer.observe(document.body, {
                 childList: true,
                 subtree: true,

@@ -646,6 +646,24 @@ def test_login_fail(client):
     assert res.status_code == 401
 
 
+def test_login_marks_session_as_permanent(client, admin_user):
+    res = client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
+
+    assert res.status_code == 200
+    with client.session_transaction() as flask_session:
+        assert flask_session.permanent is True
+    assert client.application.permanent_session_lifetime.total_seconds() == 300
+
+
+def test_protected_api_returns_401_json_when_not_authenticated(client):
+    res = client.get('/api/eventos')
+
+    assert res.status_code == 401
+    assert res.is_json
+    assert res.headers.get('X-Session-Expired') == '1'
+    assert res.get_json()['session_expired'] is True
+
+
 def test_dashboard_page_no_longer_renders_management_analytics(client, app, admin_user):
     seeded = _seed_dashboard_analytics_data(app)
 

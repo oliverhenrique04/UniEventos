@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -26,6 +27,13 @@ def _load_local_env():
 _load_local_env()
 
 
+def _get_int_env(name, default):
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 def _build_postgres_uri():
     direct_uri = os.environ.get('DATABASE_URL')
     if direct_uri:
@@ -42,6 +50,9 @@ def _build_postgres_uri():
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-only-change-me')
+    SESSION_TIMEOUT_MINUTES = max(_get_int_env('SESSION_TIMEOUT_MINUTES', 5), 1)
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+    SESSION_REFRESH_EACH_REQUEST = True
     SQLALCHEMY_DATABASE_URI = _build_postgres_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -63,7 +74,7 @@ class Config:
     CERTIFICATE_NAME_DEFAULT_W_MM = float(os.environ.get('CERTIFICATE_NAME_DEFAULT_W_MM', '240'))
     CERTIFICATE_NAME_DEFAULT_H_MM = float(os.environ.get('CERTIFICATE_NAME_DEFAULT_H_MM', '12'))
     CERTIFICATE_NAME_DEFAULT_FONT_SIZE = float(os.environ.get('CERTIFICATE_NAME_DEFAULT_FONT_SIZE', '24'))
-    CHECKIN_RADIUS_METERS = int(os.environ.get('CHECKIN_RADIUS_METERS', '500'))
+    CHECKIN_RADIUS_METERS = _get_int_env('CHECKIN_RADIUS_METERS', 500)
     MOODLE_LOGIN_ENABLED = os.environ.get('MOODLE_LOGIN_ENABLED', 'false').lower() == 'true'
     MOODLE_LOGIN_URL = os.environ.get('MOODLE_LOGIN_URL', '')
     MOODLE_TOOL_CONSUMER_KEY = os.environ.get('MOODLE_TOOL_CONSUMER_KEY', '')

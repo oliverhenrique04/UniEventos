@@ -1,10 +1,15 @@
-from flask import Blueprint, request, jsonify, redirect, current_app, url_for
+from flask import Blueprint, request, jsonify, redirect, current_app, session, url_for
 from flask_login import login_user, logout_user, login_required, current_user
 from app.services.auth_service import AuthService
 from app.utils import normalize_cpf
 
 bp = Blueprint('auth', __name__, url_prefix='/api')
 auth_service = AuthService()
+
+
+def _start_authenticated_session(user):
+    login_user(user)
+    session.permanent = True
 
 @bp.route('/login', methods=['POST'])
 def login():
@@ -15,7 +20,7 @@ def login():
     user = auth_service.authenticate_user(login_value, password)
     
     if user:
-        login_user(user)
+        _start_authenticated_session(user)
         return jsonify({"status": "success"})
     
     return jsonify({"status": "error", "message": "Dados inválidos"}), 401
@@ -137,7 +142,7 @@ def ava_launch_login():
     if not user:
         return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
 
-    login_user(user)
+    _start_authenticated_session(user)
     return redirect(url_for('main.index'))
 
 
@@ -181,7 +186,7 @@ def ava_direct_login():
     if not user:
         return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
 
-    login_user(user)
+    _start_authenticated_session(user)
     return redirect(url_for('main.index'))
 
 
