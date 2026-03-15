@@ -339,6 +339,7 @@ def list_institutional_certificates():
                 'status': item.status,
                 'recipients_count': len(item.recipients),
                 'created_by_username': item.created_by_username,
+                'created_by_name': item.creator.nome if item.creator else None,
                 'created_at': item.created_at.isoformat() if item.created_at else None,
                 'can_edit': _can_edit_institutional_certificate(item),
             }
@@ -411,6 +412,7 @@ def get_institutional_certificate(certificate_id):
         'template': json.loads(cert.cert_template_json or '{}'),
         'status': cert.status,
         'created_by_username': cert.created_by_username,
+        'created_by_name': cert.creator.nome if cert.creator else None,
         'can_edit': _can_edit_institutional_certificate(cert),
     })
 

@@ -158,7 +158,7 @@
                             <th>Status</th>
                             <th>Atualizar</th>
                             <th>Destinatarios</th>
-                            <th>Acoes</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -756,7 +756,7 @@ async function carregarCertificadosInstitucionais(page = 1) {
             <td class="fw-bold">#${item.id}</td>
             <td>
                 <div class="fw-semibold text-dark">${item.titulo}</div>
-                <div class="x-small text-muted">Criado por: ${item.created_by_username || '-'}</div>
+                <div class="x-small text-muted">Criado por: ${item.created_by_name || item.created_by_username || '-'}</div>
             </td>
             <td><span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${item.categoria || '-'}</span></td>
             <td><small class="fw-bold text-slate-600">${formatDateDisplay(item.data_emissao)}</small></td>
