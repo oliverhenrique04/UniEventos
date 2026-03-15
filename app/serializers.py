@@ -43,6 +43,7 @@ def serialize_activity(activity, current_user=None):
         'event_id': activity.event_id,
         'nome': activity.nome,
         'palestrante': activity.palestrante,
+        'email_palestrante': activity.email_palestrante,
         'local': activity.local,
         'descricao': activity.descricao,
         'data_atv': _fmt_date(activity.data_atv),

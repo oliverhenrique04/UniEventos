@@ -212,6 +212,7 @@ class Activity(db.Model):
         event_id (int): Foreign key to the event.
         nome (str): Activity name.
         palestrante (str): Speaker name.
+        email_palestrante (str): Speaker email address.
         local (str): Location of the activity.
         descricao (str): Description.
         data_atv (str): Date of activity.
@@ -225,6 +226,7 @@ class Activity(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
     nome = db.Column(db.String(100))
     palestrante = db.Column(db.String(100))
+    email_palestrante = db.Column(db.String(120), nullable=True)
     local = db.Column(db.String(100))
     descricao = db.Column(db.Text)
     data_atv = db.Column(db.Date)
@@ -347,4 +349,3 @@ class InstitutionalCertificateRecipient(db.Model):
         db.Index('ix_institutional_recipient_entregue', 'cert_entregue'),
         db.Index('ix_institutional_recipient_data_envio', 'cert_data_envio'),
     )
-

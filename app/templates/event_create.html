@@ -403,11 +403,15 @@
                     <label class="small fw-bold text-muted mb-1">Horas</label>
                     <input type="number" class="form-control atv-horas" placeholder="0" min="0" required>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Palestrante / Facilitador</label>
                     <input type="text" class="form-control atv-palestrante" placeholder="Nome do responsável">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">E-mail do Palestrante</label>
+                    <input type="email" class="form-control atv-email-palestrante" placeholder="nome@exemplo.com">
+                </div>
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Local / Link</label>
                     <input type="text" class="form-control atv-local" placeholder="Ex: Auditório ou URL Meet">
                 </div>
@@ -455,6 +459,7 @@
                 activities.push({
                     nome: row.querySelector('.atv-nome').value,
                     palestrante: row.querySelector('.atv-palestrante').value,
+                    email_palestrante: row.querySelector('.atv-email-palestrante').value,
                     local: row.querySelector('.atv-local').value,
                     horas: row.querySelector('.atv-horas').value,
                     vagas: row.querySelector('.atv-unlim').checked ? -1 : row.querySelector('.atv-vagas').value,
@@ -507,5 +512,4 @@
     };
 </script>
 {% endblock %}
-
 

@@ -64,6 +64,36 @@ def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin
     assert event.data_fim == date.today()
 
 
+def test_event_service_create_standard_event_persists_speaker_email(app, admin_user):
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento com Email de Palestrante',
+        'descricao': 'Desc',
+        'is_rapido': False,
+        'data_inicio': '2030-03-01',
+        'hora_inicio': '19:00',
+        'data_fim': '2030-03-01',
+        'hora_fim': '21:00',
+        'atividades': [
+            {
+                'nome': 'Mesa Redonda',
+                'palestrante': 'Profa. Teste',
+                'email_palestrante': 'profa.teste@example.com',
+                'local': 'Sala 5',
+                'descricao': 'Atividade com contato do palestrante',
+                'data_atv': '2030-03-01',
+                'hora_atv': '19:30',
+                'horas': 2,
+                'vagas': 40,
+            }
+        ],
+    })
+
+    assert event.tipo == 'PADRAO'
+    assert len(event.activities) == 1
+    assert event.activities[0].email_palestrante == 'profa.teste@example.com'
+
+
 def test_event_service_update_event_sends_email_to_owner(app):
     with app.app_context():
         owner = User(

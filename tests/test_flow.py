@@ -78,6 +78,7 @@ class SystemTestCase(unittest.TestCase):
                 {
                     "nome": "Palestra AI",
                     "palestrante": "Gemini",
+                    "email_palestrante": "gemini@example.com",
                     "local": "Auditorio",
                     "descricao": "Intro to AI",
                     "data_atv": "2026-10-10",
@@ -99,6 +100,7 @@ class SystemTestCase(unittest.TestCase):
         events = res.get_json()
         self.assertEqual(len(events['items']), 1)
         self.assertEqual(events['items'][0]['nome'], "Semana de TI")
+        self.assertEqual(events['items'][0]['atividades'][0]['email_palestrante'], "gemini@example.com")
         print(" -> Listagem OK")
 
     def test_pages_load(self):

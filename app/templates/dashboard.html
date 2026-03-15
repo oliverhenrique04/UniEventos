@@ -2197,6 +2197,7 @@
 
         <input type="text" class="form-control form-control-sm mb-2 atv-local" placeholder="Local / Sala">
         <input type="text" class="form-control form-control-sm mb-2 atv-palestrante" placeholder="Palestrante">
+        <input type="email" class="form-control form-control-sm mb-2 atv-email-palestrante" placeholder="E-mail do palestrante">
         <textarea class="form-control form-control-sm atv-desc" placeholder="Breve descrição" rows="1"></textarea>
       </div>
     `;
@@ -2221,6 +2222,7 @@
                 hora_atv: el.querySelector('.atv-hora').value,
                 local: el.querySelector('.atv-local').value,
                 palestrante: el.querySelector('.atv-palestrante').value,
+                email_palestrante: el.querySelector('.atv-email-palestrante').value,
                 descricao: el.querySelector('.atv-desc').value
             });
         });
@@ -2937,6 +2939,7 @@
             card.querySelector('.atv-hora').value = a.hora_atv || '';
             card.querySelector('.atv-local').value = a.local || '';
             card.querySelector('.atv-palestrante').value = a.palestrante || '';
+            card.querySelector('.atv-email-palestrante').value = a.email_palestrante || '';
             card.querySelector('.atv-desc').value = a.descricao || '';
         });
 

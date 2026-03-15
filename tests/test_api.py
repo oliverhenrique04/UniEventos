@@ -1051,6 +1051,53 @@ def test_create_event_api(client, app, admin_user):
     assert 'link' in res.json
 
 
+def test_create_standard_event_api_persists_speaker_email(client, app, admin_user):
+    with app.app_context():
+        admin = db.session.get(User, 'admin_test')
+        admin.can_create_events = True
+        db.session.commit()
+
+    _login_admin(client)
+    data = {
+        'nome': 'Evento API com Contato',
+        'descricao': 'Via API com email do palestrante',
+        'is_rapido': False,
+        'data_inicio': '2030-04-10',
+        'hora_inicio': '18:00',
+        'data_fim': '2030-04-10',
+        'hora_fim': '22:00',
+        'atividades': [
+            {
+                'nome': 'Palestra de Abertura',
+                'palestrante': 'Dra. API',
+                'email_palestrante': 'dra.api@example.com',
+                'local': 'Auditorio Central',
+                'descricao': 'Apresentacao principal',
+                'data_atv': '2030-04-10',
+                'hora_atv': '19:00',
+                'horas': 2,
+                'vagas': 120,
+            }
+        ],
+    }
+
+    res = client.post('/api/criar_evento', json=data)
+    assert res.status_code == 200
+
+    list_res = client.get('/api/eventos')
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    activity = payload['items'][0]['atividades'][0]
+    assert activity['email_palestrante'] == 'dra.api@example.com'
+
+    with app.app_context():
+        saved_event = Event.query.filter_by(nome='Evento API com Contato').first()
+        assert saved_event is not None
+        saved_activity = Activity.query.filter_by(event_id=saved_event.id, nome='Palestra de Abertura').first()
+        assert saved_activity is not None
+        assert saved_activity.email_palestrante == 'dra.api@example.com'
+
+
 def test_manual_enroll_api_sends_email_notification(client, app, admin_user, monkeypatch):
     seeded = _seed_manual_enrollment_data(app)
     sent_payloads = []

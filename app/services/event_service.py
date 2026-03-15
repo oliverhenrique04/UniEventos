@@ -58,6 +58,11 @@ class EventService:
         return hours
 
     @staticmethod
+    def _normalize_optional_email(value):
+        raw = str(value or '').strip()
+        return raw or None
+
+    @staticmethod
     def can_create_events(user):
         return bool(user and getattr(user, 'can_create_events', False))
 
@@ -318,6 +323,7 @@ class EventService:
                 activity = existing_ids[int(atv_id)]
                 activity.nome = atv_data['nome']
                 activity.palestrante = atv_data['palestrante']
+                activity.email_palestrante = self._normalize_optional_email(atv_data.get('email_palestrante'))
                 activity.local = atv_data['local']
                 activity.descricao = atv_data.get('descricao', '')
                 activity.data_atv = self._parse_date(atv_data.get('data_atv'))
@@ -334,6 +340,7 @@ class EventService:
                     event_id=event.id,
                     nome=atv_data['nome'],
                     palestrante=atv_data['palestrante'],
+                    email_palestrante=self._normalize_optional_email(atv_data.get('email_palestrante')),
                     local=atv_data['local'],
                     descricao=atv_data.get('descricao', ''),
                     data_atv=self._parse_date(atv_data.get('data_atv')),
@@ -613,7 +620,7 @@ class EventService:
         return query.order_by(Activity.data_atv.asc(), Activity.hora_atv.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
     def _create_default_checkin_activity(self, event, workload_hours):
-        activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=workload_hours, vagas=-1, latitude=event.latitude, longitude=event.longitude)
+        activity = Activity(event_id=event.id, nome="Check-in Presença", palestrante="", email_palestrante=None, local="", descricao="Registro de presença.", data_atv=event.data_inicio, hora_atv=event.hora_inicio, carga_horaria=workload_hours, vagas=-1, latitude=event.latitude, longitude=event.longitude)
         self.activity_repo.save(activity)
 
     def _create_activities(self, event, activities_data):
@@ -629,5 +636,18 @@ class EventService:
             except (ValueError, TypeError):
                 vagas = -1
 
-            activity = Activity(event_id=event.id, nome=atv['nome'], palestrante=atv['palestrante'], local=atv['local'], descricao=atv.get('descricao', ''), data_atv=self._parse_date(atv.get('data_atv')), hora_atv=self._parse_time(atv.get('hora_atv')), carga_horaria=horas, vagas=vagas, latitude=event.latitude, longitude=event.longitude)
+            activity = Activity(
+                event_id=event.id,
+                nome=atv['nome'],
+                palestrante=atv['palestrante'],
+                email_palestrante=self._normalize_optional_email(atv.get('email_palestrante')),
+                local=atv['local'],
+                descricao=atv.get('descricao', ''),
+                data_atv=self._parse_date(atv.get('data_atv')),
+                hora_atv=self._parse_time(atv.get('hora_atv')),
+                carga_horaria=horas,
+                vagas=vagas,
+                latitude=event.latitude,
+                longitude=event.longitude,
+            )
             self.activity_repo.save(activity)

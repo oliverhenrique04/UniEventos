@@ -258,6 +258,7 @@
             nome: "{{ atv.nome }}",
             horas: {{ atv.carga_horaria or 0 }},
             palestrante: "{{ atv.palestrante or '' }}",
+            email_palestrante: {{ (atv.email_palestrante or '') | tojson }},
             local: "{{ atv.local or '' }}",
             vagas: {{ atv.vagas or -1 }},
             data_atv: "{{ atv.data_atv or '' }}",
@@ -421,11 +422,15 @@
                     <label class="small fw-bold text-muted mb-1">Horas</label>
                     <input type="number" class="form-control atv-horas" value="${data.horas || 0}" min="0" required>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Palestrante</label>
                     <input type="text" class="form-control atv-palestrante" value="${data.palestrante || ''}">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">E-mail do Palestrante</label>
+                    <input type="email" class="form-control atv-email-palestrante" value="${data.email_palestrante || ''}">
+                </div>
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted mb-1">Local / Link</label>
                     <input type="text" class="form-control atv-local" value="${data.local || ''}">
                 </div>
@@ -489,6 +494,7 @@
                     id: row.querySelector('.atv-id').value,
                     nome: row.querySelector('.atv-nome').value,
                     palestrante: row.querySelector('.atv-palestrante').value,
+                    email_palestrante: row.querySelector('.atv-email-palestrante').value,
                     local: row.querySelector('.atv-local').value,
                     horas: row.querySelector('.atv-horas').value,
                     vagas: row.querySelector('.atv-unlim').checked ? -1 : row.querySelector('.atv-vagas').value,
@@ -535,5 +541,4 @@
     };
 </script>
 {% endblock %}
-
 
