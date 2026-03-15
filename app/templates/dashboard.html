@@ -897,7 +897,7 @@
             carregarUsuarios();
             inicializarPainelLimpezaCertificados();
         }
-        if (userRole === 'gestor') {
+        if (['admin', 'gestor'].includes(userRole)) {
             inicializarControlesAnalyticsGestor();
             carregarDashboardGestorAnalytics();
             document.getElementById('btnRefreshGestorAnalytics')?.addEventListener('click', () => carregarDashboardGestorAnalytics(true));
