@@ -474,6 +474,7 @@ let previewDestinatarioCurrentUrl = '';
 let previewDestinatarioCurrentRecipientId = null;
 let editarCertificadoModalInstance = null;
 let ACTIVE_CERT_CAN_EDIT = false;
+const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
 
 function bindPreviewDestinatarioHandlers() {
     if (previewDestinatarioHandlersBound) return;
@@ -535,6 +536,25 @@ function setButtonLoading(button, isLoading, loadingText = 'Processando...') {
     if (button.dataset.originalHtml) {
         button.innerHTML = button.dataset.originalHtml;
     }
+}
+
+function formatDateTimeBrasilia(value) {
+    if (!value) return '-';
+    const raw = String(value).trim();
+    if (!raw) return '-';
+
+    const hasTimezoneInfo = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+    const dt = new Date(hasTimezoneInfo ? raw : `${raw}Z`);
+    if (Number.isNaN(dt.getTime())) return '-';
+
+    return dt.toLocaleString('pt-BR', {
+        timeZone: BRASILIA_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
 
 function renderCertificatesLoading() {
@@ -1066,7 +1086,7 @@ async function carregarDestinatarios(id, page = 1) {
             </td>
             <td><small class="font-monospace">${item.cert_hash || '-'}</small></td>
             <td>${item.cert_entregue ? '<span class="badge text-bg-success">Sim</span>' : '<span class="badge text-bg-secondary">Nao</span>'}</td>
-            <td>${item.cert_data_envio ? new Date(item.cert_data_envio).toLocaleString('pt-BR') : '-'}</td>
+            <td>${formatDateTimeBrasilia(item.cert_data_envio)}</td>
             <td class="text-end pe-1">
                 <button class="btn btn-sm btn-outline-info" onclick='abrirPreviewDestinatario(${item.id}, ${JSON.stringify(item.nome || '')})' title="Preview">
                     <i class="fa-regular fa-eye"></i>

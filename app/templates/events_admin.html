@@ -490,14 +490,22 @@
     let ATIVIDADES_EVENTO_ATUAL = [];
     let intervaloProjetorGestao = null;
     let atividadeAtualProjetorGestao = null;
+    const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
 
     document.addEventListener('DOMContentLoaded', () => carregarEventos(1));
 
     function formatDateOrDash(value) {
         if (!value || typeof value !== 'string') return '--/--/----';
-        const parts = value.split('-');
-        if (parts.length !== 3) return '--/--/----';
-        return [parts[2], parts[1], parts[0]].join('/');
+
+        const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateOnlyMatch) {
+            return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+        }
+
+        const hasTimezoneInfo = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+        const dt = new Date(hasTimezoneInfo ? value : `${value}Z`);
+        if (Number.isNaN(dt.getTime())) return '--/--/----';
+        return dt.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIMEZONE });
     }
 
     async function carregarEventos(page) {

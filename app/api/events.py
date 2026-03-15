@@ -15,7 +15,7 @@ from app.models import (
 )
 from app.services.event_service import EventService
 from app.serializers import serialize_event
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 bp = Blueprint('events', __name__, url_prefix='/api')
 event_service = EventService()
@@ -640,7 +640,7 @@ def dashboard_analytics():
                 'course_id': course_id,
                 'cutoff_date': cutoff_date.isoformat(),
             },
-            'generated_at': datetime.utcnow().isoformat(),
+            'generated_at': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
         }
 
     if not event_ids:
@@ -912,6 +912,6 @@ def dashboard_analytics():
         'course_id': course_id,
         'cutoff_date': cutoff_date.isoformat(),
     }
-    payload['generated_at'] = datetime.utcnow().isoformat()
+    payload['generated_at'] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
 
     return jsonify(payload)
