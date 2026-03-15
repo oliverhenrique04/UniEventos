@@ -57,7 +57,7 @@ def designer_certificado(event_id):
         'certificate_designer.html',
         user=current_user,
         event=event,
-        fixed_validation_elements=CertificateService.get_fixed_validation_elements(),
+        fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='event'),
     )
 
 @bp.route('/gerenciar_entregas/<int:event_id>')
@@ -104,7 +104,7 @@ def designer_certificado_institucional(certificate_id):
         user=current_user,
         event=cert,
         designer_mode='institutional',
-        fixed_validation_elements=CertificateService.get_fixed_validation_elements(),
+        fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='institutional'),
     )
 
 @bp.route('/usuarios')

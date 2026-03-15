@@ -26,6 +26,19 @@ class InstitutionalCertificateService:
         return rendered
 
     @staticmethod
+    def _format_issue_date(value):
+        raw = str(value or '').strip()
+        if not raw:
+            return ''
+
+        for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+            try:
+                return datetime.strptime(raw, fmt).strftime('%d/%m/%Y')
+            except ValueError:
+                continue
+        return raw
+
+    @staticmethod
     def _recipient_metadata(recipient):
         try:
             data = json.loads(recipient.metadata_json or '{}')
@@ -75,12 +88,13 @@ class InstitutionalCertificateService:
         profile = self._recipient_effective_profile(recipient)
         carga_horaria = str(metadata.get('carga_horaria') or '-')
         curso_usuario = str(metadata.get('curso_usuario') or '-')
+        issue_date = self._format_issue_date(certificate.data_emissao)
 
         placeholders = {
             '{{RECIPIENT_NAME}}': profile['nome'] or '',
             '{{CERTIFICATE_TITLE}}': certificate.titulo or '',
             '{{CATEGORY}}': certificate.categoria or '',
-            '{{EMISSION_DATE}}': certificate.data_emissao or '',
+            '{{EMISSION_DATE}}': issue_date,
             '{{SIGNER}}': certificate.signer_name or 'Coordenacao de Extensao',
             '{{CARGA_HORARIA}}': carga_horaria,
             '{{CURSO_USUARIO}}': curso_usuario,
@@ -90,7 +104,7 @@ class InstitutionalCertificateService:
             '{{EVENTO}}': certificate.titulo or '',
             '{{HORAS}}': carga_horaria,
             '{{CURSO}}': curso_usuario,
-            '{{DATA}}': certificate.data_emissao or '',
+            '{{DATA}}': issue_date,
             '{{CPF}}': profile['cpf'] or '',
         }
 
@@ -110,6 +124,7 @@ class InstitutionalCertificateService:
 
     def generate_recipient_pdf(self, certificate, recipient, template_override=None, tag_overrides=None):
         profile = self._recipient_effective_profile(recipient)
+        metadata = self._recipient_metadata(recipient)
 
         if not recipient.cert_hash:
             recipient.cert_hash = self.build_hash(certificate.id, profile['nome'], profile['email'])
@@ -121,9 +136,37 @@ class InstitutionalCertificateService:
             data_inicio = None
 
         rendered_template_json = self._render_institutional_template_json(certificate, recipient)
+        carga_horaria = str(metadata.get('carga_horaria') or '-')
+        curso_usuario = str(metadata.get('curso_usuario') or '-')
+        issue_date = self._format_issue_date(certificate.data_emissao)
+        default_tag_overrides = {
+            '{{RECIPIENT_NAME}}': profile['nome'] or '',
+            '{{CERTIFICATE_TITLE}}': certificate.titulo or '',
+            '{{CATEGORY}}': certificate.categoria or '',
+            '{{EMISSION_DATE}}': issue_date,
+            '{{SIGNER}}': certificate.signer_name or 'Coordenacao de Extensao',
+            '{{CARGA_HORARIA}}': carga_horaria,
+            '{{CURSO_USUARIO}}': curso_usuario,
+            '{{HASH}}': recipient.cert_hash or '',
+            # Backward-compatible aliases
+            '{{NOME}}': profile['nome'] or '',
+            '{{EVENTO}}': certificate.titulo or '',
+            '{{HORAS}}': carga_horaria,
+            '{{CURSO}}': curso_usuario,
+            '{{DATA}}': issue_date,
+            '{{CPF}}': profile['cpf'] or '',
+        }
+        merged_tag_overrides = {
+            **default_tag_overrides,
+            **{str(key): '' if value is None else str(value) for key, value in (tag_overrides or {}).items()},
+        }
         fake_event = SimpleNamespace(
             id=certificate.id,
             nome=certificate.titulo,
+            titulo=certificate.titulo,
+            categoria=certificate.categoria,
+            data_emissao=certificate.data_emissao,
+            signer_name=certificate.signer_name,
             data_inicio=data_inicio,
             cert_bg_path=certificate.cert_bg_path,
             cert_template_json=rendered_template_json,
@@ -144,7 +187,7 @@ class InstitutionalCertificateService:
             certificate.categoria or '-',
             enrollment=fake_enrollment,
             template_override=template_override,
-            tag_overrides=tag_overrides,
+            tag_overrides=merged_tag_overrides,
         )
 
     def queue_email(self, certificate, recipient, attachment_path):
@@ -161,7 +204,7 @@ class InstitutionalCertificateService:
                 'recipient_name': profile['nome'],
                 'certificate_title': certificate.titulo,
                 'category_name': certificate.categoria,
-                'issue_date': certificate.data_emissao,
+                'issue_date': self._format_issue_date(certificate.data_emissao),
                 'certificate_number': recipient.cert_hash,
                 'signer_name': certificate.signer_name,
                 'recipient_cpf': profile['cpf'],

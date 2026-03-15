@@ -787,6 +787,8 @@
     const INSTITUTIONAL_PREVIEW_TITLE = {{ ((event.titulo if event.titulo is defined else event.nome) or '')|tojson }};
     const INSTITUTIONAL_PREVIEW_CATEGORY = {{ ((event.categoria if event.categoria is defined else '-') or '-')|tojson }};
     const INSTITUTIONAL_PREVIEW_SIGNER = {{ ((event.signer_name if event.signer_name is defined else 'Coordenacao de Extensao') or 'Coordenacao de Extensao')|tojson }};
+    const FIXED_NAME_TAG = designerMode === 'institutional' ? TAG_RECIPIENT_NAME : TAG_NOME;
+    const FIXED_NAME_LABEL = designerMode === 'institutional' ? 'Nome do destinatário' : 'Nome do participante';
 
     function getTodayDateBrasilia() {
         return new Date().toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIMEZONE });
@@ -820,8 +822,8 @@
         id: 'txt2',
         type: 'text',
         text: designerMode === 'institutional'
-            ? 'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}} em {{EMISSION_DATE}}.'
-            : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.',
+            ? 'Certificamos que {{ "{{RECIPIENT_NAME}}" }} participou de {{ "{{CERTIFICATE_TITLE}}" }} em {{ "{{EMISSION_DATE}}" }}.'
+            : 'Certificamos que {{ "{{NOME}}" }}, CPF {{ "{{CPF}}" }}, participou do evento {{ "{{EVENTO}}" }} realizado em {{ "{{DATA}}" }}.',
         x: 50,
         y: 50,
         w: designerMode === 'institutional' ? 80 : 82,
@@ -832,7 +834,7 @@
         bold: false,
         italic: false,
         font_family: 'Helvetica',
-        zIndex: 2,
+        zIndex: 3,
         locked: false,
         visible: true
     });
@@ -845,7 +847,7 @@
         elements: defaultTemplateElements
     };
 
-    const FIXED_ELEMENT_IDS = ['qrcode', 'hash', 'date_fixed'];
+    const FIXED_ELEMENT_IDS = ['name_fixed', 'qrcode', 'hash', 'date_fixed'];
 
     let template = JSON.parse(JSON.stringify(defaultTemplate));
     let designer = null;
@@ -1688,6 +1690,16 @@
         }
 
         normalized.type = 'text';
+        if (normalized.id === 'name_fixed') {
+            normalized.text = FIXED_NAME_TAG;
+            normalized.align = 'center';
+            normalized.font_family = 'Helvetica';
+            normalized.is_html = false;
+            normalized.html_content = null;
+            normalized.auto_fit = true;
+            return normalized;
+        }
+
         if (normalized.id === 'hash') {
             normalized.text = HASH_TAG;
             normalized.align = 'left';
@@ -2264,21 +2276,31 @@
         const addCheck = (label, status, description) => checks.push({ label, status, description });
 
         const fixedValidationRules = {
+            name_fixed: {
+                label: FIXED_NAME_LABEL,
+                description: designerMode === 'institutional'
+                    ? 'Linha fixa com o nome do destinatário do certificado institucional.'
+                    : 'Linha fixa com o nome do participante em destaque no certificado.',
+                validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(FIXED_NAME_TAG),
+                error: designerMode === 'institutional'
+                    ? 'O nome fixo precisa permanecer como texto dinâmico com {{RECIPIENT_NAME}}.'
+                    : 'O nome fixo precisa permanecer como texto dinâmico com {{NOME}}.'
+            },
             date_fixed: {
                 label: 'Data de emissão',
-                description: 'Data de emissão do certificado.',
+                description: 'Texto dinâmico responsável por imprimir a data de emissão do certificado.',
                 validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(TAG_DATA),
                 error: 'A data fixa precisa permanecer como texto dinâmico com {{DATA}}.'
             },
             hash: {
                 label: 'Hash de validação',
-                description: 'Ccódigo usado para validar a autenticidade do certificado.',
+                description: 'Texto dinâmico com o código único usado para validar a autenticidade do certificado.',
                 validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(HASH_TAG),
                 error: 'O hash de validação precisa permanecer como texto dinâmico com {{HASH}}.'
             },
             qrcode: {
                 label: 'QR Code de validação',
-                description: 'QR Code.',
+                description: 'Elemento QR que aponta para a página pública de validação do certificado.',
                 validate: (item) => item.type === 'qr',
                 error: 'O QR Code de validação precisa permanecer como elemento do tipo QR.'
             }
@@ -2833,7 +2855,7 @@
 
         const blocked = selected.find((o) => FIXED_ELEMENT_IDS.includes(o.data?.id));
         if (blocked) {
-            Toast.fire({ icon: 'warning', title: 'Data, hash e QR são obrigatórios para validação' });
+            Toast.fire({ icon: 'warning', title: 'Os elementos fixos do layout não podem ser removidos' });
             return;
         }
 

@@ -108,17 +108,17 @@ def _run_send_batch_job(job_id, event_id, app_obj):
             )
 
 
-def _normalize_template(template_json):
+def _normalize_template(template_json, designer_mode='event'):
     if template_json is None:
         return None, None
 
-    normalized, error = _normalize_template_payload(template_json)
+    normalized, error = _normalize_template_payload(template_json, designer_mode=designer_mode)
     if error:
         return None, error
     return json.dumps(normalized, ensure_ascii=False), None
 
 
-def _normalize_template_payload(template_source):
+def _normalize_template_payload(template_source, designer_mode='event'):
     if template_source is None:
         return None, None
 
@@ -136,7 +136,7 @@ def _normalize_template_payload(template_source):
         if element.get('is_html') and element.get('html_content'):
             element['html_content'] = _sanitize_html_content(element['html_content'])
 
-    return cert_service.normalize_template_payload(parsed), None
+    return cert_service.normalize_template_payload(parsed, designer_mode=designer_mode), None
 
 
 def _build_pdf_preview_response(pdf_path):
@@ -249,7 +249,7 @@ def setup_certificate(event_id):
     template_json = request.form.get('template')
     remove_bg = request.form.get('remove_bg') == 'true'
 
-    normalized_template, template_error = _normalize_template(template_json)
+    normalized_template, template_error = _normalize_template(template_json, designer_mode='event')
     if template_error:
         return jsonify({"erro": template_error}), 400
     
@@ -287,7 +287,7 @@ def preview_layout(event_id):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     payload = request.get_json(silent=True) or {}
-    normalized_template, template_error = _normalize_template_payload(payload.get('template'))
+    normalized_template, template_error = _normalize_template_payload(payload.get('template'), designer_mode='event')
     if template_error:
         return jsonify({"erro": template_error}), 400
 

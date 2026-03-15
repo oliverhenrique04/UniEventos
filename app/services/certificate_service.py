@@ -21,6 +21,11 @@ class CertificateService:
     PAGE_WIDTH_MM = 297
     PAGE_HEIGHT_MM = 210
     DEFAULT_FIXED_LAYOUT_MM = {
+        'name_x': 30.0,
+        'name_y': 65.0,
+        'name_w': 240.0,
+        'name_h': 12.0,
+        'name_font': 24.0,
         'qr_x': 12.0,
         'qr_y': 108.0,
         'qr_size': 36.0,
@@ -77,8 +82,13 @@ class CertificateService:
         return 'institutional' if getattr(event, 'is_institutional_certificate', False) else 'event'
 
     @classmethod
-    def get_fixed_validation_elements(cls):
+    def get_fixed_validation_elements(cls, designer_mode='event'):
         layout = {
+            'name_x': cls._config_float('CERTIFICATE_NAME_DEFAULT_X_MM', cls.DEFAULT_FIXED_LAYOUT_MM['name_x']),
+            'name_y': cls._config_float('CERTIFICATE_NAME_DEFAULT_Y_MM', cls.DEFAULT_FIXED_LAYOUT_MM['name_y']),
+            'name_w': cls._config_float('CERTIFICATE_NAME_DEFAULT_W_MM', cls.DEFAULT_FIXED_LAYOUT_MM['name_w']),
+            'name_h': cls._config_float('CERTIFICATE_NAME_DEFAULT_H_MM', cls.DEFAULT_FIXED_LAYOUT_MM['name_h']),
+            'name_font': cls._config_float('CERTIFICATE_NAME_DEFAULT_FONT_SIZE', cls.DEFAULT_FIXED_LAYOUT_MM['name_font']),
             'qr_x': cls._config_float('CERTIFICATE_QR_DEFAULT_X_MM', cls.DEFAULT_FIXED_LAYOUT_MM['qr_x']),
             'qr_y': cls._config_float('CERTIFICATE_QR_DEFAULT_Y_MM', cls.DEFAULT_FIXED_LAYOUT_MM['qr_y']),
             'qr_size': cls._config_float('CERTIFICATE_QR_DEFAULT_SIZE_MM', cls.DEFAULT_FIXED_LAYOUT_MM['qr_size']),
@@ -92,12 +102,30 @@ class CertificateService:
             'date_h': cls.DEFAULT_FIXED_LAYOUT_MM['date_h'],
         }
 
+        name_box = cls._box_from_top_left_mm(layout['name_x'], layout['name_y'], layout['name_w'], layout['name_h'])
         date_box = cls._box_from_top_left_mm(layout['date_x'], layout['date_y'], layout['date_w'], layout['date_h'])
         hash_box = cls._box_from_top_left_mm(layout['hash_x'], layout['hash_y'], layout['hash_w'], layout['hash_h'])
         qr_box = cls._box_from_top_left_mm(layout['qr_x'], layout['qr_y'], layout['qr_size'], layout['qr_size'])
         qr_canvas_size = int(round(cls._px_from_mm_x(layout['qr_size'])))
+        name_tag = '{{RECIPIENT_NAME}}' if designer_mode == 'institutional' else '{{NOME}}'
 
         return [
+            {
+                'id': 'name_fixed',
+                'type': 'text',
+                'text': name_tag,
+                **name_box,
+                'font': layout['name_font'],
+                'color': '#0f172a',
+                'align': 'center',
+                'bold': True,
+                'italic': False,
+                'font_family': 'Helvetica',
+                'zIndex': 2,
+                'locked': True,
+                'visible': True,
+                'auto_fit': True,
+            },
             {
                 'id': 'date_fixed',
                 'type': 'text',
@@ -109,8 +137,8 @@ class CertificateService:
                 'bold': False,
                 'italic': False,
                 'font_family': 'Helvetica',
-                'zIndex': 3,
-                'locked': False,
+                'zIndex': 4,
+                'locked': True,
                 'visible': True,
                 'auto_fit': True,
             },
@@ -125,8 +153,8 @@ class CertificateService:
                 'bold': False,
                 'italic': False,
                 'font_family': 'Courier',
-                'zIndex': 4,
-                'locked': False,
+                'zIndex': 5,
+                'locked': True,
                 'visible': True,
                 'auto_fit': False,
             },
@@ -135,8 +163,8 @@ class CertificateService:
                 'type': 'qr',
                 **qr_box,
                 'size': qr_canvas_size,
-                'zIndex': 5,
-                'locked': False,
+                'zIndex': 6,
+                'locked': True,
                 'visible': True,
             },
         ]
@@ -165,33 +193,33 @@ class CertificateService:
             })
 
         text_elements.append({
-            'id': 'txt2',
-            'type': 'text',
-            'text': (
-                'Certificamos que {{RECIPIENT_NAME}} participou de {{CERTIFICATE_TITLE}} em {{EMISSION_DATE}}.'
-                if designer_mode == 'institutional'
-                else 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} realizado em {{DATA}}.'
-            ),
-            'x': 50,
-            'y': 50,
-            'w': 82 if designer_mode == 'event' else 80,
-            'h': 24,
-            'font': 22,
-            'color': '#334155',
-            'align': 'center',
-            'bold': False,
-            'italic': False,
-            'font_family': 'Helvetica',
-            'zIndex': 2 if designer_mode == 'event' else 2,
-            'locked': False,
-            'visible': True,
-        })
+        'id': 'txt2',
+        'type': 'text',
+        'text': (
+            'Certificamos que {{{{RECIPIENT_NAME}}}} participou de {{{{CERTIFICATE_TITLE}}}} em {{{{EMISSION_DATE}}}}.'
+            if designer_mode == 'institutional'
+            else 'Certificamos que {{{{NOME}}}}, CPF {{{{CPF}}}}, participou do evento {{{{EVENTO}}}} realizado em {{{{DATA}}}}.'
+        ),
+        'x': 50,
+        'y': 50,
+        'w': 82 if designer_mode == 'event' else 80,
+        'h': 24,
+        'font': 22,
+        'color': '#334155',
+        'align': 'center',
+        'bold': False,
+        'italic': False,
+        'font_family': 'Helvetica',
+        'zIndex': 3,
+        'locked': False,
+        'visible': True,
+    })
 
         return {
             'version': 2,
             'document': {'gridSize': 2, 'snap': True, 'guides': True},
             'bg': str(bg or '').strip(),
-            'elements': text_elements + json.loads(json.dumps(cls.get_fixed_validation_elements())),
+            'elements': text_elements + json.loads(json.dumps(cls.get_fixed_validation_elements(designer_mode=designer_mode))),
         }
 
     @classmethod
@@ -247,7 +275,7 @@ class CertificateService:
         return normalized
 
     @classmethod
-    def normalize_template_payload(cls, template):
+    def normalize_template_payload(cls, template, designer_mode='event'):
         def _as_int(value, default):
             try:
                 return int(value)
@@ -280,7 +308,7 @@ class CertificateService:
         if not isinstance(raw_elements, list):
             raw_elements = []
 
-        fixed_elements = cls.get_fixed_validation_elements()
+        fixed_elements = cls.get_fixed_validation_elements(designer_mode=designer_mode)
         fixed_element_ids = {item['id'] for item in fixed_elements}
         fixed_elements_by_id = {item['id']: item for item in fixed_elements}
         seen_fixed_ids = set()
@@ -334,6 +362,9 @@ class CertificateService:
             text = str(element.get('text') or '')
             if element_id == 'date_fixed' and '{{DATA}}' not in text:
                 text = 'Data de Emissão: {{DATA}}'
+            if element_id == 'name_fixed':
+                text = '{{RECIPIENT_NAME}}' if designer_mode == 'institutional' else '{{NOME}}'
+                font_family = 'Helvetica'
             if element_id == 'hash':
                 font_family = 'Courier'
                 text = '{{HASH}}'
@@ -349,8 +380,8 @@ class CertificateService:
                 'italic': bool(element.get('italic')),
                 'font_family': font_family,
                 'text_styles': cls._normalize_text_styles(element.get('text_styles') or {}),
-                'is_html': False if element_id == 'hash' else bool(element.get('is_html')),
-                'html_content': None if element_id == 'hash' else element.get('html_content'),
+                'is_html': False if element_id in {'hash', 'name_fixed'} else bool(element.get('is_html')),
+                'html_content': None if element_id in {'hash', 'name_fixed'} else element.get('html_content'),
                 'auto_fit': False if element_id == 'hash' else element.get('auto_fit', True) is not False,
             })
 
@@ -376,23 +407,23 @@ class CertificateService:
                 except Exception:
                     template_override = {}
 
-            normalized_override = self.normalize_template_payload(template_override or {})
+            normalized_override = self.normalize_template_payload(template_override or {}, designer_mode=designer_mode)
             return normalized_override.get('elements', []), (normalized_override.get('bg') or getattr(event, 'cert_bg_path', None))
 
         default_template = self.build_default_template(designer_mode=designer_mode, bg=getattr(event, 'cert_bg_path', ''))
 
         if not event.cert_template_json:
-            normalized = self.normalize_template_payload(default_template)
+            normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
             return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         try:
             template = json.loads(event.cert_template_json)
         except Exception:
-            normalized = self.normalize_template_payload(default_template)
+            normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
             return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         if isinstance(template, dict) and isinstance(template.get('elements'), list):
-            normalized = self.normalize_template_payload(template)
+            normalized = self.normalize_template_payload(template, designer_mode=designer_mode)
             return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
         if isinstance(template, dict):
@@ -402,10 +433,10 @@ class CertificateService:
                 'bg': getattr(event, 'cert_bg_path', ''),
                 'elements': self._normalize_legacy_elements(template),
             }
-            normalized = self.normalize_template_payload(normalized_legacy)
+            normalized = self.normalize_template_payload(normalized_legacy, designer_mode=designer_mode)
             return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
-        normalized = self.normalize_template_payload(default_template)
+        normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
         return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
 
     def _normalize_legacy_elements(self, legacy_dict):

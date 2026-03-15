@@ -3,9 +3,11 @@ import json
 import os
 from io import BytesIO
 from datetime import date, time
+from types import SimpleNamespace
 from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.services.certificate_service import CertificateService
+from app.services.institutional_certificate_service import InstitutionalCertificateService
 from app.services.admin_service import AdminService
 from app.services.email_template_service import EmailTemplateService
 from app.models import User
@@ -621,6 +623,8 @@ def test_certificate_service_normalize_template_payload_restores_fixed_validatio
 
     by_id = {item['id']: item for item in normalized['elements']}
 
+    assert by_id['name_fixed']['visible'] is True
+    assert by_id['name_fixed']['text'] == '{{NOME}}'
     assert by_id['date_fixed']['visible'] is True
     assert '{{DATA}}' in by_id['date_fixed']['text']
     assert by_id['hash']['visible'] is True
@@ -639,6 +643,11 @@ def test_certificate_service_normalize_template_payload_uses_configured_fixed_de
         app.config['CERTIFICATE_HASH_DEFAULT_Y_MM'] = 150
         app.config['CERTIFICATE_DATE_DEFAULT_X_MM'] = 12
         app.config['CERTIFICATE_DATE_DEFAULT_Y_MM'] = 195
+        app.config['CERTIFICATE_NAME_DEFAULT_X_MM'] = 30
+        app.config['CERTIFICATE_NAME_DEFAULT_Y_MM'] = 65
+        app.config['CERTIFICATE_NAME_DEFAULT_W_MM'] = 240
+        app.config['CERTIFICATE_NAME_DEFAULT_H_MM'] = 12
+        app.config['CERTIFICATE_NAME_DEFAULT_FONT_SIZE'] = 24
 
         expected = {
             item['id']: item
@@ -651,13 +660,76 @@ def test_certificate_service_normalize_template_payload_uses_configured_fixed_de
         })
         by_id = {item['id']: item for item in normalized['elements']}
 
-        for item_id in ('date_fixed', 'hash', 'qrcode'):
+        for item_id in ('name_fixed', 'date_fixed', 'hash', 'qrcode'):
             assert by_id[item_id]['x'] == pytest.approx(expected[item_id]['x'])
             assert by_id[item_id]['y'] == pytest.approx(expected[item_id]['y'])
             assert by_id[item_id]['w'] == pytest.approx(expected[item_id]['w'])
             assert by_id[item_id]['h'] == pytest.approx(expected[item_id]['h'])
 
+        assert by_id['name_fixed']['font'] == pytest.approx(expected['name_fixed']['font'])
         assert by_id['qrcode']['size'] == expected['qrcode']['size']
+
+
+def test_certificate_service_normalize_template_payload_uses_recipient_name_in_institutional_mode():
+    normalized = CertificateService.normalize_template_payload({
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'elements': [],
+    }, designer_mode='institutional')
+
+    by_id = {item['id']: item for item in normalized['elements']}
+
+    assert by_id['name_fixed']['text'] == '{{RECIPIENT_NAME}}'
+
+
+def test_institutional_certificate_service_generate_recipient_pdf_injects_default_recipient_tags(monkeypatch):
+    service = InstitutionalCertificateService()
+    captured = {}
+
+    def fake_generate_pdf(event, user, activities, total_hours, enrollment=None, template_override=None, tag_overrides=None):
+        captured['event'] = event
+        captured['user'] = user
+        captured['tag_overrides'] = dict(tag_overrides or {})
+        return 'mocked.pdf'
+
+    monkeypatch.setattr(service.event_certificate_service, 'generate_pdf', fake_generate_pdf)
+
+    certificate = SimpleNamespace(
+        id=10,
+        titulo='Certificado Institucional',
+        categoria='Reconhecimento',
+        data_emissao='2030-01-10',
+        signer_name='Coord. NUTED',
+        cert_bg_path='',
+        cert_template_json=json.dumps({
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'elements': [
+                {'id': 'name_fixed', 'type': 'text', 'text': '{{RECIPIENT_NAME}}'},
+            ],
+        }),
+    )
+    recipient = SimpleNamespace(
+        id=5,
+        nome='Maria da Silva',
+        email='maria@example.com',
+        cpf='12345678900',
+        cert_hash='HASH1234567890AB',
+        metadata_json=json.dumps({'carga_horaria': '12 horas', 'curso_usuario': 'Direito'}),
+        linked_user=None,
+    )
+
+    pdf_path = service.generate_recipient_pdf(certificate, recipient)
+
+    assert pdf_path == 'mocked.pdf'
+    assert captured['tag_overrides']['{{RECIPIENT_NAME}}'] == 'Maria da Silva'
+    assert captured['tag_overrides']['{{NOME}}'] == 'Maria da Silva'
+    assert captured['tag_overrides']['{{CERTIFICATE_TITLE}}'] == 'Certificado Institucional'
+    assert captured['tag_overrides']['{{EMISSION_DATE}}'] == '10/01/2030'
+    assert captured['tag_overrides']['{{DATA}}'] == '10/01/2030'
+    assert captured['tag_overrides']['{{CARGA_HORARIA}}'] == '12 horas'
+    assert captured['tag_overrides']['{{CURSO_USUARIO}}'] == 'Direito'
+    assert captured['tag_overrides']['{{HASH}}'] == 'HASH1234567890AB'
 
 
 def test_certificate_service_generate_pdf_template_override_keeps_fixed_element_geometry(app, admin_user):

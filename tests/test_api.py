@@ -391,7 +391,7 @@ def test_certificate_setup_normalizes_fonts_and_injects_required_elements(client
 
         assert txt1['font_family'] == 'Helvetica'
         assert '{{DATA}}' in date_fixed['text']
-        assert {'date_fixed', 'hash', 'qrcode'}.issubset(fixed_ids)
+        assert {'name_fixed', 'date_fixed', 'hash', 'qrcode'}.issubset(fixed_ids)
 
 
 def test_certificate_designer_default_script_removes_participation_title(client, app, admin_user):
