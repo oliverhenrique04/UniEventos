@@ -897,11 +897,6 @@
             carregarUsuarios();
             inicializarPainelLimpezaCertificados();
         }
-        if (['admin', 'gestor'].includes(userRole)) {
-            inicializarControlesAnalyticsGestor();
-            carregarDashboardGestorAnalytics();
-            document.getElementById('btnRefreshGestorAnalytics')?.addEventListener('click', () => carregarDashboardGestorAnalytics(true));
-        }
         if (userRole !== 'participante') carregarEventosGestor(1);
         if (userRole === 'participante') carregarEventosAluno(1);
 
