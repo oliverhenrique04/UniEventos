@@ -20,23 +20,338 @@
         font-weight: 600;
     }
 
-    /* Scanner Overlay */
+    /* Check-in UX */
     #areaCamera {
         position: relative;
         overflow: hidden;
-        border-radius: 16px;
+        border-radius: 24px;
+        background:
+            radial-gradient(circle at top, rgba(59, 130, 246, 0.12), transparent 36%),
+            linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.22);
+    }
+
+    #reader {
+        border-radius: 20px;
+        overflow: hidden;
+        min-height: min(52vh, 420px);
+        background: #020617;
     }
 
     #reader video {
-        border-radius: 12px;
+        border-radius: 20px;
         object-fit: cover;
     }
 
-    .action-btn-lg {
-        padding: 1rem 2rem;
-        font-size: 1.1rem;
+    .checkin-quick-card {
+        position: relative;
+        overflow: hidden;
+        padding: 1.15rem 1.15rem 1.2rem;
+        border-top: 4px solid #044d84;
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.08), transparent 30%),
+            linear-gradient(145deg, #ffffff 0%, #f7fbff 58%, #f8fcf8 100%);
+    }
+
+    .checkin-quick-card::after {
+        content: "";
+        position: absolute;
+        inset: auto -40px -60px auto;
+        width: 160px;
+        height: 160px;
+        background: radial-gradient(circle, rgba(4, 77, 132, 0.12) 0%, rgba(4, 77, 132, 0) 72%);
+        pointer-events: none;
+    }
+
+    .checkin-quick-layout {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .checkin-quick-copy {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.9rem;
+        text-align: left;
+    }
+
+    .checkin-quick-icon {
+        width: 3.4rem;
+        height: 3.4rem;
+        border-radius: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        color: #1d4ed8;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+    }
+
+    .checkin-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.3rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(11, 108, 184, 0.08);
+        color: #0b5c99;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .checkin-quick-title {
+        font-size: 1.08rem;
+        font-weight: 800;
+        color: #14324b;
+        margin: 0.7rem 0 0.3rem;
+    }
+
+    .checkin-quick-text {
+        font-size: 0.92rem;
+        color: #5f7389;
+        margin: 0;
+        max-width: 44rem;
+    }
+
+    .checkin-open-btn {
+        width: 100%;
+        min-height: 54px;
+        font-weight: 800;
+        border-radius: 16px;
+        box-shadow: 0 14px 26px rgba(4, 77, 132, 0.18);
+    }
+
+    .checkin-modal-content {
+        border-radius: 28px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .checkin-modal-header {
+        background: rgba(255, 255, 255, 0.96);
+        border-bottom: 1px solid #e2e8f0;
+        padding: 1rem 1.1rem;
+    }
+
+    .checkin-modal-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.3rem;
+        color: #0b5c99;
+        font-size: 0.73rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .checkin-modal-shell {
+        display: grid;
+        grid-template-columns: 1fr;
+        min-height: min(78vh, 760px);
+    }
+
+    .checkin-modal-aside {
+        padding: 1.25rem;
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.12), transparent 34%),
+            linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+        border-bottom: 1px solid #e5edf6;
+    }
+
+    .checkin-modal-main {
+        padding: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: #ffffff;
+    }
+
+    .checkin-state-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.42rem 0.78rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid transparent;
+    }
+
+    .checkin-state-pill.is-ready {
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+        border-color: rgba(4, 77, 132, 0.12);
+    }
+
+    .checkin-state-pill.is-scanning,
+    .checkin-state-pill.is-processing {
+        background: rgba(37, 99, 235, 0.09);
+        color: #1d4ed8;
+        border-color: rgba(37, 99, 235, 0.14);
+    }
+
+    .checkin-state-pill.is-success {
+        background: rgba(22, 163, 74, 0.1);
+        color: #15803d;
+        border-color: rgba(22, 163, 74, 0.16);
+    }
+
+    .checkin-state-pill.is-error {
+        background: rgba(220, 38, 38, 0.1);
+        color: #b91c1c;
+        border-color: rgba(220, 38, 38, 0.16);
+    }
+
+    .checkin-aside-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #14324b;
+        margin: 1rem 0 0.45rem;
+    }
+
+    .checkin-aside-text {
+        color: #5b7086;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+    }
+
+    .checkin-guideline-list {
+        display: grid;
+        gap: 0.8rem;
+        margin-top: 1rem;
+    }
+
+    .checkin-guideline-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.7rem;
+        padding: 0.85rem 0.9rem;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid #dde8f4;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    .checkin-guideline-icon {
+        width: 2rem;
+        height: 2rem;
         border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eff6ff;
+        color: #2563eb;
+        flex-shrink: 0;
+    }
+
+    .checkin-guideline-label {
+        display: block;
+        font-size: 0.84rem;
+        font-weight: 800;
+        color: #17324d;
+        margin-bottom: 0.1rem;
+    }
+
+    .checkin-guideline-text {
+        font-size: 0.82rem;
+        color: #60748a;
+        margin: 0;
+    }
+
+    .checkin-start-panel {
+        padding: 1.15rem;
+        border-radius: 20px;
+        border: 1px solid #dbe7f2;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 255, 0.98) 100%);
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+    }
+
+    .checkin-start-icon {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.95rem;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        color: #2563eb;
+        font-size: 1.5rem;
+        box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
+    }
+
+    .checkin-start-btn {
+        min-height: 56px;
+        font-weight: 800;
+        border-radius: 16px;
+    }
+
+    .checkin-trust-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        padding: 0.8rem 0.9rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #56697e;
+        font-size: 0.85rem;
+    }
+
+    .checkin-result-card {
+        padding: 1.2rem;
+        border-radius: 22px;
+        border: 1px solid #dbe7f2;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+    }
+
+    .checkin-result-card.is-error {
+        border-color: rgba(220, 38, 38, 0.16);
+        background: linear-gradient(180deg, #fffafa 0%, #fff5f5 100%);
+    }
+
+    .checkin-result-card.is-processing {
+        border-color: rgba(37, 99, 235, 0.16);
+    }
+
+    .checkin-result-icon {
+        width: 4.2rem;
+        height: 4.2rem;
+        border-radius: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.6rem;
+    }
+
+    .checkin-result-icon.is-success {
+        background: rgba(22, 163, 74, 0.12);
+        color: #15803d;
+    }
+
+    .checkin-result-icon.is-error {
+        background: rgba(220, 38, 38, 0.12);
+        color: #b91c1c;
+    }
+
+    .checkin-result-icon.is-processing {
+        background: rgba(37, 99, 235, 0.1);
+        color: #2563eb;
     }
 
     /* Mobile-first pequenos ajustes */
@@ -48,6 +363,33 @@
 
         .glass-panel {
             border-radius: 16px;
+        }
+
+        .checkin-quick-card {
+            padding: 1rem;
+        }
+
+        .checkin-modal-content {
+            border-radius: 0;
+        }
+
+        .checkin-modal-header {
+            padding: 0.95rem 1rem;
+        }
+
+        .checkin-modal-main,
+        .checkin-modal-aside {
+            padding: 1rem;
+        }
+
+        .checkin-aside-title {
+            font-size: 1.18rem;
+        }
+
+        .checkin-start-panel,
+        .checkin-result-card {
+            padding: 1rem;
+            border-radius: 18px;
         }
     }
 
@@ -649,6 +991,33 @@
         }
     }
 
+    @media (min-width: 768px) {
+        .checkin-quick-layout {
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .checkin-open-btn {
+            width: auto;
+            min-width: 220px;
+        }
+    }
+
+    @media (min-width: 992px) {
+        .checkin-modal-shell {
+            grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.35fr);
+        }
+
+        .checkin-modal-aside {
+            border-right: 1px solid #e5edf6;
+            border-bottom: 0;
+            padding: 1.5rem;
+        }
+
+        .checkin-modal-main {
+            padding: 1.45rem;
+        }
+    }
+
     .role-scope-card {
         height: 100%;
         border-top: 4px solid #0b6cb8;
@@ -727,8 +1096,8 @@
                         </p>
                     </div>
                 </div>
-                <a href="{{ url_for('main.gerenciar_eventos') }}" class="btn btn-primary btn-lg w-100">
-                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar Eventos
+                <a href="{{ url_for('main.gerenciar_eventos') }}" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar
                 </a>
             </div>
         </div>
@@ -748,7 +1117,7 @@
                         <h4 class="fw-bold mb-2">Painel Analítico</h4>
                         <p class="text-muted mb-0">
                             {% if user.role == 'coordenador' %}
-                            Indicadores filtrados automaticamente para o seu curso.
+                            Indicadores operacionais focados no desempenho do seu curso.
                             {% elif user.role == 'gestor' %}
                             Monitoramento institucional consolidado de cursos, eventos e emissões.
                             {% else %}
@@ -757,8 +1126,8 @@
                         </p>
                     </div>
                 </div>
-                <a href="{{ url_for('main.analitico_page') }}" class="btn btn-outline-primary btn-lg w-100">
-                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar Analítico
+                <a href="{{ url_for('main.analitico_page') }}" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-arrow-right me-2"></i>Acessar
                 </a>
             </div>
         </div>
@@ -778,7 +1147,7 @@
                         <h4 class="fw-bold mb-2">Certificados Acadêmicos</h4>
                         <p class="text-muted mb-0">
                             {% if user.role == 'coordenador' %}
-                            Consulta em somente leitura para os usuários vinculados ao seu curso.
+                            Consulta dos Certificados Acadêmicos do seu curso.
                             {% elif user.role == 'gestor' %}
                             Consulta institucional ampla, com edição e exclusão apenas dos seus próprios registros.
                             {% elif user.role == 'admin' %}
@@ -789,9 +1158,9 @@
                         </p>
                     </div>
                 </div>
-                <a href="{{ url_for('main.certificados_institucionais_page') }}" class="btn btn-outline-dark btn-lg w-100">
+                <a href="{{ url_for('main.certificados_institucionais_page') }}" class="btn btn-primary btn-sm w-100">
                     <i class="fa-solid fa-arrow-right me-2"></i>
-                    {% if user.role == 'coordenador' %}Acessar Consulta Acadêmica{% else %}Acessar Acadêmicos{% endif %}
+                    Acessar
                 </a>
             </div>
         </div>
@@ -1100,7 +1469,7 @@
             </div>
         </div>
         {% endif %}
-
+        
         <div class="col-lg-12">
             <div class="d-flex align-items-center justify-content-between mb-4 px-2 flex-wrap gap-2">
                 <div>
@@ -1109,15 +1478,15 @@
                     </h3>
                     <p class="text-muted mb-0">
                         {% if user.role == 'extensao' %}
-                        Acompanhe participantes, entregas e certificados de eventos sem alterar o cadastro principal.
+                        Acompanhe participantes, entregas e certificados de eventos.
                         {% elif user.role == 'coordenador' %}
                         Visualize e gerencie os eventos vinculados ao seu curso.
                         {% elif user.role == 'gestor' %}
-                        Monitore todos os eventos e atue diretamente apenas nos registros sob sua autoria.
+                        Monitore todos os eventos e atue diretamente.
                         {% elif user.can_create_events and user.role != 'admin' %}
-                        Centralize a criação e o acompanhamento dos seus eventos em um único painel.
+                        Centralize a criação e o acompanhamento dos seus eventos.
                         {% else %}
-                        Centralize cursos, participantes, certificados e operação dos eventos em um único fluxo.
+                        Centralize cursos, participantes, certificados e operação dos eventos.
                         {% endif %}
                     </p>
                 </div>
@@ -1160,9 +1529,9 @@
                 </h4>
                 <p class="text-muted mb-4">
                     {% if user.role == 'coordenador' %}
-                    Consulte em modo somente leitura os certificados acadêmicos vinculados aos usuários do seu curso.
+                    Consulte os certificados acadêmicos vinculados ao seu curso.
                     {% else %}
-                    Gerencie certificados de monitoria, representação, iniciação científica e também os certificados vinculados aos eventos.
+                    Gerencie certificados Acadêmicos e de Eventos/Atividades.
                     {% endif %}
                 </p>
                 <div class="d-flex flex-column flex-md-row gap-2">
@@ -1180,38 +1549,34 @@
     </div>
     {% endif %}
 
-    <div class="row justify-content-center mb-5">
-        <div class="col-12 col-md-10 col-lg-6 text-center">
-            <!-- Scanner Section -->
-            <div id="checkin-digital" class="glass-panel border-top border-5 border-primary py-5 px-4 mb-5 shadow-lg bg-white">
-                <div class="mb-4">
-                    <div class="bg-indigo-50 d-inline-flex p-4 rounded-circle mb-3">
-                        <i class="fa-solid fa-qrcode fa-3x text-primary"></i>
+    <div class="row justify-content-center mb-4">
+        <div class="col-12 col-xl-10">
+            <div id="checkin-digital" class="glass-panel checkin-quick-card shadow-sm">
+                <div class="checkin-quick-layout">
+                    <div class="checkin-quick-copy">
+                        <div class="checkin-quick-icon">
+                            <i class="fa-solid fa-qrcode"></i>
+                        </div>
+                        <div>
+                            <span class="checkin-kicker">
+                                <i class="fa-solid fa-bolt"></i>Acesso rápido
+                            </span>
+                            <h4 class="checkin-quick-title">Registro de Presença Digital</h4>
+                            <p class="checkin-quick-text">
+                                {% if user.role == 'participante' %}
+                                Abra o leitor e confirme sua presença sem perder espaço na dashboard.
+                                {% else %}
+                                Abra o leitor para validar presença em atividades presenciais.
+                                {% endif %}
+                            </p>
+                        </div>
                     </div>
-                    <h2 class="fw-bold">Registro de Presença Digital</h2>
-                    <p class="text-muted">
-                        {% if user.role == 'participante' %}
-                        Direcione a câmera do dispositivo ao código QR para confirmar sua presença.
-                        {% else %}
-                        Utilize o leitor abaixo para validar presença digital sempre que atuar em atividades presenciais.
-                        {% endif %}
-                    </p>
+                    <div class="d-grid d-md-block">
+                        <button type="button" class="btn btn-primary btn-sm checkin-open-btn" onclick="abrirModalCheckin()">
+                            <i class="fa-solid fa-camera me-2"></i>Abrir leitor
+                        </button>
+                    </div>
                 </div>
-                
-                <div id="scanControl">
-                    <button onclick="iniciarScanner()" class="btn btn-primary btn-lg w-100 rounded-pill py-3 shadow-lg">
-                        <i class="fa-solid fa-camera me-2"></i> Iniciar Leitura do Código
-                    </button>
-                </div>
-                
-                <div id="areaCamera" class="mt-4 rounded-4 shadow-lg bg-dark overflow-hidden animate__animated animate__fadeIn" style="display:none;">
-                    <div id="reader"></div>
-                    <button onclick="pararScanner()" class="btn btn-dark w-100 rounded-0 py-3 text-danger fw-bold border-top border-secondary">
-                        <i class="fa-solid fa-circle-xmark me-2"></i> Interromper
-                    </button>
-                </div>
-                
-                <div id="feedback" class="mt-4"></div>
             </div>
         </div>
     </div>
@@ -1250,6 +1615,58 @@
             <nav class="mt-4">
                 <ul class="pagination justify-content-center" id="paginacaoAluno"></ul>
             </nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCheckinScanner" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content border-0 shadow-lg checkin-modal-content">
+            <div class="modal-header checkin-modal-header">
+                <div>
+                    <div class="checkin-modal-kicker">
+                        <i class="fa-solid fa-qrcode"></i>Check-in digital
+                    </div>
+                    <h5 class="modal-title fw-bold mb-0">Capturar QR Code de Presença</h5>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="checkin-modal-shell">
+                   
+
+                    <section class="checkin-modal-main">
+                        <div id="scanControl" class="checkin-start-panel text-center">
+                            <div class="checkin-start-icon">
+                                <i class="fa-solid fa-expand"></i>
+                            </div>
+                            <h4 class="fw-bold mb-2">Tudo pronto para escanear</h4>
+                            <p class="text-muted mb-4">
+                                Posicione o QR Code dentro da área de leitura. A câmera será ativada em seguida.
+                            </p>
+                            <button type="button" onclick="iniciarScanner()" class="btn btn-primary btn-lg w-100 checkin-start-btn">
+                                <i class="fa-solid fa-camera me-2"></i>Ativar câmera e iniciar leitura
+                            </button>
+                        </div>
+
+                        <div class="checkin-trust-note">
+                            <i class="fa-solid fa-circle-info mt-1"></i>
+                            <div>Se o seu navegador solicitar acesso à câmera ou à localização, autorize para que a validação de presença possa ser
+                            concluída. Em dispositivos com mais de uma câmera, como alguns celulares, pode ser necessário selecionar manualmente a
+                            câmera traseira.</div>
+                        </div>
+
+                        <div id="areaCamera" class="animate__animated animate__fadeIn" style="display:none;">
+                            <div id="reader"></div>
+                            <button type="button" onclick="pararScanner()" class="btn btn-dark w-100 py-3 fw-bold border-0 mt-3">
+                                <i class="fa-solid fa-circle-xmark me-2 text-danger"></i>Interromper captura
+                            </button>
+                        </div>
+
+                        <div id="feedback"></div>
+                    </section>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -1522,16 +1939,13 @@
             carregarDashboardGestorAnalytics();
             document.getElementById('btnRefreshGestorAnalytics')?.addEventListener('click', () => carregarDashboardGestorAnalytics(true));
         }
+        inicializarModalCheckin();
         if (document.getElementById('listaEventosGestor')) carregarEventosGestor(1);
         if (document.getElementById('listaEventosAluno')) carregarEventosAluno(1);
 
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('open_checkin') === '1') {
-            const checkinSection = document.getElementById('checkin-digital');
-            if (checkinSection) {
-                checkinSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-            setTimeout(() => iniciarScanner(), 250);
+            setTimeout(() => abrirModalCheckin(), 180);
         }
         if (document.getElementById('listaEventosGestor')) {
             const projectorEventId = Number(urlParams.get('open_projector'));
@@ -3240,32 +3654,162 @@
     // --------------------------
     let scanner = null;
     let locationPromise = null;
+    let checkinModalInstance = null;
+    let checkinModalListenersBound = false;
 
-    function iniciarScanner() {
+    function getCheckinElements() {
+        return {
+            modalEl: document.getElementById('modalCheckinScanner'),
+            scanControl: document.getElementById('scanControl'),
+            areaCamera: document.getElementById('areaCamera'),
+            feedback: document.getElementById('feedback'),
+            reader: document.getElementById('reader'),
+            statePill: document.getElementById('checkinStatePill'),
+            stateTitle: document.getElementById('checkinStateTitle'),
+            stateDescription: document.getElementById('checkinStateDescription'),
+        };
+    }
+
+    function getCheckinModalInstance() {
+        const { modalEl } = getCheckinElements();
+        if (!modalEl) return null;
+        if (!checkinModalInstance) {
+            checkinModalInstance = new bootstrap.Modal(modalEl);
+        }
+        return checkinModalInstance;
+    }
+
+    function setCheckinModalState(state) {
+        const { statePill, stateTitle, stateDescription } = getCheckinElements();
+        if (!statePill || !stateTitle || !stateDescription) return;
+
+        const states = {
+            ready: {
+                className: 'is-ready',
+                pill: '<i class="fa-solid fa-circle-play"></i>Pronto para escanear',
+                title: 'Abra a câmera somente quando precisar',
+                description: 'Toque em iniciar para abrir o leitor com foco total na captura, mantendo a dashboard leve e organizada.',
+            },
+            scanning: {
+                className: 'is-scanning',
+                pill: '<i class="fa-solid fa-camera"></i>Capturando QR',
+                title: 'Posicione o QR Code dentro da moldura',
+                description: 'Mantenha o código estável e bem iluminado. A leitura acontece automaticamente assim que o QR for reconhecido.',
+            },
+            processing: {
+                className: 'is-processing',
+                pill: '<i class="fa-solid fa-spinner fa-spin"></i>Validando presença',
+                title: 'Estamos validando sua presença',
+                description: 'Conferimos o token, a atividade e, quando necessário, a localização antes de liberar a confirmação.',
+            },
+            success: {
+                className: 'is-success',
+                pill: '<i class="fa-solid fa-circle-check"></i>Presença confirmada',
+                title: 'Leitura concluída com sucesso',
+                description: 'Sua presença foi registrada. Você pode baixar o certificado ou iniciar uma nova leitura sem sair da modal.',
+            },
+            error: {
+                className: 'is-error',
+                pill: '<i class="fa-solid fa-triangle-exclamation"></i>Falha na leitura',
+                title: 'Não foi possível concluir a validação',
+                description: 'Revise o QR Code, permissões do navegador e tente novamente. O restante da dashboard permanece preservado.',
+            },
+        };
+
+        const selectedState = states[state] || states.ready;
+        statePill.className = `checkin-state-pill ${selectedState.className}`;
+        statePill.innerHTML = selectedState.pill;
+        stateTitle.textContent = selectedState.title;
+        stateDescription.textContent = selectedState.description;
+    }
+
+    async function clearCheckinScanner({ resetReader = true } = {}) {
+        const { reader } = getCheckinElements();
+        const activeScanner = scanner;
+        scanner = null;
+
+        if (activeScanner) {
+            try {
+                await activeScanner.clear();
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        if (resetReader && reader) {
+            reader.innerHTML = '';
+        }
+    }
+
+    function resetCheckinModalState() {
+        const { scanControl, areaCamera, feedback, reader } = getCheckinElements();
+        locationPromise = null;
+        setCheckinModalState('ready');
+
+        if (scanControl) scanControl.style.display = 'block';
+        if (areaCamera) areaCamera.style.display = 'none';
+        if (feedback) feedback.innerHTML = '';
+        if (reader) reader.innerHTML = '';
+    }
+
+    function inicializarModalCheckin() {
+        const { modalEl } = getCheckinElements();
+        if (!modalEl || checkinModalListenersBound) return;
+
+        modalEl.addEventListener('show.bs.modal', () => {
+            resetCheckinModalState();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', async () => {
+            await clearCheckinScanner();
+            resetCheckinModalState();
+        });
+
+        checkinModalListenersBound = true;
+    }
+
+    function abrirModalCheckin() {
+        inicializarModalCheckin();
+        resetCheckinModalState();
+        const modal = getCheckinModalInstance();
+        if (!modal) return;
+        modal.show();
+    }
+
+    async function iniciarScanner() {
+        const { scanControl, areaCamera, feedback } = getCheckinElements();
+        await clearCheckinScanner();
+
         // Solicita localização imediatamente no clique (necessário para iOS Safari)
         locationPromise = getPreciseLocation().catch(e => {
             console.warn("Localização falhou/negada:", e);
             throw e;
         });
 
-        document.getElementById('scanControl').style.display = 'none';
-        document.getElementById('areaCamera').style.display = 'block';
-        document.getElementById('feedback').innerHTML = "";
-        
-        const config = { 
-            fps: 10, 
+        if (scanControl) scanControl.style.display = 'none';
+        if (areaCamera) areaCamera.style.display = 'block';
+        if (feedback) feedback.innerHTML = '';
+        setCheckinModalState('scanning');
+
+        const config = {
+            fps: 10,
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0
         };
-        
+
         scanner = new Html5QrcodeScanner("reader", config, false);
         scanner.render(onScanSuccess, (err) => console.log(err));
     }
 
-    function pararScanner() {
-        if(scanner) { scanner.clear().catch(error => console.error(error)); }
-        document.getElementById('areaCamera').style.display = 'none';
-        document.getElementById('scanControl').style.display = 'block';
+    async function pararScanner() {
+        await clearCheckinScanner();
+        resetCheckinModalState();
+    }
+
+    async function reiniciarScannerCheckin() {
+        await clearCheckinScanner();
+        resetCheckinModalState();
+        await iniciarScanner();
     }
 
     async function getPreciseLocation() {
@@ -3301,22 +3845,39 @@
     }
 
     async function onScanSuccess(decodedText) {
-        if(scanner) scanner.clear(); 
-        document.getElementById('areaCamera').style.display = 'none'; 
-        
+        const { areaCamera, feedback, scanControl } = getCheckinElements();
+        await clearCheckinScanner({ resetReader: false });
+        if (areaCamera) areaCamera.style.display = 'none';
+        if (scanControl) scanControl.style.display = 'none';
+
         if (decodedText.includes('/confirmar_presenca/')) {
-            document.getElementById('feedback').innerHTML = '<div class="alert alert-info text-center shadow-sm rounded-pill"><i class="fa-solid fa-spinner fa-spin me-2"></i> Redirecionando para confirmação segura...</div>';
+            setCheckinModalState('processing');
+            if (feedback) {
+                feedback.innerHTML = `
+                    <div class="checkin-result-card is-processing text-center animate__animated animate__fadeInUp">
+                        <div class="checkin-result-icon is-processing">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-2">Redirecionando para confirmação segura</h4>
+                        <p class="text-muted mb-0">Estamos abrindo a etapa protegida de validação desta atividade.</p>
+                    </div>`;
+            }
             setTimeout(() => window.location.href = decodedText, 1000);
             return;
         }
 
         // Legacy / Manual token handling with robust location
-        document.getElementById('feedback').innerHTML = `
-            <div class="glass-panel p-4 text-center border-top border-4 border-primary shadow-lg animate__animated animate__pulse animate__infinite">
-                <div class="spinner-border text-primary mb-3"></div>
-                <h5 class="fw-bold mb-1">Validando Presença...</h5>
-                <p class="text-muted small mb-0"><i class="fa-solid fa-satellite-dish me-1"></i> Sincronizando com satélites (GPS)...</p>
-            </div>`;
+        setCheckinModalState('processing');
+        if (feedback) {
+            feedback.innerHTML = `
+                <div class="checkin-result-card is-processing text-center animate__animated animate__fadeInUp">
+                    <div class="checkin-result-icon is-processing">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-2">Validando presença</h4>
+                    <p class="text-muted mb-0"><i class="fa-solid fa-satellite-dish me-1"></i>Sincronizando token, atividade e localização para concluir a leitura.</p>
+                </div>`;
+        }
 
         let coords = { latitude: null, longitude: null };
         try {
@@ -3344,28 +3905,43 @@
             const json = await res.json();
             
             if(json.status === 'success') {
-                document.getElementById('feedback').innerHTML = `
-                    <div class="text-center animate__animated animate__fadeInUp">
-                        <div class="mb-3 text-success" style="font-size: 3rem;"><i class="fa-solid fa-circle-check"></i></div>
-                        <h4 class="fw-bold text-dark">Presença Confirmada!</h4>
-                        <p class="text-muted">Seu certificado já está disponível.</p>
-                        <a href="${json.download_link}" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow">
-                            <i class="fa-solid fa-download me-2"></i> Baixar Certificado
-                        </a>
-                        <button onclick="iniciarScanner()" class="btn btn-link text-secondary mt-2">Escanear outro código</button>
-                    </div>`;
-                document.getElementById('scanControl').style.display = 'none';
+                setCheckinModalState('success');
+                if (feedback) {
+                    feedback.innerHTML = `
+                        <div class="checkin-result-card text-center animate__animated animate__fadeInUp">
+                            <div class="checkin-result-icon is-success">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
+                            <h4 class="fw-bold text-dark mb-2">Presença confirmada</h4>
+                            <p class="text-muted mb-4">Seu certificado já está disponível para download.</p>
+                            <div class="d-grid gap-2">
+                                <a href="${json.download_link}" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow">
+                                    <i class="fa-solid fa-download me-2"></i>Baixar certificado
+                                </a>
+                                <button type="button" onclick="reiniciarScannerCheckin()" class="btn btn-outline-secondary rounded-pill fw-bold">
+                                    <i class="fa-solid fa-rotate me-2"></i>Escanear outro código
+                                </button>
+                            </div>
+                        </div>`;
+                }
             } else {
                 throw new Error(json.erro || "Código inválido");
             }
         } catch (e) {
-            document.getElementById('feedback').innerHTML = `
-                <div class="alert alert-danger border-0 shadow-sm text-center rounded-4 p-4 animate__animated animate__shakeX">
-                    <i class="fa-solid fa-triangle-exclamation fa-2x mb-3"></i>
-                    <h6 class="fw-bold">Erro de Validação</h6>
-                    <p class="small mb-0">${e.message}</p>
-                    <button onclick="iniciarScanner()" class="btn btn-dark btn-sm mt-3 rounded-pill">Tentar Novamente</button>
-                </div>`;
+            setCheckinModalState('error');
+            if (feedback) {
+                feedback.innerHTML = `
+                    <div class="checkin-result-card is-error text-center animate__animated animate__shakeX">
+                        <div class="checkin-result-icon is-error">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-2">Erro de validação</h4>
+                        <p class="text-muted mb-4">${e.message}</p>
+                        <button type="button" onclick="reiniciarScannerCheckin()" class="btn btn-dark rounded-pill px-4">
+                            <i class="fa-solid fa-rotate me-2"></i>Tentar novamente
+                        </button>
+                    </div>`;
+            }
         }
     }
 </script>
