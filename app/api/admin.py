@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.services.admin_service import AdminService
 from app.serializers import serialize_user
 from app.models import Activity, Event
+from app.extensions import db
 from threading import Thread, Lock
 from math import ceil
 from uuid import uuid4

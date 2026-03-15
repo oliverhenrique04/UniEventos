@@ -13,6 +13,7 @@ from app.models import (
 from app.extensions import db
 from openpyxl import Workbook
 from app.services.auth_service import AuthService
+from app.api import admin as admin_api
 
 
 def _login_admin(client):
@@ -33,6 +34,51 @@ def _create_event_for_certs(app, owner_username='admin_test'):
         db.session.add(event)
         db.session.commit()
         return event.id
+
+
+def _seed_manual_enrollment_data(app, participant_email='manual_api@test.local'):
+    with app.app_context():
+        participant = User(
+            username='manual_api_user',
+            role='participante',
+            nome='Participante API',
+            cpf='22233344455',
+            email=participant_email,
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento API Manual',
+            descricao='Evento para inscricao manual via API',
+            tipo='PADRAO',
+            token_publico='token-api-manual',
+            data_inicio=date(2030, 6, 15),
+            hora_inicio=time(18, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade API Manual',
+            local='Sala API',
+            descricao='Descricao atividade API',
+            data_atv=date(2030, 6, 16),
+            hora_atv=time(19, 0),
+            carga_horaria=3,
+            vagas=50,
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        return {
+            'cpf': participant.cpf,
+            'activity_id': activity.id,
+            'participant_name': participant.nome,
+        }
 
 
 def _login_participant(client):
@@ -161,6 +207,82 @@ def test_create_event_api(client, admin_user):
     res = client.post('/api/criar_evento', json=data)
     assert res.status_code == 200
     assert 'link' in res.json
+
+
+def test_manual_enroll_api_sends_email_notification(client, app, admin_user, monkeypatch):
+    seeded = _seed_manual_enrollment_data(app)
+    sent_payloads = []
+    monkeypatch.setattr(
+        admin_api.admin_service.notification_service,
+        'send_email_task',
+        lambda **kwargs: sent_payloads.append(kwargs) or True
+    )
+
+    _login_admin(client)
+    res = client.post('/api/inscricao_manual', json={
+        'cpf': seeded['cpf'],
+        'activity_id': seeded['activity_id'],
+    })
+
+    assert res.status_code == 200
+    assert res.get_json()['mensagem'] == 'Inscrição realizada com sucesso.'
+    assert len(sent_payloads) == 1
+    assert sent_payloads[0]['template_name'] == 'manual_enrollment_confirmation.html'
+    assert sent_payloads[0]['subject'] == 'Você foi adicionado ao evento: Evento API Manual'
+
+    with app.app_context():
+        enrollment = Enrollment.query.filter_by(user_cpf=seeded['cpf'], activity_id=seeded['activity_id']).first()
+        assert enrollment is not None
+        assert enrollment.presente is True
+
+
+def test_manual_enroll_api_duplicate_does_not_send_email(client, app, admin_user, monkeypatch):
+    seeded = _seed_manual_enrollment_data(app)
+    with app.app_context():
+        db.session.add(Enrollment(
+            activity_id=seeded['activity_id'],
+            user_cpf=seeded['cpf'],
+            nome=seeded['participant_name'],
+            presente=True,
+        ))
+        db.session.commit()
+
+    sent_payloads = []
+    monkeypatch.setattr(
+        admin_api.admin_service.notification_service,
+        'send_email_task',
+        lambda **kwargs: sent_payloads.append(kwargs) or True
+    )
+
+    _login_admin(client)
+    res = client.post('/api/inscricao_manual', json={
+        'cpf': seeded['cpf'],
+        'activity_id': seeded['activity_id'],
+    })
+
+    assert res.status_code == 400
+    assert res.get_json()['erro'] == 'Usuário já está inscrito nesta atividade.'
+    assert sent_payloads == []
+
+
+def test_manual_enroll_api_invalid_activity_does_not_send_email(client, app, admin_user, monkeypatch):
+    seeded = _seed_manual_enrollment_data(app)
+    sent_payloads = []
+    monkeypatch.setattr(
+        admin_api.admin_service.notification_service,
+        'send_email_task',
+        lambda **kwargs: sent_payloads.append(kwargs) or True
+    )
+
+    _login_admin(client)
+    res = client.post('/api/inscricao_manual', json={
+        'cpf': seeded['cpf'],
+        'activity_id': 'invalido',
+    })
+
+    assert res.status_code == 400
+    assert res.get_json()['erro'] == 'Atividade inválida.'
+    assert sent_payloads == []
 
 
 def test_certificate_setup_rejects_invalid_json(client, app, admin_user):
