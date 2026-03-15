@@ -69,6 +69,204 @@
         .navbar .nav-profile-link.active .fw-bold {
             font-weight: 700;
         }
+
+        .session-warning-modal .modal-content {
+            border: 0;
+            border-radius: 28px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top right, rgba(14, 116, 144, 0.14), transparent 32%),
+                linear-gradient(180deg, #ffffff 0%, #f7fbff 55%, #f8fcf8 100%);
+            box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+        }
+
+        .session-warning-header {
+            padding: 1.15rem 1.25rem 0.5rem;
+            border-bottom: 0;
+        }
+
+        .session-warning-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.78rem;
+            border-radius: 999px;
+            background: rgba(4, 77, 132, 0.08);
+            color: #0b5c99;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .session-warning-body {
+            padding: 0.5rem 1.25rem 1.25rem;
+        }
+
+        .session-warning-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.9fr);
+            gap: 1rem;
+            align-items: stretch;
+        }
+
+        .session-warning-main {
+            padding: 1.1rem;
+            border-radius: 24px;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: rgba(255, 255, 255, 0.88);
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+        }
+
+        .session-warning-aside {
+            padding: 1.1rem;
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent 34%),
+                linear-gradient(180deg, #eff6ff 0%, #eef8ff 100%);
+            border: 1px solid rgba(191, 219, 254, 0.9);
+        }
+
+        .session-warning-icon {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            color: #1d4ed8;
+            font-size: 1.5rem;
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.14);
+        }
+
+        .session-warning-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #14324b;
+            margin: 0.9rem 0 0.45rem;
+        }
+
+        .session-warning-text {
+            color: #64748b;
+            line-height: 1.65;
+            margin-bottom: 1rem;
+        }
+
+        .session-warning-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .session-warning-metric {
+            padding: 0.9rem 1rem;
+            border-radius: 18px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.96) 100%);
+        }
+
+        .session-warning-metric-label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 0.35rem;
+        }
+
+        .session-warning-metric-value {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .session-warning-progress {
+            height: 0.75rem;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.18);
+            overflow: hidden;
+        }
+
+        .session-warning-progress-bar {
+            height: 100%;
+            width: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #0b6cb8 0%, #2563eb 55%, #38bdf8 100%);
+            transition: width 0.6s ease;
+        }
+
+        .session-warning-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .session-warning-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(191, 219, 254, 0.95);
+            color: #1d4ed8;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .session-warning-note {
+            margin: 0;
+            color: #4f6277;
+            line-height: 1.6;
+            font-size: 0.92rem;
+        }
+
+        .session-warning-footer {
+            padding: 0 1.25rem 1.25rem;
+            border-top: 0;
+            gap: 0.75rem;
+        }
+
+        .session-warning-continue {
+            min-width: 220px;
+            min-height: 48px;
+            font-weight: 800;
+            border-radius: 16px;
+            box-shadow: 0 14px 28px rgba(4, 77, 132, 0.18);
+        }
+
+        .session-warning-exit {
+            min-height: 48px;
+            border-radius: 16px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 767.98px) {
+            .session-warning-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .session-warning-modal .modal-content {
+                border-radius: 22px;
+            }
+
+            .session-warning-metrics {
+                grid-template-columns: 1fr;
+            }
+
+            .session-warning-footer {
+                flex-direction: column-reverse;
+            }
+
+            .session-warning-continue,
+            .session-warning-exit {
+                width: 100%;
+            }
+        }
     </style>
 
     {% block head_styles %}{% endblock %}
@@ -176,6 +374,82 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% if user %}
+    <div class="modal fade session-warning-modal" id="modalSessionWarning" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header session-warning-header">
+                    <div class="session-warning-kicker">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                        Sessão monitorada
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body session-warning-body">
+                    <div class="session-warning-layout">
+                        <section class="session-warning-main">
+                            <div class="session-warning-icon">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <h3 class="session-warning-title">Sua sessão atingiu 50% do tempo configurado</h3>
+                            <p class="session-warning-text">
+                                Para manter a navegação protegida, a plataforma encerrará automaticamente a sessão quando o tempo limite for alcançado.
+                                Se você ainda estiver usando o sistema, renove agora com um clique.
+                            </p>
+
+                            <div class="session-warning-metrics">
+                                <div class="session-warning-metric">
+                                    <span class="session-warning-metric-label">Tempo total da sessão</span>
+                                    <span class="session-warning-metric-value" id="sessionWarningConfiguredTime">--</span>
+                                </div>
+                                <div class="session-warning-metric">
+                                    <span class="session-warning-metric-label">Tempo restante</span>
+                                    <span class="session-warning-metric-value" id="sessionWarningRemainingTime">--</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <aside class="session-warning-aside">
+                            <div class="session-warning-chip-row">
+                                <span class="session-warning-chip">
+                                    <i class="fa-solid fa-clock"></i>
+                                    Aviso na metade do tempo
+                                </span>
+                                <span class="session-warning-chip">
+                                    <i class="fa-solid fa-lock"></i>
+                                    Proteção ativa
+                                </span>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="small fw-bold text-primary">Janela restante</span>
+                                    <span class="small fw-bold text-primary" id="sessionWarningPercent">50%</span>
+                                </div>
+                                <div class="session-warning-progress">
+                                    <div class="session-warning-progress-bar" id="sessionWarningProgressBar"></div>
+                                </div>
+                            </div>
+
+                            <p class="session-warning-note" id="sessionWarningContext">
+                                Sua sessão será encerrada automaticamente caso não haja renovação dentro do tempo restante.
+                            </p>
+                        </aside>
+                    </div>
+                </div>
+                <div class="modal-footer session-warning-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-light border session-warning-exit" id="btnSessionWarningLogout">
+                        <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Encerrar agora
+                    </button>
+                    <button type="button" class="btn btn-primary session-warning-continue" id="btnSessionWarningKeepAlive">
+                        <i class="fa-solid fa-rotate-right me-2"></i>Continuar conectado
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Institutional Footer -->
     <footer class="border-top bg-white mt-auto py-3 full-width-container">
         <div class="container">
@@ -216,8 +490,14 @@
         }} || '';
         const isAuthenticatedUser = {{ (user is defined and user is not none)|tojson }};
         const sessionTimeoutMs = {{ ((config['SESSION_TIMEOUT_MINUTES'] if config.get('SESSION_TIMEOUT_MINUTES') else 0) * 60 * 1000)|int }};
+        const sessionHalfTimeMs = sessionTimeoutMs ? Math.max(Math.floor(sessionTimeoutMs / 2), 1000) : 0;
         let sessionRedirectInProgress = false;
         let sessionLogoutTimerId = null;
+        let sessionWarningTimerId = null;
+        let sessionCountdownIntervalId = null;
+        let sessionWarningDeadlineTs = null;
+        let sessionWarningModalInstance = null;
+        let sessionWarningVisible = false;
 
         function withScriptRoot(url) {
             if (typeof url !== 'string') return url;
@@ -256,9 +536,121 @@
             window.location.assign(withScriptRoot('{{ url_for('main.logout') }}'));
         }
 
+        function getSessionWarningElements() {
+            return {
+                modalEl: document.getElementById('modalSessionWarning'),
+                remainingEl: document.getElementById('sessionWarningRemainingTime'),
+                configuredEl: document.getElementById('sessionWarningConfiguredTime'),
+                percentEl: document.getElementById('sessionWarningPercent'),
+                progressBarEl: document.getElementById('sessionWarningProgressBar'),
+                contextEl: document.getElementById('sessionWarningContext'),
+                keepAliveBtn: document.getElementById('btnSessionWarningKeepAlive'),
+                logoutBtn: document.getElementById('btnSessionWarningLogout'),
+            };
+        }
+
+        function getSessionWarningModalInstance() {
+            const { modalEl } = getSessionWarningElements();
+            if (!modalEl) return null;
+            if (!sessionWarningModalInstance) {
+                sessionWarningModalInstance = new bootstrap.Modal(modalEl, {
+                    backdrop: 'static',
+                    keyboard: false,
+                });
+            }
+            return sessionWarningModalInstance;
+        }
+
+        function clearSessionWarningCountdown() {
+            if (sessionCountdownIntervalId) {
+                clearInterval(sessionCountdownIntervalId);
+                sessionCountdownIntervalId = null;
+            }
+            sessionWarningDeadlineTs = null;
+        }
+
+        function clearSessionTimers() {
+            if (sessionLogoutTimerId) {
+                clearTimeout(sessionLogoutTimerId);
+                sessionLogoutTimerId = null;
+            }
+            if (sessionWarningTimerId) {
+                clearTimeout(sessionWarningTimerId);
+                sessionWarningTimerId = null;
+            }
+            clearSessionWarningCountdown();
+        }
+
+        function formatSessionTime(ms) {
+            const totalSeconds = Math.max(Math.ceil(ms / 1000), 0);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            if (minutes <= 0) return `${seconds}s`;
+            if (seconds === 0) return `${minutes}min`;
+            return `${minutes}min ${String(seconds).padStart(2, '0')}s`;
+        }
+
+        function hideSessionWarningModal() {
+            const { modalEl, keepAliveBtn } = getSessionWarningElements();
+            keepAliveBtn?.removeAttribute('disabled');
+            keepAliveBtn?.classList.remove('disabled');
+            if (modalEl?.classList.contains('show')) {
+                const modal = getSessionWarningModalInstance();
+                modal?.hide();
+            }
+            sessionWarningVisible = false;
+            clearSessionWarningCountdown();
+        }
+
+        function updateSessionWarningCountdown() {
+            if (!sessionWarningDeadlineTs) return;
+            const {
+                remainingEl,
+                configuredEl,
+                percentEl,
+                progressBarEl,
+                contextEl,
+            } = getSessionWarningElements();
+            const remainingMs = Math.max(sessionWarningDeadlineTs - Date.now(), 0);
+            const warningWindowMs = Math.max(sessionTimeoutMs - sessionHalfTimeMs, 1);
+            const remainingPercent = Math.max(Math.min((remainingMs / warningWindowMs) * 100, 100), 0);
+
+            if (configuredEl) configuredEl.textContent = formatSessionTime(sessionTimeoutMs);
+            if (remainingEl) remainingEl.textContent = formatSessionTime(remainingMs);
+            if (percentEl) percentEl.textContent = `${Math.round(remainingPercent)}%`;
+            if (progressBarEl) progressBarEl.style.width = `${remainingPercent}%`;
+            if (contextEl) {
+                contextEl.textContent = remainingMs > 0
+                    ? `Faltam ${formatSessionTime(remainingMs)} para o encerramento automático. Renove a sessão para continuar trabalhando com segurança.`
+                    : 'O tempo de sessão foi encerrado. Redirecionando para a tela inicial...';
+            }
+
+            if (remainingMs <= 0) {
+                redirectToLogin();
+            }
+        }
+
+        function showSessionWarningModal() {
+            if (!isAuthenticatedUser || !sessionTimeoutMs || sessionRedirectInProgress || sessionWarningVisible) return;
+
+            const modal = getSessionWarningModalInstance();
+            if (!modal) return;
+
+            clearSessionWarningCountdown();
+            sessionWarningVisible = true;
+            sessionWarningDeadlineTs = Date.now() + Math.max(sessionTimeoutMs - sessionHalfTimeMs, 0);
+            updateSessionWarningCountdown();
+            sessionCountdownIntervalId = window.setInterval(updateSessionWarningCountdown, 1000);
+            modal.show();
+        }
+
         function resetSessionLogoutTimer() {
             if (!isAuthenticatedUser || !sessionTimeoutMs) return;
-            if (sessionLogoutTimerId) clearTimeout(sessionLogoutTimerId);
+            clearSessionTimers();
+            hideSessionWarningModal();
+            sessionWarningTimerId = window.setTimeout(() => {
+                showSessionWarningModal();
+            }, sessionHalfTimeMs);
             sessionLogoutTimerId = window.setTimeout(() => {
                 redirectToLogin();
             }, sessionTimeoutMs);
@@ -293,6 +685,39 @@
         window.apiUrl = withScriptRoot;
         window.pathUrl = withScriptRoot;
         window.redirectToLogin = redirectToLogin;
+
+        async function renewSessionFromModal() {
+            const { keepAliveBtn } = getSessionWarningElements();
+            if (!keepAliveBtn) return;
+
+            keepAliveBtn.setAttribute('disabled', 'disabled');
+            keepAliveBtn.classList.add('disabled');
+
+            try {
+                const response = await originalFetch(withScriptRoot('/api/session/ping'), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (response.headers.get('X-Session-Expired') === '1' || response.status === 401) {
+                    redirectToLogin();
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Falha ao renovar sessão (${response.status}).`);
+                }
+
+                resetSessionLogoutTimer();
+                Toast.fire({ icon: 'success', title: 'Sessão renovada com sucesso.' });
+            } catch (_) {
+                keepAliveBtn.removeAttribute('disabled');
+                keepAliveBtn.classList.remove('disabled');
+                Toast.fire({ icon: 'warning', title: 'Não foi possível renovar a sessão.' });
+            }
+        }
 
         function rewriteAttributeIfNeeded(el, attrName) {
             if (!el.hasAttribute(attrName)) return;
@@ -340,6 +765,13 @@
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 rewriteDomAbsolutePaths();
+                const { modalEl, keepAliveBtn, logoutBtn } = getSessionWarningElements();
+                keepAliveBtn?.addEventListener('click', renewSessionFromModal);
+                logoutBtn?.addEventListener('click', redirectToLogin);
+                modalEl?.addEventListener('hidden.bs.modal', () => {
+                    clearSessionWarningCountdown();
+                    sessionWarningVisible = false;
+                });
                 resetSessionLogoutTimer();
                 observer.observe(document.body, {
                     childList: true,
@@ -350,6 +782,13 @@
             });
         } else {
             rewriteDomAbsolutePaths();
+            const { modalEl, keepAliveBtn, logoutBtn } = getSessionWarningElements();
+            keepAliveBtn?.addEventListener('click', renewSessionFromModal);
+            logoutBtn?.addEventListener('click', redirectToLogin);
+            modalEl?.addEventListener('hidden.bs.modal', () => {
+                clearSessionWarningCountdown();
+                sessionWarningVisible = false;
+            });
             resetSessionLogoutTimer();
             observer.observe(document.body, {
                 childList: true,

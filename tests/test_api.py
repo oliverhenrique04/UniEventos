@@ -742,6 +742,19 @@ def test_login_marks_session_as_permanent(client, admin_user):
     assert client.application.permanent_session_lifetime.total_seconds() == 300
 
 
+def test_session_ping_keeps_authenticated_session_alive(client, admin_user):
+    _login_admin(client)
+
+    res = client.get('/api/session/ping')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['status'] == 'ok'
+    assert payload['session_timeout_minutes'] >= 1
+    with client.session_transaction() as flask_session:
+        assert flask_session.permanent is True
+
+
 def test_protected_api_returns_401_json_when_not_authenticated(client):
     res = client.get('/api/eventos')
 
@@ -757,6 +770,8 @@ def test_dashboard_page_no_longer_renders_management_analytics(client, app, admi
     _login_admin(client)
     admin_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in admin_html
+    assert 'id="modalSessionWarning"' in admin_html
+    assert 'id="btnSessionWarningKeepAlive"' in admin_html
 
     client.get('/logout')
     _login_user(client, seeded['gestor_username'])

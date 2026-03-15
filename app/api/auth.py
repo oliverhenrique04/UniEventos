@@ -42,6 +42,19 @@ def logout():
     return redirect(url_for('main.index'))
 
 
+@bp.route('/session/ping', methods=['GET'])
+@login_required
+def session_ping():
+    """Keep the authenticated session alive without side effects."""
+    session.permanent = True
+    session.modified = True
+    return jsonify({
+        'status': 'ok',
+        'message': 'Sessão renovada com sucesso.',
+        'session_timeout_minutes': int(current_app.config.get('SESSION_TIMEOUT_MINUTES', 0) or 0),
+    })
+
+
 @bp.route('/ava')
 def ava_login_redirect():
     """Redirects users to Moodle AVA login/launch URL."""
