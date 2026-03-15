@@ -163,6 +163,35 @@
         .timer-circle svg { width: 110px; height: 110px; }
         .timer-text { font-size: 1.75rem; }
     }
+
+    #areaAdicao {
+        position: relative;
+        z-index: 12;
+        overflow: visible;
+    }
+
+    .manual-enroll-search {
+        position: relative;
+        z-index: 20;
+    }
+
+    #resultadosBusca {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 280px;
+        overflow-y: auto;
+        border: 1px solid #dbe4ee;
+        border-radius: 1rem;
+        background: #fff;
+    }
+
+    .participants-table-wrap {
+        position: relative;
+        z-index: 1;
+    }
 </style>
 {% endblock %}
 
@@ -283,10 +312,12 @@
                     <h6 class="fw-bold mb-3 text-primary">Nova Inscrição Manual</h6>
                     <div class="row g-2 mb-3">
                         <div class="col-md-7">
-                            <label class="small fw-bold text-muted mb-1">Buscar Participante (Nome, RA ou CPF)</label>
-                            <input type="text" id="addPartSearch" class="form-control" placeholder="Digite para buscar..." oninput="buscarParticipantesLive(this.value)">
-                            <div id="resultadosBusca" class="list-group shadow-sm mt-1 position-absolute w-100 d-none" style="z-index: 1050; max-width: 400px;">
-                                <!-- Resultados JS -->
+                            <div class="manual-enroll-search">
+                                <label class="small fw-bold text-muted mb-1">Buscar Participante (Nome, RA ou CPF)</label>
+                                <input type="text" id="addPartSearch" class="form-control" placeholder="Digite para buscar..." oninput="buscarParticipantesLive(this.value)">
+                                <div id="resultadosBusca" class="list-group shadow-lg d-none">
+                                    <!-- Resultados JS -->
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-5">
@@ -335,7 +366,7 @@
                     </div>
                 </div>
                 
-                <div class="table-responsive" style="min-height: 400px;">
+                <div class="table-responsive participants-table-wrap" style="min-height: 400px;">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
@@ -797,20 +828,34 @@
         }
         const area = document.getElementById('areaAdicao');
         area.classList.toggle('d-none');
+        USUARIO_SELECIONADO_CPF = null;
         document.getElementById('addPartSearch').value = '';
         document.getElementById('resultadosBusca').classList.add('d-none');
+        document.getElementById('resultadosBusca').innerHTML = '';
         document.getElementById('participanteSelecionado').classList.add('d-none');
     }
 
     let timeoutBusca = null;
+    let buscaParticipantesToken = 0;
     async function buscarParticipantesLive(q) {
         clearTimeout(timeoutBusca);
         const div = document.getElementById('resultadosBusca');
-        if (q.length < 2) { div.classList.add('d-none'); return; }
+        const input = document.getElementById('addPartSearch');
+        const termo = (q || '').trim();
+        if (termo.length < 2) {
+            div.classList.add('d-none');
+            div.innerHTML = '';
+            return;
+        }
 
+        const requestToken = ++buscaParticipantesToken;
         timeoutBusca = setTimeout(async () => {
-            const res = await fetch(apiUrl(`/api/buscar_participante?q=${encodeURIComponent(q)}`));
+            if (document.getElementById('areaAdicao').classList.contains('d-none')) return;
+
+            const res = await fetch(apiUrl(`/api/buscar_participante?q=${encodeURIComponent(termo)}`), { cache: 'no-store' });
             const users = await res.json();
+            if (requestToken !== buscaParticipantesToken) return;
+            if ((input.value || '').trim() !== termo) return;
             
             div.innerHTML = '';
             if (users.length === 0) {
@@ -836,6 +881,7 @@
     function selecionarUsuarioBusca(u) {
         USUARIO_SELECIONADO_CPF = u.cpf;
         document.getElementById('resultadosBusca').classList.add('d-none');
+        document.getElementById('resultadosBusca').innerHTML = '';
         document.getElementById('addPartSearch').value = u.nome;
         
         document.getElementById('selNome').innerText = u.nome;
@@ -864,7 +910,7 @@
         const json = await res.json();
         if (res.ok) {
             mostrarAreaAdicao();
-            carregarParticipantes(1);
+            await carregarParticipantes(1);
             Toast.fire({ icon: 'success', title: 'Inscrição realizada!' });
         } else {
             Swal.fire('Falha', json.erro, 'error');
@@ -905,14 +951,14 @@
             page: page
         };
         const params = new URLSearchParams(filters);
-        const res = await fetch(apiUrl(`/api/participantes_evento/${EVENTO_SELECIONADO_ID}?${params.toString()}`));
+        const res = await fetch(apiUrl(`/api/participantes_evento/${EVENTO_SELECIONADO_ID}?${params.toString()}`), { cache: 'no-store' });
         const data = await res.json();
         
         const tbody = document.getElementById('tabelaParticipantes');
         tbody.innerHTML = '';
         
         if(data.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Nenhum participante encontrado.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Nenhum participante encontrado.</td></tr>';
         }
 
         data.items.forEach(p => {
@@ -1033,5 +1079,3 @@
     }
 </script>
 {% endblock %}
-
-

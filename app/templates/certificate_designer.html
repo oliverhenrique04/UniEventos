@@ -274,6 +274,11 @@
         color: #991b1b;
     }
 
+    .var-chip.warn {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
     @media (max-width: 1200px) {
         .designer-container {
             grid-template-columns: 1fr;
@@ -730,6 +735,9 @@
     const setupUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/setup` : `${apiBaseUrl}/setup/${entityId}`;
     const uploadAssetUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/upload_asset` : `${apiBaseUrl}/upload_asset/${entityId}`;
     const sendBatchUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/send` : `${apiBaseUrl}/send_batch/${entityId}`;
+    const sendBatchStatusBaseUrl = designerMode === 'institutional'
+        ? apiUrl('/api/institutional_certificates/send/status')
+        : apiUrl('/api/certificates/send_batch/status');
     const validationBaseUrl = new URL(pathUrl('/validar/'), window.location.origin).href;
     const toolbar = document.getElementById('floatingToolbar');
     const guideV = document.getElementById('guideV');
@@ -758,13 +766,18 @@
     const HASH_ONE_LINE_SAMPLE = 'AAAAAAAAAAAAAAAA';
     const HASH_DEFAULT_FONT_SIZE = 16;
     const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+    const SUPPORTED_FONT_FAMILIES = ['Helvetica', 'Times-Roman', 'Courier'];
+    const EVENT_PREVIEW_TITLE = {{ (event.nome or '')|tojson }};
+    const INSTITUTIONAL_PREVIEW_TITLE = {{ ((event.titulo if event.titulo is defined else event.nome) or '')|tojson }};
+    const INSTITUTIONAL_PREVIEW_CATEGORY = {{ ((event.categoria if event.categoria is defined else '-') or '-')|tojson }};
+    const INSTITUTIONAL_PREVIEW_SIGNER = {{ ((event.signer_name if event.signer_name is defined else 'Coordenacao de Extensao') or 'Coordenacao de Extensao')|tojson }};
 
     function getTodayDateBrasilia() {
         return new Date().toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIMEZONE });
     }
 
     const todayDateLabel = getTodayDateBrasilia();
-    const defaultFixedDateText = `Data de Emissão: ${todayDateLabel}`;
+    const defaultFixedDateText = `Data de Emissão: ${TAG_DATA}`;
     const HASH_QR_GAP_PCT = 1.2;
 
     const defaultTemplate = {
@@ -800,6 +813,7 @@
     let isRenderingPreview = false;
     let previewRenderPending = false;
     let previewModalHandlersBound = false;
+    let sendBatchStatusPollId = null;
 
     function staticUrl(path) {
         if (!path) return '';
@@ -888,6 +902,57 @@
         }
     }
 
+    function stopSendBatchPolling() {
+        if (!sendBatchStatusPollId) return;
+        clearTimeout(sendBatchStatusPollId);
+        sendBatchStatusPollId = null;
+    }
+
+    function presentSendBatchResult(payload) {
+        if (payload.status === 'error' || payload.resultado === 'erro') {
+            Swal.fire('Falha no envio', payload.message || payload.erro || 'Nao foi possivel concluir o envio.', 'error');
+            return;
+        }
+
+        if (Number(payload.falha_fila || 0) > 0 || Number(payload.sem_email || 0) > 0) {
+            Swal.fire(
+                'Envio concluido com ressalvas',
+                `${payload.message || 'Processamento finalizado.'} Enviados: ${payload.total_enviado || 0}. Sem e-mail: ${payload.sem_email || 0}. Falhas na fila: ${payload.falha_fila || 0}.`,
+                'warning'
+            );
+            return;
+        }
+
+        Swal.fire('Processamento concluido', payload.message || 'Os certificados foram preparados e enfileirados com sucesso.', 'success');
+    }
+
+    async function pollSendBatchStatus(jobId) {
+        stopSendBatchPolling();
+        try {
+            const response = await fetch(`${sendBatchStatusBaseUrl}/${jobId}`, { cache: 'no-store' });
+            const payload = await response.json();
+            if (!response.ok) {
+                setActionButtonLoading('btnEnviarLote', false);
+                Swal.fire('Falha no acompanhamento', payload.erro || 'Nao foi possivel consultar o andamento do envio.', 'error');
+                return;
+            }
+
+            if (payload.completed) {
+                setActionButtonLoading('btnEnviarLote', false);
+                presentSendBatchResult(payload);
+                return;
+            }
+
+            setActionButtonLoading('btnEnviarLote', true, 'Processando...');
+            sendBatchStatusPollId = setTimeout(() => {
+                pollSendBatchStatus(jobId);
+            }, 2000);
+        } catch (error) {
+            setActionButtonLoading('btnEnviarLote', false);
+            Swal.fire('Falha no acompanhamento', 'Nao foi possivel consultar o andamento do envio.', 'error');
+        }
+    }
+
     function generateId(prefix) {
         return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     }
@@ -900,7 +965,44 @@
     const MIN_LEGIBLE_FONT_SIZE = 10;
     const CANVAS_PADDING = 12;
 
-    function clampTextObjectIntoCanvas(obj) {
+    function normalizeFontFamily(value) {
+        const raw = String(value || '').trim().replace(/^["']|["']$/g, '');
+        const lowered = raw.toLowerCase();
+
+        if (!raw) return 'Helvetica';
+        if (SUPPORTED_FONT_FAMILIES.includes(raw)) return raw;
+        if (lowered.includes('courier') || lowered.includes('mono')) return 'Courier';
+        if (lowered.includes('sans') || ['arial', 'helvetica', 'inter', 'roboto', 'system-ui'].includes(lowered)) return 'Helvetica';
+        if (lowered.includes('times') || ['georgia', 'garamond'].includes(lowered) || (lowered.includes('serif') && !lowered.includes('sans'))) {
+            return 'Times-Roman';
+        }
+        return 'Helvetica';
+    }
+
+    function normalizeRichTextHtml(htmlContent) {
+        const root = document.createElement('div');
+        root.innerHTML = String(htmlContent || '');
+
+        root.querySelectorAll('*').forEach((node) => {
+            if (!node.style) return;
+
+            if (node.style.fontFamily) {
+                node.style.fontFamily = normalizeFontFamily(node.style.fontFamily);
+            }
+            if (node.style.fontSize) {
+                const parsed = parseFloat(node.style.fontSize);
+                if (Number.isFinite(parsed)) {
+                    node.style.fontSize = `${Math.max(8, parsed)}px`;
+                } else {
+                    node.style.removeProperty('font-size');
+                }
+            }
+        });
+
+        return root.innerHTML;
+    }
+
+    function clampObjectIntoCanvas(obj) {
         if (!obj) return;
 
         obj.setCoords();
@@ -926,6 +1028,10 @@
             top: Math.min(Math.max(nextTop, 0), H)
         });
         obj.setCoords();
+    }
+
+    function clampTextObjectIntoCanvas(obj) {
+        clampObjectIntoCanvas(obj);
     }
 
     function forceHashRules(hashObj) {
@@ -1028,8 +1134,7 @@
         return stripHtml(normalized).replace(/\n{3,}/g, '\n\n').trim();
     }
 
-    function buildLiveSnapshotForPreview() {
-        const snapshot = exportTemplate();
+    function applyPendingJoditContent(snapshot) {
         const modalEl = document.getElementById('joditModal');
 
         if (!modalEl || !modalEl.classList.contains('show') || !joditInstance || !joditTargetObj?.data?.id) {
@@ -1037,7 +1142,7 @@
         }
 
         const targetId = joditTargetObj.data.id;
-        const pendingHtml = String(joditInstance.value || '');
+        const pendingHtml = normalizeRichTextHtml(joditInstance.value || '');
         const pendingText = htmlToPreviewText(pendingHtml);
         const target = (snapshot.elements || []).find((el) => el.id === targetId);
 
@@ -1048,6 +1153,14 @@
         }
 
         return snapshot;
+    }
+
+    function buildTemplateSnapshot() {
+        return applyPendingJoditContent(exportTemplate());
+    }
+
+    function buildLiveSnapshotForPreview() {
+        return buildTemplateSnapshot();
     }
 
     function randomHash16() {
@@ -1068,7 +1181,7 @@
             'Mariana Fernandes Rocha'
         ];
         const eventos = [
-            '{{ event.nome }}',
+            EVENT_PREVIEW_TITLE,
             'Semana Acadêmica de Tecnologia',
             'Simpósio de Inovação e Pesquisa',
             'Jornada de Extensão Universitária'
@@ -1097,12 +1210,12 @@
             return {
                 ...baseData,
                 [TAG_RECIPIENT_NAME]: name,
-                [TAG_CERTIFICATE_TITLE]: "{{ event.titulo if event.titulo is defined else event.nome }}" || 'Certificado Institucional',
-                [TAG_CATEGORY]: "{{ event.categoria if event.categoria is defined else '-' }}" || 'Institucional',
+                [TAG_CERTIFICATE_TITLE]: INSTITUTIONAL_PREVIEW_TITLE || 'Certificado Institucional',
+                [TAG_CATEGORY]: INSTITUTIONAL_PREVIEW_CATEGORY || 'Institucional',
                 [TAG_CARGA_HORARIA]: `${2 + Math.floor(Math.random() * 39)} horas`,
                 [TAG_CURSO_USUARIO]: 'Ciencia da Computacao',
                 [TAG_EMISSION_DATE]: data,
-                [TAG_SIGNER]: "{{ event.signer_name if event.signer_name is defined else 'Coordenacao de Extensao' }}" || 'Coordenacao de Extensao'
+                [TAG_SIGNER]: INSTITUTIONAL_PREVIEW_SIGNER || 'Coordenacao de Extensao'
             };
         }
 
@@ -1192,7 +1305,7 @@
         const pendingTextById = {};
         const modalEl = document.getElementById('joditModal');
         if (modalEl && modalEl.classList.contains('show') && joditInstance && joditTargetObj?.data?.id) {
-            pendingTextById[joditTargetObj.data.id] = htmlToPreviewText(joditInstance.value || '');
+            pendingTextById[joditTargetObj.data.id] = htmlToPreviewText(normalizeRichTextHtml(joditInstance.value || ''));
         }
 
         const liveObjects = (designer?.getObjects() || [])
@@ -1258,7 +1371,7 @@
                 const objectId = obj.data?.id;
                 const pendingText = objectId ? pendingTextById[objectId] : null;
                 const pendingHtml = (modalEl && modalEl.classList.contains('show') && joditInstance && joditTargetObj?.data?.id === objectId)
-                    ? String(joditInstance.value || '')
+                    ? normalizeRichTextHtml(joditInstance.value || '')
                     : null;
                 const htmlSource = pendingHtml || (obj.data?.is_html ? (obj.data?.html_content || null) : null);
 
@@ -1352,6 +1465,10 @@
     }
 
     function openCertificatePreview() {
+        const report = getLayoutValidationReport();
+        if (report.errors.length) {
+            Toast.fire({ icon: 'warning', title: 'Preview aberto com layout incompleto. Revise os itens obrigatorios.' });
+        }
         const modalEl = document.getElementById('previewModal');
         bindPreviewModalHandlers();
         previewData = buildRandomPreviewData();
@@ -1377,7 +1494,7 @@
 
     function buildFabricTextPreview(htmlContent, options = {}) {
         const fallback = {
-            fontFamily: options.fontFamily || 'Helvetica',
+            fontFamily: normalizeFontFamily(options.fontFamily || 'Helvetica'),
             fontSize: Math.max(8, Number(options.fontSize || 20)),
             fill: options.color || '#000000',
             fontWeight: options.bold ? 'bold' : 'normal',
@@ -1453,7 +1570,7 @@
                     if (value.includes('line-through')) next.linethrough = true;
                 }
                 if (key === 'color' && value) next.fill = value;
-                if (key === 'font-family' && value) next.fontFamily = value.split(',')[0].replace(/["']/g, '').trim() || next.fontFamily;
+                if (key === 'font-family' && value) next.fontFamily = normalizeFontFamily(value.split(',')[0]);
                 if (key === 'font-size') {
                     const parsed = parseFloat(value);
                     if (Number.isFinite(parsed)) next.fontSize = Math.max(8, parsed);
@@ -1541,7 +1658,7 @@
         if (!obj || obj.data?.type !== 'text') return;
 
         const preview = buildFabricTextPreview(htmlContent, {
-            fontFamily: obj.data?.font_family || obj.fontFamily || 'Helvetica',
+            fontFamily: normalizeFontFamily(obj.data?.font_family || obj.fontFamily || 'Helvetica'),
             fontSize: obj.data?.baseFontSize || obj.fontSize || 20,
             color: obj.data?.color || obj.fill || '#000000',
             align: obj.data?.align || obj.textAlign || 'center',
@@ -1555,7 +1672,7 @@
             fontSize: preview.fontSize,
             fill: obj.data?.color || preview.fill,
             textAlign: preview.textAlign,
-            fontFamily: obj.data?.font_family || preview.fontFamily,
+            fontFamily: normalizeFontFamily(obj.data?.font_family || preview.fontFamily),
             fontWeight: preview.fontWeight,
             fontStyle: preview.fontStyle,
             width: Math.max(20, Number(obj.data?.blockWidth || obj.width || 120)),
@@ -1711,6 +1828,44 @@
         syncBlockSizeControls();
     }
 
+    function normalizeFixedElementConfig(element) {
+        const normalized = { ...element };
+        if (!FIXED_ELEMENT_IDS.includes(normalized.id)) {
+            return normalized;
+        }
+
+        normalized.locked = false;
+        normalized.visible = true;
+
+        if (normalized.id === 'qrcode') {
+            normalized.type = 'qr';
+            normalized.size = Number(normalized.size ?? 80);
+            return normalized;
+        }
+
+        normalized.type = 'text';
+        if (normalized.id === 'hash') {
+            normalized.text = HASH_TAG;
+            normalized.align = 'left';
+            normalized.font = HASH_DEFAULT_FONT_SIZE;
+            normalized.font_family = 'Courier';
+            normalized.is_html = false;
+            normalized.html_content = null;
+            normalized.auto_fit = false;
+            return normalized;
+        }
+
+        const fixedContent = `${normalized.text || ''} ${normalized.html_content || ''}`;
+        const hasDynamicDate = fixedContent.includes(TAG_DATA);
+        if (!hasDynamicDate) {
+            normalized.text = defaultFixedDateText;
+            if (normalized.is_html && normalized.html_content) {
+                normalized.html_content = plainTextToHtml(defaultFixedDateText);
+            }
+        }
+        return normalized;
+    }
+
     function applyTemplateDefaults(raw) {
         const out = JSON.parse(JSON.stringify(defaultTemplate));
         if (!raw || typeof raw !== 'object') return out;
@@ -1722,7 +1877,7 @@
         out.bg = raw.bg || template.bg;
 
         if (Array.isArray(raw.elements)) {
-            out.elements = raw.elements.map((el, idx) => ({
+            out.elements = raw.elements.map((el, idx) => normalizeFixedElementConfig({
                 id: el.id || generateId('el'),
                 type: el.type || (el.src ? 'image' : 'text'),
                 text: el.id === 'hash' ? HASH_TAG : (el.text || ''),
@@ -1736,14 +1891,14 @@
                 align: el.id === 'hash' ? 'left' : (el.align || 'center'),
                 bold: !!el.bold,
                 italic: !!el.italic,
-                font_family: el.font_family || 'Helvetica',
+                font_family: normalizeFontFamily(el.font_family || 'Helvetica'),
                 text_styles: el.text_styles || {},
                 is_html: el.id === 'hash' ? false : !!el.is_html,
-                html_content: el.id === 'hash' ? null : (el.html_content || null),
+                html_content: el.id === 'hash' ? null : normalizeRichTextHtml(el.html_content || null),
                 size: Number(el.size ?? 80),
                 zIndex: Number(el.zIndex ?? idx + 1),
                 locked: FIXED_ELEMENT_IDS.includes(el.id) ? false : !!el.locked,
-                visible: el.visible !== false
+                visible: FIXED_ELEMENT_IDS.includes(el.id) ? true : el.visible !== false
             }));
         } else if (raw.elements === undefined) {
             const keys = Object.keys(raw).filter((k) => typeof raw[k] === 'object');
@@ -1751,7 +1906,7 @@
                 out.elements = keys.map((key, idx) => {
                     const el = raw[key] || {};
                     if (key === 'qrcode') {
-                        return {
+                        return normalizeFixedElementConfig({
                             id: key,
                             type: 'qr',
                             x: Number(el.x ?? 88),
@@ -1761,10 +1916,10 @@
                             size: Number(el.size ?? 80),
                             zIndex: Number(el.zIndex ?? idx + 1),
                             locked: false,
-                            visible: el.visible !== false
-                        };
+                            visible: true
+                        });
                     }
-                    return {
+                    return normalizeFixedElementConfig({
                         id: key,
                         type: el.type || (el.src ? 'image' : 'text'),
                         text: key === 'hash' ? HASH_TAG : (el.text || ''),
@@ -1778,14 +1933,14 @@
                         align: key === 'hash' ? 'left' : (el.align || 'center'),
                         bold: !!el.bold,
                         italic: !!el.italic,
-                        font_family: el.font_family || 'Helvetica',
+                        font_family: normalizeFontFamily(el.font_family || 'Helvetica'),
                         text_styles: el.text_styles || {},
                         is_html: key === 'hash' ? false : !!el.is_html,
-                        html_content: key === 'hash' ? null : (el.html_content || null),
+                        html_content: key === 'hash' ? null : normalizeRichTextHtml(el.html_content || null),
                         zIndex: Number(el.zIndex ?? idx + 1),
                         locked: FIXED_ELEMENT_IDS.includes(key) ? false : !!el.locked,
-                        visible: el.visible !== false
-                    };
+                        visible: FIXED_ELEMENT_IDS.includes(key) ? true : el.visible !== false
+                    });
                 });
             }
         }
@@ -1947,7 +2102,7 @@
         historyFuture = [];
     }
 
-    function applyTemplateOnCanvas(nextTemplate) {
+    async function applyTemplateOnCanvas(nextTemplate) {
         isHydrating = true;
         template = applyTemplateDefaults(nextTemplate);
         bgPath = template.bg || '';
@@ -1956,6 +2111,7 @@
         designer.clear();
         if (keepBackground) designer.setBackgroundImage(keepBackground, designer.renderAll.bind(designer));
         renderGridOverlay();
+        const loaders = [];
 
         const addObjectFromTemplate = (el) => {
             if (el.visible === false) return;
@@ -1963,7 +2119,7 @@
             if (el.type === 'text') {
                 const resolvedHtmlContent = el.html_content || plainTextToHtml(el.text || '');
                 const preview = buildFabricTextPreview(resolvedHtmlContent, {
-                    fontFamily: el.font_family || 'Helvetica',
+                    fontFamily: normalizeFontFamily(el.font_family || 'Helvetica'),
                     fontSize: Math.max(8, Number(el.font || 20)),
                     color: el.color || '#000000',
                     align: el.align || 'center',
@@ -1981,7 +2137,7 @@
                     textAlign: preview.textAlign,
                     fontStyle: el.italic ? 'italic' : 'normal',
                     fontWeight: el.bold ? 'bold' : 'normal',
-                    fontFamily: el.font_family || 'Helvetica',
+                    fontFamily: normalizeFontFamily(el.font_family || 'Helvetica'),
                     styles: preview.styles,
                     editable: false,
                     hoverCursor: 'pointer',
@@ -2022,55 +2178,73 @@
                     size: 180,
                     level: 'H'
                 });
-                fabric.Image.fromURL(qrious.toDataURL(), (img) => {
-                    img.set({
-                        left: pctToPxX(el.x),
-                        top: pctToPxY(el.y),
-                        originX: 'center',
-                        originY: 'center',
-                        scaleX: pctToPxX(el.w) / img.width,
-                        scaleY: pctToPxY(el.h) / img.height,
-                        lockRotation: true,
-                        lockMovementX: !!el.locked,
-                        lockMovementY: !!el.locked,
-                        lockScalingX: !!el.locked,
-                        lockScalingY: !!el.locked,
-                        hasControls: !el.locked
+                loaders.push(new Promise((resolve) => {
+                    fabric.Image.fromURL(qrious.toDataURL(), (img) => {
+                        if (!img) {
+                            resolve();
+                            return;
+                        }
+                        img.set({
+                            left: pctToPxX(el.x),
+                            top: pctToPxY(el.y),
+                            originX: 'center',
+                            originY: 'center',
+                            scaleX: pctToPxX(el.w) / img.width,
+                            scaleY: pctToPxY(el.h) / img.height,
+                            lockRotation: true,
+                            lockMovementX: !!el.locked,
+                            lockMovementY: !!el.locked,
+                            lockScalingX: !!el.locked,
+                            lockScalingY: !!el.locked,
+                            hasControls: !el.locked
+                        });
+                        img.data = { ...el, type: 'qr' };
+                        clampObjectIntoCanvas(img);
+                        designer.add(img);
+                        designer.renderAll();
+                        resolve();
                     });
-                    img.data = { ...el, type: 'qr' };
-                    designer.add(img);
-                    designer.renderAll();
-                });
+                }));
                 return;
             }
 
             if (el.type === 'image' && el.src) {
                 const src = staticUrl(el.src);
-                fabric.Image.fromURL(src, (img) => {
-                    img.set({
-                        left: pctToPxX(el.x),
-                        top: pctToPxY(el.y),
-                        originX: 'center',
-                        originY: 'center',
-                        scaleX: pctToPxX(el.w) / img.width,
-                        scaleY: pctToPxY(el.h) / img.height,
-                        lockMovementX: !!el.locked,
-                        lockMovementY: !!el.locked,
-                        lockScalingX: !!el.locked,
-                        lockScalingY: !!el.locked,
-                        hasControls: !el.locked
-                    });
-                    img.data = { ...el };
-                    designer.add(img);
-                    designer.renderAll();
-                }, { crossOrigin: 'anonymous' });
+                loaders.push(new Promise((resolve) => {
+                    fabric.Image.fromURL(src, (img) => {
+                        if (!img) {
+                            resolve();
+                            return;
+                        }
+                        img.set({
+                            left: pctToPxX(el.x),
+                            top: pctToPxY(el.y),
+                            originX: 'center',
+                            originY: 'center',
+                            scaleX: pctToPxX(el.w) / img.width,
+                            scaleY: pctToPxY(el.h) / img.height,
+                            lockMovementX: !!el.locked,
+                            lockMovementY: !!el.locked,
+                            lockScalingX: !!el.locked,
+                            lockScalingY: !!el.locked,
+                            hasControls: !el.locked
+                        });
+                        img.data = { ...el };
+                        clampObjectIntoCanvas(img);
+                        designer.add(img);
+                        designer.renderAll();
+                        resolve();
+                    }, { crossOrigin: 'anonymous' });
+                }));
             }
         };
 
         template.elements.forEach(addObjectFromTemplate);
+        await Promise.all(loaders);
         alignHashWithQr(false);
         updateElementsList();
         syncControlsFromTemplate();
+        designer.requestRenderAll();
         isHydrating = false;
     }
 
@@ -2112,13 +2286,13 @@
                     align: obj.data?.align || obj.textAlign || 'center',
                     bold: obj.fontWeight === 'bold',
                     italic: obj.fontStyle === 'italic',
-                    font_family: obj.data.font_family || 'Helvetica',
+                    font_family: normalizeFontFamily(obj.data.font_family || 'Helvetica'),
                     text_styles: obj.data?.text_styles || obj.styles || {},
                     auto_fit: obj.data?.autoFit !== false
                 };
                 if (obj.data?.is_html && obj.data?.html_content) {
                     textExport.is_html = true;
-                    textExport.html_content = obj.data.html_content;
+                    textExport.html_content = normalizeRichTextHtml(obj.data.html_content);
                 }
                 doc.elements.push(textExport);
                 return;
@@ -2189,49 +2363,174 @@
         syncBlockSizeControls();
     }
 
-    function updateVariableStatusPanel() {
-        const panel = document.getElementById('variable-status-panel');
-        if (!panel) return;
-
-        const snapshot = exportTemplate();
-        const allText = snapshot.elements
+    function collectTemplateText(elements) {
+        return (elements || [])
             .filter((el) => el.type === 'text')
             .map((el) => {
                 const plain = el.text || '';
                 const rich = (el.is_html && el.html_content) ? stripHtml(el.html_content) : '';
-                return plain + ' ' + rich;
+                return `${plain} ${rich}`.trim();
             })
             .join(' ');
+    }
 
-        const hasQR = snapshot.elements.some((el) => el.type === 'qr' || el.id === 'qrcode');
+    function collectUnsupportedFontsFromHtml(htmlContent) {
+        const root = document.createElement('div');
+        root.innerHTML = String(htmlContent || '');
+        const unsupported = new Set();
 
-        const checks = [
-            ...(designerMode === 'institutional'
-                ? [
-                    { label: '{{RECIPIENT_NAME}}', ok: allText.includes('{{RECIPIENT_NAME}}') },
-                    { label: '{{CERTIFICATE_TITLE}}', ok: allText.includes('{{CERTIFICATE_TITLE}}') },
-                    { label: '{{CATEGORY}}', ok: allText.includes('{{CATEGORY}}') },
-                    { label: '{{CARGA_HORARIA}}', ok: allText.includes('{{CARGA_HORARIA}}') },
-                    { label: '{{CURSO_USUARIO}}', ok: allText.includes('{{CURSO_USUARIO}}') },
-                    { label: '{{EMISSION_DATE}}', ok: allText.includes('{{EMISSION_DATE}}') },
-                    { label: '{{SIGNER}}', ok: allText.includes('{{SIGNER}}') },
-                ]
-                : [
-                    { label: '{{NOME}}', ok: allText.includes('{{NOME}}') },
-                    { label: '{{CPF}}', ok: allText.includes('{{CPF}}') },
-                    { label: '{{EVENTO}}', ok: allText.includes('{{EVENTO}}') },
-                    {% if event.tipo == 'PADRAO' %}{ label: '{{ATIVIDADE}}', ok: allText.includes('{{ATIVIDADE}}') },{% endif %}
-                    {% if event.tipo == 'PADRAO' %}{ label: '{{PALESTRANTE}}', ok: allText.includes('{{PALESTRANTE}}') },{% endif %}
-                    { label: '{{HORAS}}', ok: allText.includes('{{HORAS}}') },
-                    { label: '{{DATA}}', ok: allText.includes('{{DATA}}') },
-                ]),
-            { label: HASH_TAG, ok: allText.includes(HASH_TAG) },
-            { label: 'Item fixo DATA', ok: snapshot.elements.some((el) => el.id === 'date_fixed') },
-            { label: 'QRCode', ok: hasQR }
-        ];
+        root.querySelectorAll('*').forEach((node) => {
+            const rawFamily = node.style?.fontFamily;
+            if (!rawFamily) return;
+            const raw = String(rawFamily).split(',')[0].replace(/["']/g, '').trim();
+            if (!raw) return;
+            if (normalizeFontFamily(raw) !== raw) {
+                unsupported.add(raw);
+            }
+        });
+
+        return Array.from(unsupported);
+    }
+
+    function getOutOfBoundsElements(elements) {
+        return (elements || []).filter((el) => {
+            if (!el || el.visible === false) return false;
+            const width = Number(el.w || 0);
+            const height = Number(el.h || 0);
+            const x = Number(el.x || 0);
+            const y = Number(el.y || 0);
+
+            return (
+                width <= 0 ||
+                height <= 0 ||
+                (x - (width / 2)) < 0 ||
+                (x + (width / 2)) > 100 ||
+                (y - (height / 2)) < 0 ||
+                (y + (height / 2)) > 100
+            );
+        });
+    }
+
+    function getLayoutValidationReport() {
+        const snapshot = buildTemplateSnapshot();
+        const elements = snapshot.elements || [];
+        const allText = collectTemplateText(elements);
+        const errors = [];
+        const warnings = [];
+        const checks = [];
+
+        const fixedValidationRules = {
+            date_fixed: {
+                label: 'Data de emissao',
+                validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(TAG_DATA),
+                error: 'A data fixa precisa permanecer como texto dinâmico com {{DATA}}.'
+            },
+            hash: {
+                label: 'Hash de validacao',
+                validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(HASH_TAG),
+                error: 'O hash de validacao precisa permanecer como texto dinâmico com {{HASH}}.'
+            },
+            qrcode: {
+                label: 'QR Code de validacao',
+                validate: (item) => item.type === 'qr',
+                error: 'O QR Code de validacao precisa permanecer como elemento do tipo QR.'
+            }
+        };
+
+        FIXED_ELEMENT_IDS.forEach((id) => {
+            const matches = elements.filter((el) => el.id === id);
+            if (matches.length !== 1) {
+                checks.push({ label: fixedValidationRules[id].label, status: 'miss' });
+                if (matches.length === 0) {
+                    errors.push(`O layout precisa conter o item fixo ${fixedValidationRules[id].label}.`);
+                } else {
+                    errors.push(`O layout possui ${matches.length} instâncias do item fixo ${fixedValidationRules[id].label}.`);
+                }
+                return;
+            }
+
+            const item = matches[0];
+            if (item.visible === false || !fixedValidationRules[id].validate(item)) {
+                checks.push({ label: fixedValidationRules[id].label, status: 'miss' });
+                errors.push(fixedValidationRules[id].error);
+                return;
+            }
+
+            checks.push({ label: fixedValidationRules[id].label, status: 'ok' });
+        });
+
+        const variableChecks = designerMode === 'institutional'
+            ? [
+                '{{RECIPIENT_NAME}}',
+                '{{CERTIFICATE_TITLE}}',
+                '{{CATEGORY}}',
+                '{{CARGA_HORARIA}}',
+                '{{CURSO_USUARIO}}',
+                '{{EMISSION_DATE}}',
+                '{{SIGNER}}'
+            ]
+            : [
+                '{{NOME}}',
+                '{{CPF}}',
+                '{{EVENTO}}',
+                {% if event.tipo == 'PADRAO' %}'{{ATIVIDADE}}',{% endif %}
+                {% if event.tipo == 'PADRAO' %}'{{PALESTRANTE}}',{% endif %}
+                '{{HORAS}}',
+                '{{DATA}}'
+            ];
+
+        variableChecks.forEach((label) => {
+            const present = allText.includes(label);
+            checks.push({ label, status: present ? 'ok' : 'warn' });
+            if (!present) {
+                warnings.push(`A variável ${label} não está presente no layout.`);
+            }
+        });
+
+        const unsupportedFonts = new Set();
+        elements
+            .filter((el) => el.type === 'text')
+            .forEach((el) => {
+                const fontFamily = String(el.font_family || '').trim();
+                if (fontFamily && normalizeFontFamily(fontFamily) !== fontFamily) {
+                    unsupportedFonts.add(fontFamily);
+                }
+                collectUnsupportedFontsFromHtml(el.html_content).forEach((font) => unsupportedFonts.add(font));
+            });
+
+        if (unsupportedFonts.size > 0) {
+            warnings.push(`Foram detectadas fontes não suportadas no PDF: ${Array.from(unsupportedFonts).join(', ')}.`);
+            checks.push({ label: 'Compatibilidade de fontes', status: 'warn' });
+        } else {
+            checks.push({ label: 'Compatibilidade de fontes', status: 'ok' });
+        }
+
+        const outOfBounds = getOutOfBoundsElements(elements);
+        if (outOfBounds.length > 0) {
+            warnings.push(`Existem elementos fora da área útil: ${outOfBounds.map((el) => el.id).join(', ')}.`);
+            checks.push({ label: 'Elementos dentro da página', status: 'warn' });
+        } else {
+            checks.push({ label: 'Elementos dentro da página', status: 'ok' });
+        }
+
+        const customTextElements = elements.filter((el) => el.type === 'text' && !FIXED_ELEMENT_IDS.includes(el.id));
+        if (!customTextElements.length) {
+            warnings.push('Nenhum bloco de texto editável foi encontrado no layout.');
+            checks.push({ label: 'Blocos de conteúdo', status: 'warn' });
+        } else {
+            checks.push({ label: 'Blocos de conteúdo', status: 'ok' });
+        }
+
+        return { snapshot, errors, warnings, checks };
+    }
+
+    function updateVariableStatusPanel() {
+        const panel = document.getElementById('variable-status-panel');
+        if (!panel) return;
+        const report = getLayoutValidationReport();
 
         panel.innerHTML = '';
-        checks.forEach((item) => {
+        report.checks.forEach((item) => {
             const row = document.createElement('div');
             row.className = 'var-status-row';
 
@@ -2240,8 +2539,8 @@
             name.innerText = item.label;
 
             const chip = document.createElement('span');
-            chip.className = `var-chip ${item.ok ? 'ok' : 'miss'}`;
-            chip.innerText = item.ok ? 'OK' : 'FALTANDO';
+            chip.className = `var-chip ${item.status}`;
+            chip.innerText = item.status === 'ok' ? 'OK' : (item.status === 'warn' ? 'ATENCAO' : 'FALTANDO');
 
             row.appendChild(name);
             row.appendChild(chip);
@@ -2453,7 +2752,7 @@
             return;
         }
         joditTargetObj = selected[0];
-        _joditPendingContent = joditTargetObj.data?.html_content || joditTargetObj.text || '';
+        _joditPendingContent = normalizeRichTextHtml(joditTargetObj.data?.html_content || joditTargetObj.text || '');
 
         const modalEl = document.getElementById('joditModal');
         const doSetup = () => {
@@ -2472,6 +2771,18 @@
                         'undo', 'redo', '|',
                         'eraser', 'copyformat'
                     ],
+                    controls: {
+                        font: {
+                            list: {
+                                Helvetica: 'Sans Serif',
+                                'Times-Roman': 'Serif',
+                                Courier: 'Monospace'
+                            }
+                        },
+                        fontsize: {
+                            list: ['10', '12', '14', '16', '18', '20', '24', '28', '32', '40']
+                        }
+                    },
                     enter: 'P',
                     showCharsCounter: false,
                     showWordsCounter: false,
@@ -2483,7 +2794,7 @@
                     }
                 });
             }
-            joditInstance.value = _joditPendingContent;
+            joditInstance.value = normalizeRichTextHtml(_joditPendingContent);
             joditInstance.focus();
         };
 
@@ -2511,7 +2822,7 @@
         }
 
         pushHistory();
-        const htmlContent = joditInstance.value;
+        const htmlContent = normalizeRichTextHtml(joditInstance.value);
 
         joditTargetObj.data.html_content = htmlContent;
         joditTargetObj.data.is_html = true;
@@ -2577,7 +2888,7 @@
 
         // Open Jodit and insert tag after it's ready
         joditTargetObj = obj;
-        _joditPendingContent = obj.data?.html_content || obj.text || '';
+        _joditPendingContent = normalizeRichTextHtml(obj.data?.html_content || obj.text || '');
         const doInsert = () => {
             modalEl.removeEventListener('shown.bs.modal', doInsert);
             if (joditInstance) {
@@ -2607,7 +2918,7 @@
             obj.data.baseFontSize = size;
         }
         if (prop === 'font_family') {
-            obj.data.font_family = val;
+            obj.data.font_family = normalizeFontFamily(val);
         }
         if (prop === 'color') {
             obj.data.color = val || '#000000';
@@ -2743,6 +3054,10 @@
             pushHistory();
             const src = json.asset_url;
             fabric.Image.fromURL(src, (img) => {
+                if (!img) {
+                    Toast.fire({ icon: 'error', title: 'Nao foi possivel carregar a imagem enviada' });
+                    return;
+                }
                 img.set({
                     left: W * 0.5,
                     top: H * 0.5,
@@ -2773,7 +3088,7 @@
         if (!input.files[0]) return;
         const formData = new FormData();
         formData.append('background', input.files[0]);
-        formData.append('template', JSON.stringify(exportTemplate()));
+        formData.append('template', JSON.stringify(buildTemplateSnapshot()));
 
         try {
             const res = await fetch(setupUrl, { method: 'POST', body: formData });
@@ -2803,6 +3118,13 @@
         document.getElementById('noBgMsg').classList.add('d-none');
         await new Promise((resolve) => {
             fabric.Image.fromURL(url, (img) => {
+                if (!img) {
+                    designer.setBackgroundImage(null, designer.renderAll.bind(designer));
+                    document.getElementById('noBgMsg').classList.remove('d-none');
+                    renderGridOverlay();
+                    resolve();
+                    return;
+                }
                 const scale = Math.min(W / img.width, H / img.height);
                 img.scale(scale);
                 designer.setBackgroundImage(img, () => {
@@ -2814,13 +3136,33 @@
         });
     }
 
-    async function salvarConfiguracao() {
-        setActionButtonLoading('btnSalvarLayout', true, 'Salvando...');
+    async function persistTemplateSnapshot(snapshot, extraFields = {}) {
         const formData = new FormData();
-        formData.append('template', JSON.stringify(exportTemplate()));
+        formData.append('template', JSON.stringify(snapshot));
+        Object.entries(extraFields).forEach(([key, value]) => {
+            formData.append(key, value);
+        });
+        const res = await fetch(setupUrl, { method: 'POST', body: formData });
+        const json = await res.json();
+        return { res, json };
+    }
+
+    async function salvarConfiguracao() {
+        const report = getLayoutValidationReport();
+        if (report.errors.length) {
+            const confirmSave = await Swal.fire({
+                title: 'Salvar como rascunho?',
+                html: report.errors.map((item) => `<div>${escapeHtml(item)}</div>`).join(''),
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Salvar mesmo assim'
+            });
+            if (!confirmSave.isConfirmed) return;
+        }
+
+        setActionButtonLoading('btnSalvarLayout', true, 'Salvando...');
         try {
-            const res = await fetch(setupUrl, { method: 'POST', body: formData });
-            const json = await res.json();
+            const { res, json } = await persistTemplateSnapshot(report.snapshot);
             if (!res.ok) {
                 Toast.fire({ icon: 'error', title: json.erro || 'Erro ao salvar' });
                 return;
@@ -2853,6 +3195,27 @@
     }
 
     async function confirmarEnvioLote() {
+        const report = getLayoutValidationReport();
+        if (report.errors.length) {
+            await Swal.fire({
+                title: 'Layout incompleto',
+                html: report.errors.map((item) => `<div>${escapeHtml(item)}</div>`).join(''),
+                icon: 'error'
+            });
+            return;
+        }
+
+        if (report.warnings.length) {
+            const confirmWarnings = await Swal.fire({
+                title: 'Prosseguir com avisos?',
+                html: report.warnings.map((item) => `<div>${escapeHtml(item)}</div>`).join(''),
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Continuar envio'
+            });
+            if (!confirmWarnings.isConfirmed) return;
+        }
+
         Swal.fire({
             title: 'Confirmar Envio?',
             text: 'Os certificados serão enviados agora para todos os participantes presentes.',
@@ -2860,22 +3223,37 @@
             showCancelButton: true
         }).then(async (r) => {
             if (!r.isConfirmed) return;
-            setActionButtonLoading('btnEnviarLote', true, designerMode === 'institutional' ? 'Enviando...' : 'Agendando...');
-            Toast.fire({ icon: 'info', title: 'Agendando...' });
+            stopSendBatchPolling();
+            setActionButtonLoading('btnEnviarLote', true, 'Preparando envio...');
+            Toast.fire({ icon: 'info', title: 'Preparando envio...' });
             try {
+                const persisted = await persistTemplateSnapshot(report.snapshot);
+                if (!persisted.res.ok) {
+                    Swal.fire('Falha ao salvar layout', persisted.json.erro || 'Nao foi possivel persistir o template antes do envio.', 'error');
+                    return;
+                }
                 const response = await fetch(sendBatchUrl, { method: 'POST' });
                 const payload = await response.json();
-                if (!response.ok || payload.resultado === 'erro') {
+                if (!response.ok && !payload.job_id) {
                     Swal.fire('Falha no envio', payload.erro || payload.mensagem || 'Nao foi possivel concluir o envio.', 'error');
                     return;
                 }
-                if (payload.resultado === 'parcial') {
-                    Swal.fire('Envio parcial', `${payload.mensagem}. Enviados: ${payload.total_enviado}. Falhas: ${payload.falha_fila}.`, 'warning');
+
+                if (payload.job_id) {
+                    Toast.fire({ icon: 'info', title: payload.mensagem || 'Envio em processamento no servidor.' });
+                    await pollSendBatchStatus(payload.job_id);
                     return;
                 }
-                Swal.fire('Processando', payload.mensagem || 'A fila de e-mails foi iniciada no servidor.', 'success');
+
+                presentSendBatchResult({
+                    status: response.ok ? 'completed' : 'error',
+                    ...payload,
+                    message: payload.mensagem || payload.erro
+                });
             } finally {
-                setActionButtonLoading('btnEnviarLote', false);
+                if (!sendBatchStatusPollId) {
+                    setActionButtonLoading('btnEnviarLote', false);
+                }
             }
         });
     }
@@ -2884,11 +3262,7 @@
         const confirm = await Swal.fire({ title: 'Remover Background?', icon: 'warning', showCancelButton: true });
         if (!confirm.isConfirmed) return;
 
-        const formData = new FormData();
-        formData.append('remove_bg', 'true');
-        formData.append('template', JSON.stringify(exportTemplate()));
-        const res = await fetch(setupUrl, { method: 'POST', body: formData });
-        const json = await res.json();
+        const { res, json } = await persistTemplateSnapshot(buildTemplateSnapshot(), { remove_bg: 'true' });
         if (!res.ok) {
             Toast.fire({ icon: 'error', title: json.erro || 'Falha ao remover background' });
             return;
@@ -2945,6 +3319,8 @@
                 if (obj.data?.autoFit !== false) {
                     fitTextToBlock(obj);
                 }
+            } else if (obj) {
+                clampObjectIntoCanvas(obj);
             }
             if (obj && (obj.data?.id === 'qrcode' || obj.data?.id === 'hash')) {
                 alignHashWithQr(false);
@@ -2966,6 +3342,7 @@
                     top: Math.round(obj.top / gridPxY) * gridPxY
                 });
             }
+            clampObjectIntoCanvas(obj);
             showGuidesForObject(obj);
         });
         designer.on('mouse:wheel', (opt) => {
@@ -2977,7 +3354,29 @@
     }
 
     function setupKeyboardShortcuts() {
+        function isTextInputLike(target) {
+            const modalEl = document.getElementById('joditModal');
+            if (modalEl && modalEl.classList.contains('show')) return true;
+
+            if (!target) return false;
+
+            const element = target.nodeType === Node.ELEMENT_NODE
+                ? target
+                : target.parentElement;
+            if (!element) return false;
+
+            const tagName = (element.tagName || '').toLowerCase();
+            if (['input', 'textarea', 'select'].includes(tagName)) return true;
+            if (element.isContentEditable) return true;
+            if (element.closest('[contenteditable="true"], .jodit-container, .jodit-wysiwyg, .jodit-workplace')) return true;
+            return false;
+        }
+
         document.addEventListener('keydown', (e) => {
+            if (isTextInputLike(e.target)) {
+                return;
+            }
+
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
                 undoAction();
@@ -3056,7 +3455,7 @@
         bgPath = template.bg || '';
 
         await loadBackground(bgPath);
-        applyTemplateOnCanvas(template);
+        await applyTemplateOnCanvas(template);
         renderGridOverlay();
         renderRulerLabels();
         setupDesignerEvents();

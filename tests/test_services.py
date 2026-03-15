@@ -7,9 +7,10 @@ from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.services.certificate_service import CertificateService
 from app.services.admin_service import AdminService
+from app.services.email_template_service import EmailTemplateService
 from app.models import User
 from app.extensions import db
-from app.models import Event, Course
+from app.models import Event, Course, Activity, Enrollment
 from openpyxl import Workbook
 
 def test_auth_service_register(app):
@@ -137,6 +138,272 @@ def test_event_service_delete_event_sends_email_to_owner(app):
         assert sent_payloads[0]['to_email'] == 'owner_delete@test.local'
 
 
+def test_admin_service_manual_enroll_sends_email_to_added_user(app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='manual_email_user',
+            role='participante',
+            nome='Participante Manual',
+            cpf='11122233344',
+            email='manual_email@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Manual',
+            descricao='Descricao do evento',
+            tipo='PADRAO',
+            token_publico='token-manual-email',
+            data_inicio=date(2030, 2, 10),
+            hora_inicio=time(18, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Oficina Pratica',
+            local='Laboratorio 3',
+            descricao='Descricao da atividade',
+            data_atv=date(2030, 2, 11),
+            hora_atv=time(19, 30),
+            carga_horaria=4,
+            vagas=25,
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        service = AdminService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        success, msg = service.manual_enroll(participant.cpf, activity.id)
+
+        assert success is True
+        assert msg == 'Inscrição realizada com sucesso.'
+        enrollment = Enrollment.query.filter_by(user_cpf=participant.cpf, activity_id=activity.id).first()
+        assert enrollment is not None
+        assert enrollment.presente is True
+        assert len(sent_payloads) == 1
+        assert sent_payloads[0]['to_email'] == 'manual_email@test.local'
+        assert sent_payloads[0]['subject'] == 'Você foi adicionado ao evento: Evento Manual'
+        assert sent_payloads[0]['template_name'] == 'manual_enrollment_confirmation.html'
+        assert sent_payloads[0]['template_data']['user_name'] == 'Participante Manual'
+        assert sent_payloads[0]['template_data']['event_name'] == 'Evento Manual'
+        assert sent_payloads[0]['template_data']['activity_name'] == 'Oficina Pratica'
+        assert sent_payloads[0]['template_data']['event_date'] == '11/02/2030'
+        assert sent_payloads[0]['template_data']['event_time'] == '19:30'
+        assert sent_payloads[0]['template_data']['event_location'] == 'Laboratorio 3'
+        assert sent_payloads[0]['template_data']['event_description'] == 'Descricao da atividade'
+        assert sent_payloads[0]['template_data']['event_details_url'].endswith('/inscrever/token-manual-email')
+        assert sent_payloads[0]['template_data']['my_events_url'].endswith('/meus_eventos')
+
+
+def test_admin_service_manual_enroll_without_email_does_not_send_notification(app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='manual_no_email_user',
+            role='participante',
+            nome='Participante Sem Email',
+            cpf='11122233355',
+            email=None,
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Sem Email',
+            descricao='Descricao',
+            tipo='PADRAO',
+            token_publico='token-sem-email',
+            data_inicio=date(2030, 3, 10),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Painel',
+            local='Auditorio',
+            descricao='Atividade sem email',
+            data_atv=date(2030, 3, 10),
+            hora_atv=time(10, 0),
+            carga_horaria=2,
+            vagas=40,
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        service = AdminService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        success, msg = service.manual_enroll(participant.cpf, activity.id)
+
+        assert success is True
+        assert msg == 'Inscrição realizada com sucesso.'
+        assert Enrollment.query.filter_by(user_cpf=participant.cpf, activity_id=activity.id).first() is not None
+        assert sent_payloads == []
+
+
+def test_admin_service_manual_enroll_duplicate_does_not_send_notification(app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='manual_duplicate_user',
+            role='participante',
+            nome='Participante Duplicado',
+            cpf='11122233366',
+            email='manual_duplicate@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Duplicado',
+            descricao='Descricao',
+            tipo='PADRAO',
+            token_publico='token-duplicado',
+            data_inicio=date(2030, 4, 1),
+            hora_inicio=time(14, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Mesa Redonda',
+            local='Sala 2',
+            descricao='Descricao',
+            data_atv=date(2030, 4, 1),
+            hora_atv=time(15, 0),
+            carga_horaria=2,
+            vagas=20,
+        )
+        db.session.add(activity)
+        db.session.flush()
+
+        db.session.add(Enrollment(
+            activity_id=activity.id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=True,
+        ))
+        db.session.commit()
+
+        service = AdminService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        success, msg = service.manual_enroll(participant.cpf, activity.id)
+
+        assert success is False
+        assert msg == 'Usuário já está inscrito nesta atividade.'
+        assert sent_payloads == []
+
+
+def test_manual_enrollment_email_template_renders_with_base_layout():
+    service = EmailTemplateService()
+
+    html = service.render_template('manual_enrollment_confirmation.html', {
+        'user_name': 'Participante Teste',
+        'event_name': 'Evento Template',
+        'activity_name': 'Atividade Template',
+        'event_date': '10/02/2030',
+        'event_time': '19:30',
+        'event_location': 'Laboratorio 1',
+        'event_description': 'Descricao do template',
+        'event_details_url': 'http://localhost:5000/inscrever/token-template',
+        'my_events_url': 'http://localhost:5000/meus_eventos',
+        'year': 2026,
+        'subject': 'Você foi adicionado ao evento: Evento Template',
+    })
+
+    assert 'EuroEventos' in html
+    assert 'Você foi adicionado a um evento' in html
+    assert 'Evento Template' in html
+    assert 'Atividade Template' in html
+    assert 'Abrir página do evento' in html
+
+
+def test_event_service_get_event_participants_paginated_returns_newest_first(app, admin_user):
+    with app.app_context():
+        event = Event(
+            owner_username=admin_user.username,
+            nome='Evento Ordenacao',
+            descricao='Descricao',
+            tipo='PADRAO',
+            token_publico='token-ordenacao',
+            data_inicio=date(2030, 5, 10),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade Ordenacao',
+            local='Sala 10',
+            descricao='Descricao',
+            data_atv=date(2030, 5, 10),
+            hora_atv=time(10, 0),
+            carga_horaria=2,
+            vagas=30,
+        )
+        db.session.add(activity)
+        db.session.flush()
+
+        participant_1 = User(
+            username='participant_order_1',
+            role='participante',
+            nome='Primeiro Participante',
+            cpf='99988877711',
+            email='participant1@test.local',
+        )
+        participant_1.set_password('1234')
+
+        participant_2 = User(
+            username='participant_order_2',
+            role='participante',
+            nome='Segundo Participante',
+            cpf='99988877722',
+            email='participant2@test.local',
+        )
+        participant_2.set_password('1234')
+
+        db.session.add_all([participant_1, participant_2])
+        db.session.flush()
+
+        enrollment_1 = Enrollment(
+            activity_id=activity.id,
+            user_cpf=participant_1.cpf,
+            nome=participant_1.nome,
+            presente=False,
+        )
+        db.session.add(enrollment_1)
+        db.session.flush()
+
+        enrollment_2 = Enrollment(
+            activity_id=activity.id,
+            user_cpf=participant_2.cpf,
+            nome=participant_2.nome,
+            presente=True,
+        )
+        db.session.add(enrollment_2)
+        db.session.commit()
+
+        pagination = EventService().get_event_participants_paginated(event.id, page=1, per_page=10)
+
+        assert [item.id for item in pagination.items] == [enrollment_2.id, enrollment_1.id]
+
+
 def test_certificate_service_generates_pdf_with_bounded_overflow_text(app, admin_user):
     with app.app_context():
         output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')
@@ -255,6 +522,112 @@ def test_certificate_service_generates_pdf_with_partial_rich_text_styles(app, ad
 
         assert os.path.exists(pdf_path)
         assert os.path.getsize(pdf_path) > 0
+
+
+def test_certificate_service_generates_pdf_with_unsupported_font_family_fallback(app, admin_user):
+    with app.app_context():
+        output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')
+        os.makedirs(output_dir, exist_ok=True)
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Fonte Fallback',
+            descricao='Teste fonte fallback',
+            tipo='RAPIDO',
+            data_inicio=date(2030, 7, 1),
+            hora_inicio=time(9, 0),
+            cert_template_json=json.dumps({
+                'version': 2,
+                'document': {'gridSize': 2, 'snap': True, 'guides': True},
+                'elements': [
+                    {
+                        'id': 'txt_custom',
+                        'type': 'text',
+                        'text': 'Texto com fonte nao suportada',
+                        'x': 50,
+                        'y': 50,
+                        'w': 60,
+                        'h': 12,
+                        'font': 24,
+                        'color': '#111111',
+                        'align': 'center',
+                        'font_family': 'Arial',
+                        'zIndex': 1,
+                        'visible': True
+                    }
+                ]
+            })
+        )
+
+        user = User(
+            username='cert_user_font_fallback',
+            role='student',
+            nome='Aluno Fonte Fallback',
+            cpf='10000000003',
+            email='font-fallback@example.com'
+        )
+        user.set_password('1234')
+
+        db.session.add(event)
+        db.session.add(user)
+        db.session.commit()
+
+        service = CertificateService()
+        pdf_path = service.generate_pdf(event, user, activities=[], total_hours=4)
+
+        assert os.path.exists(pdf_path)
+        assert os.path.getsize(pdf_path) > 0
+
+
+def test_certificate_service_normalize_template_payload_restores_fixed_validation_elements():
+    normalized = CertificateService.normalize_template_payload({
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'elements': [
+            {
+                'id': 'date_fixed',
+                'type': 'text',
+                'text': 'Data estática',
+                'x': 50,
+                'y': 96,
+                'w': 50,
+                'h': 4,
+                'font': 12,
+                'visible': False,
+            },
+            {
+                'id': 'hash',
+                'type': 'text',
+                'text': 'HASH-FIXO',
+                'x': 90,
+                'y': 95,
+                'w': 12,
+                'h': 4,
+                'font': 12,
+                'font_family': 'Arial',
+                'visible': False,
+            },
+            {
+                'id': 'qrcode',
+                'type': 'image',
+                'x': 90,
+                'y': 88,
+                'w': 12,
+                'h': 12,
+                'visible': False,
+            },
+        ],
+    })
+
+    by_id = {item['id']: item for item in normalized['elements']}
+
+    assert by_id['date_fixed']['visible'] is True
+    assert '{{DATA}}' in by_id['date_fixed']['text']
+    assert by_id['hash']['visible'] is True
+    assert by_id['hash']['text'] == '{{HASH}}'
+    assert by_id['hash']['font_family'] == 'Courier'
+    assert by_id['qrcode']['visible'] is True
+    assert by_id['qrcode']['type'] == 'qr'
 
 
 def _build_students_xlsx(rows, include_email=True):

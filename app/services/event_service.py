@@ -422,7 +422,7 @@ class EventService:
             if filters.get('presente') is not None:
                 query = query.filter(Enrollment.presente == filters['presente'])
 
-        return query.paginate(page=page, per_page=per_page, error_out=False)
+        return query.order_by(Enrollment.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     def toggle_attendance_manual(self, enrollment_id, status):
         """Manually forces the attendance status of a participant."""
@@ -527,7 +527,7 @@ class EventService:
                         'event_type': 'Atividade',
                         'event_description': activity.descricao or '',
                         'event_details_url': app_url,
-                        'my_events_url': f"{app_url}/meus-eventos" if app_url else '',
+                        'my_events_url': f"{app_url}/meus_eventos" if app_url else '',
                         'cancel_url': '',
                     },
                 )
@@ -564,7 +564,7 @@ class EventService:
                     'user_name': user.nome,
                     'event_name': activity.event.nome if activity.event else '-',
                     'activity_name': activity.nome,
-                    'app_url': f"{app_url}/meus-eventos" if app_url else '',
+                    'app_url': f"{app_url}/meus_eventos" if app_url else '',
                 },
             )
         return True, "Presença confirmada!", enrollment

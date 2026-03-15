@@ -585,12 +585,24 @@ def dashboard_analytics():
         return jsonify({'erro': 'Acesso negado'}), 403
 
     period_days = request.args.get('period_days', 30, type=int)
-    if period_days not in [7, 30, 90]:
+    if period_days is None or period_days < 1 or period_days > 3650:
         period_days = 30
 
     course_id = request.args.get('course_id', type=int)
     if course_id is not None and course_id <= 0:
         course_id = None
+
+    event_status = (request.args.get('event_status') or '').strip().upper() or None
+    if event_status in {'TODOS', 'TODAS', 'ALL'}:
+        event_status = None
+
+    event_type = (request.args.get('event_type') or '').strip().upper() or None
+    if event_type not in {'PADRAO', 'RAPIDO'}:
+        event_type = None
+
+    owner_username = (request.args.get('owner_username') or '').strip() or None
+    if current_user.role not in ['admin', 'gestor']:
+        owner_username = None
 
     today = datetime.utcnow().date()
     cutoff_date = today - timedelta(days=period_days)
@@ -600,8 +612,41 @@ def dashboard_analytics():
     scoped_events_query = scoped_events_query.filter(Event.data_inicio.isnot(None), Event.data_inicio >= cutoff_date)
     if course_id:
         scoped_events_query = scoped_events_query.filter(Event.course_id == course_id)
+    if event_status:
+        scoped_events_query = scoped_events_query.filter(Event.status == event_status)
+    if event_type:
+        scoped_events_query = scoped_events_query.filter(Event.tipo == event_type)
+    if owner_username:
+        scoped_events_query = scoped_events_query.filter(Event.owner_username == owner_username)
 
     event_ids = [event_id for (event_id,) in scoped_events_query.with_entities(Event.id).all()]
+
+    owner_options_query = _apply_event_visibility_scope(Event.query)
+    owner_options_query = owner_options_query.filter(Event.data_inicio.isnot(None), Event.data_inicio >= cutoff_date)
+    if course_id:
+        owner_options_query = owner_options_query.filter(Event.course_id == course_id)
+    if event_status:
+        owner_options_query = owner_options_query.filter(Event.status == event_status)
+    if event_type:
+        owner_options_query = owner_options_query.filter(Event.tipo == event_type)
+
+    owner_rows = (
+        owner_options_query
+        .outerjoin(User, User.username == Event.owner_username)
+        .with_entities(Event.owner_username, User.nome)
+        .filter(Event.owner_username.isnot(None))
+        .group_by(Event.owner_username, User.nome)
+        .order_by(func.lower(func.coalesce(User.nome, Event.owner_username)).asc())
+        .all()
+    )
+    owner_options = [
+        {
+            'username': username,
+            'name': (name or username or '').strip() or 'Sem responsável',
+        }
+        for username, name in owner_rows
+        if username
+    ]
 
     def _empty_payload():
         return {
@@ -635,9 +680,15 @@ def dashboard_analytics():
             },
             'institutional_by_category': [],
             'institutional_pending': [],
+            'filter_options': {
+                'owners': owner_options,
+            },
             'applied_filters': {
                 'period_days': period_days,
                 'course_id': course_id,
+                'event_status': event_status,
+                'event_type': event_type,
+                'owner_username': owner_username,
                 'cutoff_date': cutoff_date.isoformat(),
             },
             'generated_at': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
@@ -800,11 +851,16 @@ def dashboard_analytics():
                 'without_certificate': without_certificate,
             },
             'pending_certificate_events': pending_certificate_events,
+            'filter_options': {
+                'owners': owner_options,
+            },
         }
 
     institutional_query = InstitutionalCertificate.query
     if current_user.role not in ['admin', 'gestor']:
         institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == current_user.username)
+    elif owner_username:
+        institutional_query = institutional_query.filter(InstitutionalCertificate.created_by_username == owner_username)
     institutional_query = institutional_query.filter(InstitutionalCertificate.created_at >= cutoff_datetime)
 
     institutional_ids = [cert_id for (cert_id,) in institutional_query.with_entities(InstitutionalCertificate.id).all()]
@@ -910,6 +966,9 @@ def dashboard_analytics():
     payload['applied_filters'] = {
         'period_days': period_days,
         'course_id': course_id,
+        'event_status': event_status,
+        'event_type': event_type,
+        'owner_username': owner_username,
         'cutoff_date': cutoff_date.isoformat(),
     }
     payload['generated_at'] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()

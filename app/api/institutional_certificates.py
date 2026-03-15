@@ -4,6 +4,9 @@ import re
 import csv
 import io
 import os
+import time
+from threading import Lock, Thread
+from uuid import uuid4
 
 from flask import Blueprint, jsonify, request, make_response, send_file, current_app
 from flask import url_for
@@ -20,9 +23,12 @@ from app.models import (
     Course,
 )
 from app.services.institutional_certificate_service import InstitutionalCertificateService
+from app.services.certificate_service import CertificateService
 
 bp = Blueprint('institutional_certificates', __name__, url_prefix='/api/institutional_certificates')
 institutional_service = InstitutionalCertificateService()
+_SEND_CERTIFICATE_JOBS = {}
+_SEND_CERTIFICATE_LOCK = Lock()
 
 ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
 MAX_DESIGN_IMAGE_SIZE = 8 * 1024 * 1024
@@ -37,7 +43,7 @@ def _can_view_institutional_certificates():
 
 
 def _can_edit_institutional_certificate(cert):
-    if current_user.role == 'admin':
+    if current_user.role in ['admin', 'gestor']:
         return True
     if current_user.role == 'extensao':
         return cert.created_by_username == current_user.username
@@ -121,7 +127,8 @@ def _normalize_template(template_json):
         if element.get('is_html') and element.get('html_content'):
             element['html_content'] = _sanitize_html_content(element['html_content'])
 
-    return json.dumps(parsed, ensure_ascii=False), None
+    normalized = CertificateService.normalize_template_payload(parsed)
+    return json.dumps(normalized, ensure_ascii=False), None
 
 
 def _normalize_workload_hours(value):
@@ -205,6 +212,129 @@ def _get_viewable_certificate_or_error(certificate_id):
     if not _can_view_institutional_certificates():
         return None, (jsonify({'erro': 'Permissao negada'}), 403)
     return cert, None
+
+
+def _get_active_send_job(certificate_id, created_by):
+    for job in _SEND_CERTIFICATE_JOBS.values():
+        if job.get('certificate_id') != certificate_id:
+            continue
+        if job.get('created_by') != created_by:
+            continue
+        if not job.get('completed'):
+            return job
+    return None
+
+
+def _update_send_job(job_id, **kwargs):
+    with _SEND_CERTIFICATE_LOCK:
+        job = _SEND_CERTIFICATE_JOBS.get(job_id)
+        if not job:
+            return None
+        job.update(kwargs)
+        job['updated_at'] = time.time()
+        return dict(job)
+
+
+def _send_institutional_certificates_sync(certificate_id):
+    cert = db.session.get(InstitutionalCertificate, certificate_id)
+    if not cert:
+        return False, 'Certificado não encontrado', {
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+        }
+
+    recipients = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id).all()
+    if not recipients:
+        return False, 'Nenhum destinatario cadastrado', {
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+        }
+
+    sent_count = 0
+    skipped_without_email = 0
+    failed_queue = 0
+    now = datetime.utcnow()
+    for recipient in recipients:
+        profile = _recipient_effective_profile(recipient)
+        if not recipient.cert_hash:
+            recipient.cert_hash = institutional_service.build_hash(certificate_id, profile['nome'], profile['email'])
+
+        if not profile['email']:
+            skipped_without_email += 1
+            continue
+
+        pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
+        queued = institutional_service.queue_email(cert, recipient, pdf_path)
+        if not queued:
+            failed_queue += 1
+            continue
+
+        recipient.cert_entregue = True
+        recipient.cert_data_envio = now
+        sent_count += 1
+
+    cert.status = 'ENVIADO' if sent_count > 0 else cert.status
+    db.session.commit()
+
+    if sent_count == 0 and failed_queue > 0:
+        return False, 'Problema no envio: falha ao enfileirar e-mails.', {
+            'total_enviado': sent_count,
+            'sem_email': skipped_without_email,
+            'falha_fila': failed_queue,
+        }
+
+    if sent_count == 0:
+        return False, 'Problema no envio: nenhum destinatario com email valido', {
+            'total_enviado': sent_count,
+            'sem_email': skipped_without_email,
+            'falha_fila': failed_queue,
+        }
+
+    message = 'Envio concluido'
+    if failed_queue > 0:
+        message = 'Envio parcialmente concluido com falhas'
+
+    return True, message, {
+        'total_enviado': sent_count,
+        'sem_email': skipped_without_email,
+        'falha_fila': failed_queue,
+    }
+
+
+def _run_institutional_send_job(job_id, certificate_id, app_obj):
+    with app_obj.app_context():
+        try:
+            _update_send_job(
+                job_id,
+                status='running',
+                message='Gerando PDFs e enfileirando e-mails.',
+            )
+            success, message, summary = _send_institutional_certificates_sync(certificate_id)
+            _update_send_job(
+                job_id,
+                status='completed' if success else 'error',
+                completed=True,
+                resultado='sucesso' if success else 'erro',
+                message=message,
+                **summary,
+            )
+        except Exception as exc:
+            current_app.logger.exception(
+                'Falha no job de envio em lote de certificados institucionais (certificate_id=%s)',
+                certificate_id,
+            )
+            _update_send_job(
+                job_id,
+                status='error',
+                completed=True,
+                resultado='erro',
+                message=f'Falha inesperada no envio: {exc}',
+                total_enviado=0,
+                sem_email=0,
+                falha_fila=0,
+            )
 
 
 def _get_or_create_category(nome):
@@ -359,7 +489,7 @@ def list_institutional_certificates():
 @bp.route('', methods=['POST'])
 @login_required
 def create_institutional_certificate():
-    if current_user.role not in ['admin', 'extensao']:
+    if current_user.role not in ['admin', 'extensao', 'gestor']:
         return jsonify({'erro': 'Permissao negada'}), 403
 
     data = request.get_json(silent=True) or {}
@@ -375,6 +505,10 @@ def create_institutional_certificate():
     if not _parse_date_iso(data_emissao):
         return jsonify({'erro': 'data_emissao deve estar no formato YYYY-MM-DD'}), 400
 
+    normalized_template, template_error = _normalize_template(json.dumps(data.get('template') or {}, ensure_ascii=False))
+    if template_error:
+        return jsonify({'erro': template_error}), 400
+
     cert = InstitutionalCertificate(
         created_by_username=current_user.username,
         titulo=titulo,
@@ -383,7 +517,7 @@ def create_institutional_certificate():
         data_emissao=data_emissao,
         signer_name=(data.get('signer_name') or '').strip() or None,
         cert_bg_path=(data.get('cert_bg_path') or '').strip() or 'file/fundo_padrao.png',
-        cert_template_json=json.dumps(data.get('template') or {}, ensure_ascii=False),
+        cert_template_json=normalized_template,
         status='RASCUNHO',
     )
 
@@ -1092,67 +1226,54 @@ def send_institutional_certificates(certificate_id):
     if error:
         return error
 
-    recipients = InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id).all()
-    if not recipients:
-        return jsonify({'erro': 'Nenhum destinatario cadastrado'}), 400
+    with _SEND_CERTIFICATE_LOCK:
+        active_job = _get_active_send_job(certificate_id, current_user.username)
+        if active_job:
+            return jsonify({
+                'job_id': active_job['job_id'],
+                'mensagem': active_job.get('message') or 'Já existe um envio em processamento.',
+                'resultado': 'processando',
+                'reused': True,
+            }), 202
 
-    sent_count = 0
-    skipped_without_email = 0
-    failed_queue = 0
-    now = datetime.utcnow()
-    for recipient in recipients:
-        profile = _recipient_effective_profile(recipient)
-        if not recipient.cert_hash:
-            recipient.cert_hash = institutional_service.build_hash(certificate_id, profile['nome'], profile['email'])
+        job_id = uuid4().hex
+        _SEND_CERTIFICATE_JOBS[job_id] = {
+            'job_id': job_id,
+            'certificate_id': certificate_id,
+            'created_by': current_user.username,
+            'status': 'queued',
+            'completed': False,
+            'resultado': 'processando',
+            'message': 'Envio institucional iniciado.',
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+            'created_at': time.time(),
+            'updated_at': time.time(),
+        }
 
-        if not profile['email']:
-            skipped_without_email += 1
-            continue
-
-        pdf_path = institutional_service.generate_recipient_pdf(cert, recipient)
-        queued = institutional_service.queue_email(cert, recipient, pdf_path)
-        if not queued:
-            failed_queue += 1
-            continue
-
-        recipient.cert_entregue = True
-        recipient.cert_data_envio = now
-        sent_count += 1
-
-    cert.status = 'ENVIADO' if sent_count > 0 else cert.status
-    db.session.commit()
-
-    if sent_count == 0 and failed_queue > 0:
-        return jsonify({
-            'mensagem': 'Problema no envio',
-            'resultado': 'erro',
-            'total_enviado': sent_count,
-            'sem_email': skipped_without_email,
-            'falha_fila': failed_queue,
-        }), 500
-
-    if failed_queue > 0:
-        return jsonify({
-            'mensagem': 'Envio parcialmente concluido com falhas',
-            'resultado': 'parcial',
-            'total_enviado': sent_count,
-            'sem_email': skipped_without_email,
-            'falha_fila': failed_queue,
-        })
-
-    if sent_count == 0:
-        return jsonify({
-            'mensagem': 'Problema no envio: nenhum destinatario com email valido',
-            'resultado': 'erro',
-            'total_enviado': sent_count,
-            'sem_email': skipped_without_email,
-            'falha_fila': failed_queue,
-        }), 400
+    app_obj = current_app._get_current_object()
+    worker = Thread(target=_run_institutional_send_job, args=(job_id, certificate_id, app_obj), daemon=True)
+    worker.start()
 
     return jsonify({
-        'mensagem': 'Envio concluido',
-        'resultado': 'sucesso',
-        'total_enviado': sent_count,
-        'sem_email': skipped_without_email,
-        'falha_fila': failed_queue,
-    })
+        'job_id': job_id,
+        'mensagem': 'Envio institucional iniciado em segundo plano.',
+        'resultado': 'processando',
+    }), 202
+
+
+@bp.route('/send/status/<job_id>', methods=['GET'])
+@login_required
+def institutional_send_status(job_id):
+    with _SEND_CERTIFICATE_LOCK:
+        job = dict(_SEND_CERTIFICATE_JOBS.get(job_id) or {})
+
+    if not job:
+        return jsonify({'erro': 'Job não encontrado.'}), 404
+
+    cert = db.session.get(InstitutionalCertificate, job.get('certificate_id'))
+    if not cert or not _can_edit_institutional_certificate(cert):
+        return jsonify({'erro': 'Acesso negado.'}), 403
+
+    return jsonify(job)

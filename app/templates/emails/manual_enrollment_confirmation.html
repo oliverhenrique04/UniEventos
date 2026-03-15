@@ -1,0 +1,31 @@
+{% extends 'emails/base.html' %}
+
+{% block email_content %}
+<h2 style="margin:0 0 10px 0; color:#0f172a; font-size:24px;">Você foi adicionado a um evento</h2>
+<p style="margin:0 0 14px 0;">Prezado(a) <strong>{{ user_name }}</strong>,</p>
+<p style="margin:0 0 14px 0;">Um responsável pelo evento realizou sua inscrição manual no sistema EuroEventos.</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0; background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #044d84; border-radius:10px;">
+    <tr><td style="padding:14px;"><strong>Evento:</strong> {{ event_name }}</td></tr>
+    <tr><td style="padding:0 14px 6px 14px;"><strong>Atividade:</strong> {{ activity_name }}</td></tr>
+    <tr><td style="padding:0 14px 6px 14px;"><strong>Data:</strong> {{ event_date }}</td></tr>
+    <tr><td style="padding:0 14px 6px 14px;"><strong>Horário:</strong> {{ event_time }}</td></tr>
+    <tr><td style="padding:0 14px 14px 14px;"><strong>Local:</strong> {{ event_location }}</td></tr>
+</table>
+
+{% if event_description %}
+<p style="margin:0 0 14px 0;"><strong>Descrição:</strong> {{ event_description }}</p>
+{% endif %}
+
+<table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 12px 0;">
+    <tr>
+        <td style="background:#044d84; border-radius:8px;">
+            <a href="{{ event_details_url }}" style="display:inline-block; padding:11px 18px; color:#fff; text-decoration:none; font-weight:700;">Abrir página do evento</a>
+        </td>
+    </tr>
+</table>
+
+{% if my_events_url %}
+<p style="margin:0;"><a href="{{ my_events_url }}" style="color:#044d84;">Acessar meus eventos</a></p>
+{% endif %}
+{% endblock %}

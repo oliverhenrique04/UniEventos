@@ -1,6 +1,9 @@
 from app.models import User, Enrollment, Activity, Event, Course, db
 from app.repositories.user_repository import UserRepository
+from app.services.notification_service import NotificationService
 from sqlalchemy import or_
+from flask import current_app
+from datetime import datetime
 import csv
 import io
 from openpyxl import load_workbook
@@ -14,6 +17,7 @@ class AdminService:
     """
     def __init__(self):
         self.user_repo = UserRepository()
+        self.notification_service = NotificationService()
 
     def list_users_paginated(self, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of users with optional filtering.
@@ -143,7 +147,56 @@ class AdminService:
         )
         db.session.add(enrollment)
         db.session.commit()
+        try:
+            self._notify_manual_enrollment(user, activity)
+        except Exception:
+            current_app.logger.exception(
+                "Falha ao enfileirar email de inscricao manual para o usuario %s na atividade %s",
+                user.username,
+                activity_id,
+            )
         return True, "Inscrição realizada com sucesso."
+
+    def _notify_manual_enrollment(self, user, activity):
+        """Notify a participant when staff manually add them to an event activity."""
+        if not user or not user.email or not activity:
+            return
+
+        event = activity.event
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        event_path = f"/inscrever/{event.token_publico}" if event and event.token_publico else ''
+        my_events_path = '/meus_eventos'
+
+        event_details_url = (
+            f"{app_url}{event_path}" if app_url and event_path else
+            event_path or
+            (f"{app_url}{my_events_path}" if app_url else my_events_path)
+        )
+        my_events_url = f"{app_url}{my_events_path}" if app_url else my_events_path
+
+        event_date_value = activity.data_atv or (event.data_inicio if event else None)
+        event_time_value = activity.hora_atv or (event.hora_inicio if event else None)
+        event_date = event_date_value.strftime('%d/%m/%Y') if event_date_value else '-'
+        event_time = event_time_value.strftime('%H:%M') if event_time_value else '-'
+        event_name = event.nome if event and event.nome else activity.nome
+
+        self.notification_service.send_email_task(
+            to_email=user.email,
+            subject=f"Você foi adicionado ao evento: {event_name}",
+            template_name='manual_enrollment_confirmation.html',
+            template_data={
+                'user_name': user.nome or user.username,
+                'event_name': event_name,
+                'activity_name': activity.nome,
+                'event_date': event_date,
+                'event_time': event_time,
+                'event_location': activity.local or '-',
+                'event_description': activity.descricao or (event.descricao if event else ''),
+                'event_details_url': event_details_url,
+                'my_events_url': my_events_url,
+                'year': datetime.now().year,
+            },
+        )
 
     def import_users_csv(self, file_stream):
         """

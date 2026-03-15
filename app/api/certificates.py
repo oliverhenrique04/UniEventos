@@ -1,10 +1,14 @@
 from flask import Blueprint, request, jsonify, current_app, abort, url_for
 from flask_login import login_required, current_user
 from app.services.certificate_service import CertificateService
+from app.services.event_service import EventService
 from werkzeug.utils import secure_filename
+from threading import Lock, Thread
+from uuid import uuid4
 import os
 import json
 import re
+import time
 
 from app.models import Event, Enrollment, User, Activity
 from app.extensions import db
@@ -15,6 +19,8 @@ MAX_DESIGN_IMAGE_SIZE = 8 * 1024 * 1024
 
 bp = Blueprint('certificates', __name__, url_prefix='/api/certificates')
 cert_service = CertificateService()
+_SEND_BATCH_JOBS = {}
+_SEND_BATCH_LOCK = Lock()
 
 
 def _is_allowed_image(filename):
@@ -48,6 +54,59 @@ def _get_or_404(model, pk):
     return entity
 
 
+def _get_active_send_batch_job(event_id, created_by):
+    for job in _SEND_BATCH_JOBS.values():
+        if job.get('event_id') != event_id:
+            continue
+        if job.get('created_by') != created_by:
+            continue
+        if not job.get('completed'):
+            return job
+    return None
+
+
+def _update_send_batch_job(job_id, **kwargs):
+    with _SEND_BATCH_LOCK:
+        job = _SEND_BATCH_JOBS.get(job_id)
+        if not job:
+            return None
+        job.update(kwargs)
+        job['updated_at'] = time.time()
+        return dict(job)
+
+
+def _run_send_batch_job(job_id, event_id, app_obj):
+    with app_obj.app_context():
+        service = CertificateService()
+        try:
+            _update_send_batch_job(
+                job_id,
+                status='running',
+                message='Gerando PDFs e enfileirando e-mails.',
+            )
+            success, message, summary = service.queue_event_certificates(event_id)
+            _update_send_batch_job(
+                job_id,
+                status='completed' if success else 'error',
+                completed=True,
+                resultado='sucesso' if success else 'erro',
+                message=message,
+                **summary,
+            )
+        except Exception as exc:
+            current_app.logger.exception('Falha no job de envio em lote de certificados (event_id=%s)', event_id)
+            _update_send_batch_job(
+                job_id,
+                status='error',
+                completed=True,
+                resultado='erro',
+                message=f'Falha inesperada no envio: {exc}',
+                total_enviado=0,
+                sem_email=0,
+                falha_fila=0,
+            )
+
+
 def _normalize_template(template_json):
     if template_json is None:
         return None, None
@@ -65,18 +124,15 @@ def _normalize_template(template_json):
         if element.get('is_html') and element.get('html_content'):
             element['html_content'] = _sanitize_html_content(element['html_content'])
 
-    return json.dumps(parsed, ensure_ascii=False), None
+    normalized = cert_service.normalize_template_payload(parsed)
+    return json.dumps(normalized, ensure_ascii=False), None
 
 
 def _can_manage_event(event):
-    if current_user.role == 'admin':
-        return True
-    return event and event.owner_username == current_user.username
+    return EventService.can_manage_event(current_user, event)
 
 
 def _can_manage_certificates(event):
-    if current_user.role not in ['admin', 'coordenador', 'gestor']:
-        return False
     return _can_manage_event(event)
 
 
@@ -164,11 +220,8 @@ def setup_certificate(event_id):
     Configures the certificate background and template for an event.
     Expects a background image file and a template JSON string.
     """
-    if current_user.role not in ['admin', 'coordenador', 'gestor']:
-        return jsonify({"erro": "Permissão negada"}), 403
-        
     event = _get_or_404(Event, event_id)
-    if not _can_manage_event(event):
+    if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     bg_file = request.files.get('background')
@@ -209,11 +262,8 @@ def setup_certificate(event_id):
 @login_required
 def upload_asset(event_id):
     """Uploads an image asset for inline certificate elements."""
-    if current_user.role not in ['admin', 'coordenador', 'gestor']:
-        return jsonify({"erro": "Permissão negada"}), 403
-
     event = _get_or_404(Event, event_id)
-    if not _can_manage_event(event):
+    if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
     image_file = request.files.get('asset')
@@ -237,15 +287,61 @@ def upload_asset(event_id):
 @login_required
 def send_batch(event_id):
     """Triggers the mass generation and queued delivery of certificates."""
-    if current_user.role not in ['admin', 'coordenador', 'gestor']:
-        return jsonify({"erro": "Permissão negada"}), 403
     event = _get_or_404(Event, event_id)
     if not _can_manage_certificates(event):
         return jsonify({"erro": "Acesso negado para este evento"}), 403
 
-    success, message = cert_service.queue_event_certificates(event_id)
-    if success: return jsonify({"mensagem": message})
-    return jsonify({"erro": message}), 400
+    with _SEND_BATCH_LOCK:
+        active_job = _get_active_send_batch_job(event_id, current_user.username)
+        if active_job:
+            return jsonify({
+                'job_id': active_job['job_id'],
+                'mensagem': active_job.get('message') or 'Já existe um envio em processamento.',
+                'resultado': 'processando',
+                'reused': True,
+            }), 202
+
+        job_id = uuid4().hex
+        _SEND_BATCH_JOBS[job_id] = {
+            'job_id': job_id,
+            'event_id': event_id,
+            'created_by': current_user.username,
+            'status': 'queued',
+            'completed': False,
+            'resultado': 'processando',
+            'message': 'Envio em lote iniciado.',
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+            'created_at': time.time(),
+            'updated_at': time.time(),
+        }
+
+    app_obj = current_app._get_current_object()
+    worker = Thread(target=_run_send_batch_job, args=(job_id, event_id, app_obj), daemon=True)
+    worker.start()
+
+    return jsonify({
+        'job_id': job_id,
+        'mensagem': 'Envio em lote iniciado em segundo plano.',
+        'resultado': 'processando',
+    }), 202
+
+
+@bp.route('/send_batch/status/<job_id>', methods=['GET'])
+@login_required
+def send_batch_status(job_id):
+    with _SEND_BATCH_LOCK:
+        job = dict(_SEND_BATCH_JOBS.get(job_id) or {})
+
+    if not job:
+        return jsonify({'erro': 'Job não encontrado.'}), 404
+
+    event = db.session.get(Event, job.get('event_id'))
+    if not event or not _can_manage_certificates(event):
+        return jsonify({'erro': 'Acesso negado.'}), 403
+
+    return jsonify(job)
 
 @bp.route('/list_delivery/<int:event_id>', methods=['GET'])
 @login_required

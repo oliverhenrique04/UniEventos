@@ -100,7 +100,7 @@
         <div class="col-lg-4">
             <div class="sticky-top" style="top: 100px;">
                 <h4 class="fw-bold mb-4 px-2 d-none d-lg-block">Programação</h4>
-                <div id="lista-atividades-desktop" class="d-grid gap-3"></div>
+                <div id="lista-atividades-desktop" class="d-none d-lg-grid gap-3"></div>
 
                 {% if not user.is_authenticated %}
                 <div class="glass-panel p-4 bg-indigo-50 border-0 mt-4 text-center">
@@ -171,6 +171,7 @@
             if (!isAuthenticated) {
                 btnHtml = `<a href="${pathUrl('{{ url_for('main.index') }}')}" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
             } else if (isParticipant) {
+                const isDisabled = !a.inscrito && isFull;
                 const btnClass = a.inscrito
                     ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
                     : (isFull ? 'btn-light disabled' : 'btn-outline-primary');
@@ -184,6 +185,7 @@
                 btnHtml = `
           <button onclick="toggleInscricao(event, ${a.id}, '${acao}')"
                         data-atv-id="${a.id}"
+            ${isDisabled ? 'disabled aria-disabled="true"' : ''}
             class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
             style="font-size: 0.65rem;">
             ${btnText}
