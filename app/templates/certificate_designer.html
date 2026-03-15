@@ -248,7 +248,8 @@
     .var-status-row {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
+        gap: 12px;
         padding: 6px 8px;
         border-radius: 8px;
         background: #f8fafc;
@@ -257,7 +258,20 @@
         font-size: 12px;
     }
 
+    .var-status-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .var-status-description {
+        margin-top: 2px;
+        font-size: 11px;
+        line-height: 1.35;
+        color: #64748b;
+    }
+
     .var-chip {
+        flex-shrink: 0;
         font-size: 11px;
         font-weight: 700;
         padding: 2px 8px;
@@ -371,7 +385,6 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3 class="fw-bold m-0 text-slate-900"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Editor de Certificado</h3>
-            <p class="text-muted mb-0">Personalize o design visual e os campos de validação (código QR e hash).</p>
         </div>
         <div class="d-flex gap-2">
             {% if designer_mode == 'institutional' %}
@@ -385,9 +398,9 @@
             {% endif %}
             <button onclick="adicionarTexto()" class="btn btn-light border"><i class="fa-solid fa-plus me-1"></i> Texto</button>
             <button onclick="adicionarImagem()" class="btn btn-light border"><i class="fa-solid fa-image me-1"></i> Imagem</button>
-            <button onclick="duplicateSelected()" class="btn btn-light border"><i class="fa-solid fa-clone me-1"></i> Duplicar</button>
+<!--             <button onclick="duplicateSelected()" class="btn btn-light border"><i class="fa-solid fa-clone me-1"></i> Duplicar</button>
             <button onclick="undoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-left me-1"></i> Undo</button>
-            <button onclick="redoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-right me-1"></i> Redo</button>
+            <button onclick="redoAction()" class="btn btn-light border"><i class="fa-solid fa-rotate-right me-1"></i> Redo</button> -->
             <button onclick="resetarLayout()" class="btn btn-light border">Limpar Tudo</button>
             <button onclick="openCertificatePreview()" class="btn btn-outline-secondary"><i class="fa-solid fa-eye me-1"></i> Preview</button>
             <button id="btnSalvarLayout" onclick="salvarConfiguracao()" class="btn btn-primary shadow-sm px-4">Salvar Layout</button>
@@ -506,15 +519,15 @@
                 </div>
                 <label class="small mb-1">Tamanho do Grid (%)</label>
                 <input type="range" class="form-range" min="1" max="10" value="2" id="gridSize" oninput="setGridSize(this.value)">
-                <label class="small mb-1 mt-2">Zoom</label>
+                <!-- <label class="small mb-1 mt-2">Zoom</label>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-outline-secondary" onclick="setZoom(zoomLevel - 0.1)">-</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="setZoom(1)">100%</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="setZoom(zoomLevel + 0.1)">+</button>
-                </div>
+                </div> -->
             </div>
 
-            <div class="glass-panel p-4 mb-4">
+            <!-- <div class="glass-panel p-4 mb-4">
                 <h6 class="fw-bold mb-3">Alinhar e Distribuir</h6>
                 <div class="d-grid gap-2">
                     <div class="btn-group btn-group-sm">
@@ -532,7 +545,7 @@
                         <button class="btn btn-outline-secondary" onclick="distributeSelected('vertical')">Dist V</button>
                     </div>
                 </div>
-            </div>
+            </div> -->
 
             <div class="glass-panel p-4 mb-4">
                 <h6 class="fw-bold mb-3">Guia de Variáveis</h6>
@@ -611,7 +624,7 @@
                 <div id="variable-status-panel"></div>
             </div>
 
-            <div class="glass-panel p-4">
+            <div class="glass-panel p-4" style="display: none;">
                 <h6 class="fw-bold mb-3">Camadas</h6>
                 <div class="small text-muted mb-2">Use Ctrl/Cmd para seleção múltipla.</div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1168,11 +1181,8 @@
 
     function buildRandomPreviewData() {
         const nomes = [
-            'Ana Beatriz Souza Lima',
-            'Carlos Eduardo Martins Silva',
-            'Fernanda Alves de Oliveira',
-            'Lucas Henrique Pereira Costa',
-            'Mariana Fernandes Rocha'
+            'Fulano de Tal da Silva Santos Junior Filho',
+            'Ciclano Pereira dos Santos'
         ];
         const eventos = [
             EVENT_PREVIEW_TITLE,
@@ -1183,7 +1193,7 @@
         const name = nomes[Math.floor(Math.random() * nomes.length)];
         const evento = eventos[Math.floor(Math.random() * eventos.length)];
         const atividade = ['Palestra Magna', 'Mesa Redonda', 'Oficina Prática', 'Minicurso'].sort(() => Math.random() - 0.5)[0];
-        const palestrante = ['Profa. Maria Souza', 'Dr. Carlos Lima', 'Msc. Fernanda Alves', 'Prof. João Costa'].sort(() => Math.random() - 0.5)[0];
+        const palestrante = ['Profa. Fulana', 'Dr. Fulano', 'Msc. Ciclana', 'Prof. Fulano'].sort(() => Math.random() - 0.5)[0];
         const horas = `${8 + Math.floor(Math.random() * 33)} horas`;
         const cpfNum = `${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}.${Math.floor(100 + Math.random() * 900)}-${Math.floor(10 + Math.random() * 90)}`;
         const data = getTodayDateBrasilia();
@@ -2251,20 +2261,24 @@
         const errors = [];
         const warnings = [];
         const checks = [];
+        const addCheck = (label, status, description) => checks.push({ label, status, description });
 
         const fixedValidationRules = {
             date_fixed: {
                 label: 'Data de emissão',
+                description: 'Data de emissão do certificado.',
                 validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(TAG_DATA),
                 error: 'A data fixa precisa permanecer como texto dinâmico com {{DATA}}.'
             },
             hash: {
                 label: 'Hash de validação',
+                description: 'Ccódigo usado para validar a autenticidade do certificado.',
                 validate: (item) => item.type === 'text' && `${item.text || ''} ${item.html_content || ''}`.includes(HASH_TAG),
                 error: 'O hash de validação precisa permanecer como texto dinâmico com {{HASH}}.'
             },
             qrcode: {
                 label: 'QR Code de validação',
+                description: 'QR Code.',
                 validate: (item) => item.type === 'qr',
                 error: 'O QR Code de validação precisa permanecer como elemento do tipo QR.'
             }
@@ -2273,7 +2287,7 @@
         FIXED_ELEMENT_IDS.forEach((id) => {
             const matches = elements.filter((el) => el.id === id);
             if (matches.length !== 1) {
-                checks.push({ label: fixedValidationRules[id].label, status: 'miss' });
+                addCheck(fixedValidationRules[id].label, 'miss', fixedValidationRules[id].description);
                 if (matches.length === 0) {
                     errors.push(`O layout precisa conter o item fixo ${fixedValidationRules[id].label}.`);
                 } else {
@@ -2284,37 +2298,37 @@
 
             const item = matches[0];
             if (item.visible === false || !fixedValidationRules[id].validate(item)) {
-                checks.push({ label: fixedValidationRules[id].label, status: 'miss' });
+                addCheck(fixedValidationRules[id].label, 'miss', fixedValidationRules[id].description);
                 errors.push(fixedValidationRules[id].error);
                 return;
             }
 
-            checks.push({ label: fixedValidationRules[id].label, status: 'ok' });
+            addCheck(fixedValidationRules[id].label, 'ok', fixedValidationRules[id].description);
         });
 
         const variableChecks = designerMode === 'institutional'
             ? [
-                '{{RECIPIENT_NAME}}',
-                '{{CERTIFICATE_TITLE}}',
-                '{{CATEGORY}}',
-                '{{CARGA_HORARIA}}',
-                '{{CURSO_USUARIO}}',
-                '{{EMISSION_DATE}}',
-                '{{SIGNER}}'
+                { label: '{{ "{{RECIPIENT_NAME}}" }}', description: 'Nome do destinatário.' },
+                { label: '{{ "{{CERTIFICATE_TITLE}}" }}', description: 'Título principal.' },
+                { label: '{{ "{{CATEGORY}}" }}', description: 'Categoria.' },
+                { label: '{{ "{{CARGA_HORARIA}}" }}', description: 'Carga horária.' },
+                { label: '{{ "{{CURSO_USUARIO}}" }}', description: 'Curso do usuário associado ao destinatário.' },
+                { label: '{{ "{{EMISSION_DATE}}" }}', description: 'Data em que o certificado foi emitido.' },
+                { label: '{{ "{{SIGNER}}" }}', description: 'Assinatura ou nome da autoridade emissora.' }
             ]
             : [
-                '{{NOME}}',
-                '{{CPF}}',
-                '{{EVENTO}}',
-                {% if event.tipo == 'PADRAO' %}'{{ATIVIDADE}}',{% endif %}
-                {% if event.tipo == 'PADRAO' %}'{{PALESTRANTE}}',{% endif %}
-                '{{HORAS}}',
-                '{{DATA}}'
+                { label: '{{ "{{NOME}}" }}', description: 'Nome completo do participante.' },
+                { label: '{{ "{{CPF}}" }}', description: 'CPF do participante.' },
+                { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento.' },
+                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },{% endif %}
+                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Nome do palestrante ou responsável pela atividade.' },{% endif %}
+                { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
+                { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' }
             ];
 
-        variableChecks.forEach((label) => {
+        variableChecks.forEach(({ label, description }) => {
             const present = allText.includes(label);
-            checks.push({ label, status: present ? 'ok' : 'warn' });
+            addCheck(label, present ? 'ok' : 'warn', description);
             if (!present) {
                 warnings.push(`A variável ${label} não está presente no layout.`);
             }
@@ -2333,25 +2347,25 @@
 
         if (unsupportedFonts.size > 0) {
             warnings.push(`Foram detectadas fontes não suportadas no PDF: ${Array.from(unsupportedFonts).join(', ')}.`);
-            checks.push({ label: 'Compatibilidade de fontes', status: 'warn' });
+            addCheck('Compatibilidade de fontes', 'warn', 'Verifica se as fontes escolhidas podem ser renderizadas corretamente no PDF final.');
         } else {
-            checks.push({ label: 'Compatibilidade de fontes', status: 'ok' });
+            addCheck('Compatibilidade de fontes', 'ok', 'Verifica se as fontes escolhidas podem ser renderizadas corretamente no PDF final.');
         }
 
         const outOfBounds = getOutOfBoundsElements(elements);
         if (outOfBounds.length > 0) {
             warnings.push(`Existem elementos fora da área útil: ${outOfBounds.map((el) => el.id).join(', ')}.`);
-            checks.push({ label: 'Elementos dentro da página', status: 'warn' });
+            addCheck('Elementos dentro da página', 'warn', 'Confere se todos os elementos permanecem posicionados dentro da área útil da página.');
         } else {
-            checks.push({ label: 'Elementos dentro da página', status: 'ok' });
+            addCheck('Elementos dentro da página', 'ok', 'Confere se todos os elementos permanecem posicionados dentro da área útil da página.');
         }
 
         const customTextElements = elements.filter((el) => el.type === 'text' && !FIXED_ELEMENT_IDS.includes(el.id));
         if (!customTextElements.length) {
             warnings.push('Nenhum bloco de texto editável foi encontrado no layout.');
-            checks.push({ label: 'Blocos de conteúdo', status: 'warn' });
+            addCheck('Blocos de conteúdo', 'warn', 'Indica se o layout possui ao menos um bloco de texto editável além dos campos fixos.');
         } else {
-            checks.push({ label: 'Blocos de conteúdo', status: 'ok' });
+            addCheck('Blocos de conteúdo', 'ok', 'Indica se o layout possui ao menos um bloco de texto editável além dos campos fixos.');
         }
 
         return { snapshot, errors, warnings, checks };
@@ -2367,15 +2381,24 @@
             const row = document.createElement('div');
             row.className = 'var-status-row';
 
-            const name = document.createElement('span');
+            const body = document.createElement('div');
+            body.className = 'var-status-body';
+
+            const name = document.createElement('div');
             name.className = 'fw-semibold';
             name.innerText = item.label;
+
+            const description = document.createElement('div');
+            description.className = 'var-status-description';
+            description.innerText = item.description || '';
 
             const chip = document.createElement('span');
             chip.className = `var-chip ${item.status}`;
             chip.innerText = item.status === 'ok' ? 'OK' : (item.status === 'warn' ? 'ATENÇÃO' : 'FALTANDO');
 
-            row.appendChild(name);
+            body.appendChild(name);
+            body.appendChild(description);
+            row.appendChild(body);
             row.appendChild(chip);
             panel.appendChild(row);
         });
