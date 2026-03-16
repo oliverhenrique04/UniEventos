@@ -1109,11 +1109,12 @@
 <div class="container fade-in-up">
     {% set can_access_events_dashboard = user.role in ['admin', 'coordenador', 'gestor', 'extensao'] or user.can_create_events %}
     {% set show_events_management = can_access_events_dashboard and has_event_management_records|default(false) %}
+    {% set show_events_management_list = can_access_events_dashboard %}
     {% set can_access_analytics_dashboard = user.role in ['admin', 'coordenador', 'gestor'] %}
     {% set can_access_academics_dashboard = user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
 
     <div class="row g-4 mb-4">
-        {% if show_events_management %}
+        {% if show_events_management_list %}
         <div class="col-12 col-md-6 col-xl">
             <div class="glass-panel role-scope-card p-4 shadow-sm">
                 <span class="role-scope-badge mb-3">
