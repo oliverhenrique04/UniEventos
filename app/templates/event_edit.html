@@ -80,13 +80,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-4 pb-5 fade-in-up">
-    <form id="mainEventForm">
+<div class="container py-4 pb-5 fade-in-up event-form-page">
+    <form id="mainEventForm" class="event-form-page__form">
         <input type="hidden" id="evId" value="{{ event.id }}">
         <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-5">
-            <div>
-                <nav aria-label="breadcrumb">
+        <div class="event-form-page__header">
+            <div class="event-form-page__heading">
+                <nav aria-label="breadcrumb" class="event-form-page__breadcrumb">
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none text-muted">Início</a></li>
                         <li class="breadcrumb-item"><a href="{{ url_for('main.gerenciar_eventos') }}" class="text-decoration-none text-muted">Gestão</a></li>
@@ -96,7 +96,7 @@
                 <h2 class="fw-bold m-0"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Editar Evento</h2>
                 <p class="text-muted mb-0">Atualize as informações do evento e suas atividades.</p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="event-form-page__actions">
                 <a href="{{ url_for('main.gerenciar_eventos') }}" class="btn btn-light border">Cancelar</a>
                 <button type="submit" class="btn btn-primary px-4 shadow">
                     <i class="fa-solid fa-save me-2"></i> Salvar Alterações
@@ -104,8 +104,8 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-lg-8">
+        <div class="row g-4 event-form-page__layout">
+            <div class="col-lg-8 event-form-page__main">
                 <!-- STEP 1: CONFIGURAÇÃO BÁSICA -->
                 <div class="step-card">
                     <div class="step-header">
@@ -134,7 +134,7 @@
                                 <span>Local de Registro de Presença</span>
                                 <small class="text-primary fw-normal">Selecione no mapa ou utilize geolocalização</small>
                             </label>
-                            <div class="d-flex flex-wrap gap-2 mb-2">
+                            <div class="event-form-page__map-actions mb-2">
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="btnUseMyLocation" onclick="usarMinhaLocalizacao()">
                                     <i class="fa-solid fa-location-crosshairs me-1"></i> Utilizar Minha Localização Atual
                                 </button>
@@ -143,7 +143,7 @@
                                 </button>
                             </div>
                             <div id="map" class="mb-2 shadow-sm"></div>
-                            <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="d-flex align-items-center gap-2 mb-2 event-form-page__badge-row">
                                 <span id="checkinRadiusBadge" class="badge rounded-pill text-bg-primary px-3 py-2">
                                     <i class="fa-solid fa-circle-dot me-1"></i> Raio ativo: {{ config.CHECKIN_RADIUS_METERS|default(500) }} m
                                 </span>
@@ -205,7 +205,7 @@
                         </div>
 
                         <div id="containerPadrao" class="{% if event.tipo == 'RAPIDO' %}d-none{% endif %}">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="event-form-page__subheader mb-3">
                                 <h6 class="fw-bold m-0">Lista de Atividades</h6>
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAtvRow()">
                                     <i class="fa-solid fa-plus me-1"></i> Adicionar Atividade
@@ -233,7 +233,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-4">
+            <div class="col-lg-4 event-form-page__sidebar">
                 <div class="glass-panel p-3 bg-white border-top border-2 border-warning mb-4 shadow-sm">
                     <h6 class="fw-bold mb-2 small"><i class="fa-solid fa-circle-info text-warning me-2"></i>Importante</h6>
                     <p class="x-small text-muted mb-0">Ao salvar, as atividades antigas serão substituídas pelas novas se você adicionar/remover itens. Certifique-se de manter as atividades que já possuem inscrições se desejar preservar os dados.</p>

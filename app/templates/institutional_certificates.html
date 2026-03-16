@@ -104,13 +104,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-4 fade-in-up">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+<div class="container py-4 fade-in-up institutional-certs-page">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center mb-4 institutional-certs-page__header">
         <div>
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-certificate me-2"></i>Certificados Acadêmicos</h3>
         </div>
         {% if user.role in ['admin', 'extensao'] %}
-        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado">
+        <button class="btn btn-primary shadow-sm institutional-certs-page__cta" data-bs-toggle="modal" data-bs-target="#modalNovoCertificado">
             <i class="fa-solid fa-plus me-1"></i>Novo Certificado
         </button>
         {% else %}
@@ -118,18 +118,18 @@
         {% endif %}
     </div>
 
-    <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+    <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm institutional-certs-page__filters">
         <h6 class="fw-bold mb-3 text-uppercase small text-muted"><i class="fa-solid fa-filter me-2"></i>Filtrar Certificados</h6>
         <div class="row g-3 align-items-end">
-                <div class="col-md-4">
+                <div class="col-12 col-md-6 col-xl-4">
                     <label class="small fw-bold">Buscar por titulo</label>
                     <input type="text" id="filtroTitulo" class="form-control form-control-sm" placeholder="Ex.: Monitoria 2026">
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-md-6 col-xl-3">
                     <label class="small fw-bold">Categoria</label>
                     <input type="text" id="filtroCategoria" class="form-control form-control-sm" placeholder="Ex.: Iniciação científica">
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-md-6 col-xl-3">
                     <label class="small fw-bold">Status</label>
                     <select id="filtroStatus" class="form-select form-select-sm">
                         <option value="">Todos</option>
@@ -138,7 +138,7 @@
                         <option value="ARQUIVADO">Arquivado</option>
                     </select>
                 </div>
-                <div class="col-md-2 d-grid">
+                <div class="col-12 col-md-6 col-xl-2 d-grid">
                     <button class="btn btn-primary btn-sm fw-bold" id="btnFiltrar">
                         <i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar
                     </button>
@@ -146,9 +146,9 @@
             </div>
     </div>
 
-    <div class="glass-panel p-0 overflow-hidden mb-4">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="tabelaInstitucionais">
+    <div class="glass-panel p-0 overflow-hidden mb-4 institutional-certs-page__table-shell">
+        <div class="table-responsive institutional-certs-page__table-wrap">
+            <table class="table table-hover align-middle mb-0 institutional-certs-table" id="tabelaInstitucionais">
                     <thead class="bg-light">
                         <tr>
                             <th>ID</th>
@@ -166,9 +166,9 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="d-flex flex-column flex-xl-row justify-content-between align-items-stretch align-items-xl-center mt-3 institutional-certs-page__footer">
         <small class="text-muted" id="resumoPaginacao"></small>
-        <div class="btn-group">
+        <div class="btn-group institutional-certs-page__pager">
             <button class="btn btn-sm btn-outline-secondary" id="btnPaginaAnterior">Anterior</button>
             <button class="btn btn-sm btn-outline-secondary" id="btnPaginaProxima">Proxima</button>
         </div>
@@ -179,7 +179,7 @@
     </nav>
 </div>
 
-<div class="modal fade" id="modalNovoCertificado" tabindex="-1" aria-hidden="true">
+<div class="modal fade institutional-certs-modal" id="modalNovoCertificado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header clean-modal-header">
@@ -220,7 +220,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalEditarCertificado" tabindex="-1" aria-hidden="true">
+<div class="modal fade institutional-certs-modal" id="modalEditarCertificado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header clean-modal-header">
@@ -270,7 +270,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalDestinatarios" tabindex="-1" aria-hidden="true">
+<div class="modal fade institutional-certs-modal" id="modalDestinatarios" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header clean-modal-header">
@@ -278,7 +278,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="clean-toolbar mb-3">
+                <div class="clean-toolbar institutional-certs-modal__toolbar mb-3">
                     <div class="mini-help">
                         Gestao de vinculacao por busca, lote manual e importacao CSV.
                     </div>
@@ -315,14 +315,14 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="institutional-certs-modal__summary">
                         <small class="text-muted" id="resumoBuscaUsuarios">Nenhuma busca executada.</small>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-secondary" id="btnBuscaUsuariosAnterior">Anterior</button>
                             <button class="btn btn-outline-secondary" id="btnBuscaUsuariosProxima">Proxima</button>
                         </div>
                     </div>
-                    <div class="d-flex justify-content-end">
+                    <div class="institutional-certs-modal__action-row">
                         <button class="btn btn-outline-success" id="btnAdicionarUsuariosSelecionados">
                             <i class="fa-solid fa-user-check me-1"></i>Adicionar selecionados
                         </button>
@@ -349,7 +349,7 @@
                             <input type="file" id="fileDestinatariosCsv" class="form-control" accept=".csv">
                             <div class="form-text">CSV com cabecalho: nome,email,cpf,carga_horaria,curso_usuario</div>
                         </div>
-                        <div class="col-md-4 text-md-end">
+                        <div class="col-md-4 text-md-end institutional-certs-modal__action-row">
                             <button class="btn btn-outline-secondary" id="btnImportarCsv"><i class="fa-solid fa-file-import me-1"></i>Importar CSV</button>
                         </div>
                     </div>
@@ -357,14 +357,14 @@
 
                 <div class="clean-section mb-0">
                     <div class="clean-section-title"><i class="fa-solid fa-address-book me-1"></i>Destinatarios vinculados</div>
-                    <div class="d-flex justify-content-between align-items-center mt-1 mb-2 flex-wrap gap-2">
-                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 280px;">
+                    <div class="institutional-certs-modal__recipients-bar">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1 institutional-certs-modal__search-box" style="min-width: 280px;">
                             <input type="text" id="filtroDestinatarios" class="form-control form-control-sm" placeholder="Buscar destinatarios por nome, e-mail, CPF, carga horaria ou curso">
                             <button class="btn btn-sm btn-outline-secondary" id="btnFiltrarDestinatarios">
                                 <i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar
                             </button>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2 institutional-certs-modal__recipients-controls">
                             <small class="text-muted" id="resumoPaginacaoDestinatarios">Total: 0 | Pagina 1 de 1</small>
                             <div class="btn-group btn-group-sm">
                                 <button class="btn btn-outline-secondary" id="btnDestinatariosAnterior">Anterior</button>
@@ -421,7 +421,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalPreviewDestinatario" tabindex="-1" aria-hidden="true">
+<div class="modal fade institutional-certs-modal" id="modalPreviewDestinatario" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header clean-modal-header">
@@ -753,17 +753,19 @@ async function carregarCertificadosInstitucionais(page = 1) {
 
     tabelaBody.innerHTML = data.items.map(item => `
         <tr class="animate__animated animate__fadeIn">
-            <td class="fw-bold">#${item.id}</td>
-            <td>
-                <div class="fw-semibold text-dark">${item.titulo}</div>
-                <div class="x-small text-muted">Criado por: ${item.created_by_name || item.created_by_username || '-'}</div>
+            <td class="fw-bold" data-label="ID">#${item.id}</td>
+            <td data-label="Titulo" data-cell="title">
+                <div class="institutional-certs-table__title">
+                    <div class="fw-semibold text-dark">${item.titulo}</div>
+                    <div class="x-small text-muted">Criado por: ${item.created_by_name || item.created_by_username || '-'}</div>
+                </div>
             </td>
-            <td><span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${item.categoria || '-'}</span></td>
-            <td><small class="fw-bold text-slate-600">${formatDateDisplay(item.data_emissao)}</small></td>
-            <td>${statusBadge(item.status || 'RASCUNHO')}</td>
-            <td>
+            <td data-label="Categoria"><span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${item.categoria || '-'}</span></td>
+            <td data-label="Emissao"><small class="fw-bold text-slate-600">${formatDateDisplay(item.data_emissao)}</small></td>
+            <td data-label="Status">${statusBadge(item.status || 'RASCUNHO')}</td>
+            <td data-label="Atualizar" data-cell="status-control">
                 ${item.can_edit
-                    ? `<div class="input-group input-group-sm">
+                    ? `<div class="input-group input-group-sm institutional-certs-table__status-control">
                         <select class="form-select" id="status_${item.id}">
                             <option value="RASCUNHO" ${(item.status || 'RASCUNHO') === 'RASCUNHO' ? 'selected' : ''}>Rascunho</option>
                             <option value="ENVIADO" ${(item.status || '') === 'ENVIADO' ? 'selected' : ''}>Enviado</option>
@@ -773,9 +775,9 @@ async function carregarCertificadosInstitucionais(page = 1) {
                     </div>`
                     : `<span class="text-muted small">Somente consulta</span>`}
             </td>
-            <td><span class="badge bg-light text-dark border">${item.recipients_count}</span></td>
-            <td class="text-end">
-                <div class="btn-group shadow-sm">
+            <td data-label="Destinatarios"><span class="badge bg-light text-dark border">${item.recipients_count}</span></td>
+            <td class="text-end" data-label="Ações" data-cell="actions">
+                <div class="institutional-certs-table__actions">
                     <button class="btn btn-sm btn-light border" onclick="abrirDestinatarios(${item.id}, ${item.can_edit ? 'true' : 'false'})" title="Destinatarios"><i class="fa-solid fa-users text-primary"></i></button>
                     ${item.can_edit
                         ? `<button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Designer"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i></button>
@@ -1078,35 +1080,35 @@ async function carregarDestinatarios(id, page = 1) {
         });
         return `
         <tr data-recipient-id="${item.id}" data-has-nome="${nomeMissing ? '0' : '1'}" data-has-email="${emailMissing ? '0' : '1'}" data-has-cpf="${cpfMissing ? '0' : '1'}" class="${hasMissing ? 'row-missing-items' : ''}">
-            <td>${item.nome || ''}${hasMissing ? ' <span class="badge text-bg-warning text-dark ms-2 missing-row-badge">Incompleto</span>' : ''}</td>
-            <td>${item.email || '-'}</td>
-            <td>${item.cpf || '-'}</td>
-            <td><input type="text" class="form-control form-control-sm" id="carga_${item.id}" value="${item.carga_horaria || ''}" placeholder="Ex.: 20" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}></td>
-            <td><input type="text" class="form-control form-control-sm" id="curso_${item.id}" value="${item.curso_usuario || ''}" placeholder="Curso" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}></td>
-            <td class="text-end pe-1">
+            <td data-label="Nome">${item.nome || ''}${hasMissing ? ' <span class="badge text-bg-warning text-dark ms-2 missing-row-badge">Incompleto</span>' : ''}</td>
+            <td data-label="Email">${item.email || '-'}</td>
+            <td data-label="CPF">${item.cpf || '-'}</td>
+            <td data-label="Carga Horaria"><input type="text" class="form-control form-control-sm" id="carga_${item.id}" value="${item.carga_horaria || ''}" placeholder="Ex.: 20" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}></td>
+            <td data-label="Curso"><input type="text" class="form-control form-control-sm" id="curso_${item.id}" value="${item.curso_usuario || ''}" placeholder="Curso" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}></td>
+            <td class="text-end pe-1" data-label="Salvar">
                 <button class="btn btn-sm btn-outline-secondary" onclick="salvarDadosDestinatario(${item.id}, this)" title="Salvar dados" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}>
                     <i class="fa-solid fa-floppy-disk"></i>
                 </button>
             </td>
-            <td><small class="font-monospace">${item.cert_hash || '-'}</small></td>
-            <td>${item.cert_entregue ? '<span class="badge text-bg-success">Sim</span>' : '<span class="badge text-bg-secondary">Nao</span>'}</td>
-            <td>${formatDateTimeBrasilia(item.cert_data_envio)}</td>
-            <td class="text-end pe-1">
+            <td data-label="Hash"><small class="font-monospace">${item.cert_hash || '-'}</small></td>
+            <td data-label="Entregue">${item.cert_entregue ? '<span class="badge text-bg-success">Sim</span>' : '<span class="badge text-bg-secondary">Nao</span>'}</td>
+            <td data-label="Data Envio">${formatDateTimeBrasilia(item.cert_data_envio)}</td>
+            <td class="text-end pe-1" data-label="Preview">
                 <button class="btn btn-sm btn-outline-info" onclick='abrirPreviewDestinatario(${item.id}, ${JSON.stringify(item.nome || '')})' title="Preview">
                     <i class="fa-regular fa-eye"></i>
                 </button>
             </td>
-            <td class="text-end pe-1">
+            <td class="text-end pe-1" data-label="PDF">
                 <button class="btn btn-sm btn-outline-primary" onclick="baixarPdfDestinatario(${item.id})" title="Baixar PDF">
                     <i class="fa-solid fa-download"></i>
                 </button>
             </td>
-            <td class="text-end pe-1">
+            <td class="text-end pe-1" data-label="Reenviar">
                 <button class="btn btn-sm btn-outline-success" onclick="reenviarDestinatario(${item.id}, this)" ${(ACTIVE_CERT_CAN_EDIT && item.email) ? '' : 'disabled'}>
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </td>
-            <td class="text-end pe-1">
+            <td class="text-end pe-1" data-label="Remover">
                 <button class="btn btn-sm btn-outline-danger" onclick="removerDestinatario(${item.id})" ${ACTIVE_CERT_CAN_EDIT ? '' : 'disabled'}>
                     <i class="fa-solid fa-trash"></i>
                 </button>
@@ -1309,12 +1311,12 @@ function renderSearchUsersRows() {
     }
     tbody.innerHTML = searchUsersResults.map((user, index) => `
         <tr>
-            <td><input type="checkbox" class="form-check-input check-usuario-selecao" value="${index}" ${selectedUsersMap.has(userSelectionKey(user)) ? 'checked' : ''}></td>
-            <td>${user.nome || user.username || '-'}</td>
-            <td>${user.email || '-'}</td>
-            <td>${user.cpf || '-'}</td>
-            <td>${user.ra || '-'}</td>
-            <td>${user.curso || '-'}</td>
+            <td data-label="Selecionar" data-cell="select"><input type="checkbox" class="form-check-input check-usuario-selecao" value="${index}" ${selectedUsersMap.has(userSelectionKey(user)) ? 'checked' : ''}></td>
+            <td data-label="Nome">${user.nome || user.username || '-'}</td>
+            <td data-label="Email">${user.email || '-'}</td>
+            <td data-label="CPF">${user.cpf || '-'}</td>
+            <td data-label="RA">${user.ra || '-'}</td>
+            <td data-label="Curso">${user.curso || '-'}</td>
         </tr>
     `).join('');
 

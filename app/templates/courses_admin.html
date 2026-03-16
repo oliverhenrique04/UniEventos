@@ -100,12 +100,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-3 py-md-4 fade-in-up">
-    <div class="page-header-mobile d-flex flex-column flex-lg-row justify-content-between align-items-center mb-4 mb-lg-4">
+<div class="container py-3 py-md-4 fade-in-up courses-admin-page">
+    <div class="page-header-mobile d-flex flex-column flex-lg-row justify-content-between align-items-center mb-4 mb-lg-4 courses-admin-page__header">
         <div class="mb-3 mb-lg-0">
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-graduation-cap text-primary me-2"></i>Gestão de Cursos</h3>
         </div>
-        <div class="btn-action-group">
+        <div class="btn-action-group courses-admin-page__actions">
             {% if user.role == 'admin' %}
             <button onclick="abrirModalNovoCurso()" class="btn btn-action btn-new-course shadow-sm">
                 <i class="fa-solid fa-plus me-2"></i>Novo Curso
@@ -117,7 +117,7 @@
     </div>
 
     <!-- FILTERS -->
-    <div class="glass-panel p-3 p-md-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+    <div class="glass-panel p-3 p-md-4 mb-4 bg-white border-top border-2 border-primary shadow-sm courses-admin-page__filters">
         <h6 class="fw-bold mb-3 text-uppercase small text-muted d-flex align-items-center">
             <i class="fa-solid fa-filter me-2"></i>Filtrar Cursos
         </h6>
@@ -143,7 +143,7 @@
                     <option value="50">50</option>
                 </select>
             </div>
-            <div class="col-12 col-md-3 d-flex align-items-end gap-2">
+            <div class="col-12 col-md-3 d-flex align-items-end gap-2 courses-admin-page__filter-actions">
                 <button onclick="carregarCursos(1)" class="btn btn-primary btn-sm w-100 fw-bold">
                     <i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar
                 </button>
@@ -155,13 +155,13 @@
     </div>
 
     <!-- TABLE -->
-    <div class="glass-panel p-0 overflow-hidden mb-4 shadow-sm border">
-        <div class="px-3 px-md-4 py-3 border-bottom bg-light-subtle d-flex justify-content-between align-items-center">
+    <div class="glass-panel p-0 overflow-hidden mb-4 shadow-sm border courses-admin-page__table-shell">
+        <div class="px-3 px-md-4 py-3 border-bottom bg-light-subtle d-flex justify-content-between align-items-center courses-admin-page__table-header">
             <span class="small text-muted fw-semibold">Cursos cadastrados</span>
             <span class="badge text-bg-primary rounded-pill" id="badgeTotalCursos">0</span>
         </div>
         <div class="table-responsive rounded">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 courses-admin-page__table">
                 <thead class="bg-light">
                     <tr>
                         <th class="ps-3 ps-md-4">Identificação</th>
@@ -176,7 +176,7 @@
         </div>
     </div>
 
-    <nav aria-label="Paginação">
+    <nav aria-label="Paginação" class="courses-admin-page__pagination">
         <ul class="pagination justify-content-center pagination-sm" id="paginacaoCursos"></ul>
     </nav>
 </div>
@@ -292,12 +292,12 @@
             const nomeSeguro = String(c.nome || '').replace(/"/g, '&quot;');
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn hover-bg-light">
-                    <td class="ps-3 ps-md-4" data-label="Identificação">
+                    <td class="ps-3 ps-md-4" data-label="Curso" data-cell="name">
                         <div class="fw-bold text-dark">#${c.id}</div>
                         <div class="text-muted small d-md-none">${c.nome}</div>
                     </td>
                     <td class="d-none d-md-table-cell fw-bold text-dark" data-label="Nome do Curso">${c.nome}</td>
-                    <td class="text-end pe-3 pe-md-4" data-label="Ações">
+                    <td class="text-end pe-3 pe-md-4" data-label="Ações" data-cell="actions">
                         ${IS_READ_ONLY
                             ? '<span class="text-muted small">Somente consulta</span>'
                             : `<button class="btn btn-sm btn-outline-primary rounded-3" onclick="abrirModalEditar(${c.id}, &quot;${nomeSeguro}&quot;)" title="Editar curso"><i class="fa-solid fa-pen me-1"></i>Editar</button>`}
@@ -425,5 +425,4 @@
     }
 </script>
 {% endblock %}
-
 

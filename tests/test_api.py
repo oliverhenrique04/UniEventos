@@ -26,6 +26,12 @@ def _login_admin(client):
     _login_user(client, 'admin_test')
 
 
+def _extract_main_nav(html):
+    start = html.index('<nav class="navbar navbar-expand-lg app-navbar sticky-top">')
+    end = html.index('</nav>', start)
+    return html[start:end]
+
+
 def _create_event_for_certs(app, owner_username='admin_test'):
     with app.app_context():
         event = Event(
@@ -773,25 +779,83 @@ def test_dashboard_page_no_longer_renders_management_analytics(client, app, admi
     assert 'id="modalSessionWarning"' in admin_html
     assert 'id="btnSessionWarningKeepAlive"' in admin_html
 
-    client.get('/logout')
+    client.get('/api/logout')
     _login_user(client, seeded['gestor_username'])
     gestor_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in gestor_html
 
-    client.get('/logout')
+    client.get('/api/logout')
     _login_user(client, seeded['coord_username'])
     coord_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in coord_html
 
-    client.get('/logout')
+    client.get('/api/logout')
     _login_user(client, seeded['prof_eng_a_username'])
     professor_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in professor_html
 
-    client.get('/logout')
+    client.get('/api/logout')
     _login_user(client, seeded['participant_username'])
     participante_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in participante_html
+
+
+def test_authenticated_navbar_keeps_mobile_collapse_and_role_links(client, app, admin_user):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    _login_admin(client)
+    admin_html = client.get('/').get_data(as_text=True)
+    admin_nav = _extract_main_nav(admin_html)
+    assert 'data-bs-toggle="collapse"' in admin_html
+    assert 'data-bs-target="#navbarMain"' in admin_html
+    assert 'aria-controls="navbarMain"' in admin_html
+    assert 'collapse navbar-collapse app-navbar__panel' in admin_html
+    assert 'href="/cursos"' in admin_nav
+    assert 'href="/usuarios"' in admin_nav
+    assert 'href="/analitico"' in admin_nav
+    assert 'href="/eventos_admin"' in admin_nav
+
+    client.get('/api/logout')
+    _login_user(client, seeded['gestor_username'])
+    gestor_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
+    assert 'href="/cursos"' in gestor_nav
+    assert 'href="/usuarios"' in gestor_nav
+    assert 'href="/analitico"' in gestor_nav
+    assert 'href="/eventos_admin"' in gestor_nav
+
+    client.get('/api/logout')
+    _login_user(client, seeded['coord_username'])
+    coord_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
+    assert 'href="/cursos"' not in coord_nav
+    assert 'href="/usuarios"' not in coord_nav
+    assert 'href="/analitico"' in coord_nav
+    assert 'href="/eventos_admin"' in coord_nav
+
+    with app.app_context():
+        participant = db.session.get(User, seeded['participant_username'])
+        participant.can_create_events = True
+        db.session.commit()
+
+    client.get('/api/logout')
+    _login_user(client, seeded['participant_username'])
+    creator_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
+    assert 'href="/eventos_admin"' in creator_nav
+    assert 'href="/cursos"' not in creator_nav
+    assert 'href="/usuarios"' not in creator_nav
+    assert 'href="/analitico"' not in creator_nav
+
+    with app.app_context():
+        participant = db.session.get(User, seeded['participant_username'])
+        participant.can_create_events = False
+        db.session.commit()
+
+    client.get('/api/logout')
+    _login_user(client, seeded['participant_username'])
+    participant_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
+    assert 'href="/eventos_admin"' not in participant_nav
+    assert 'href="/cursos"' not in participant_nav
+    assert 'href="/usuarios"' not in participant_nav
+    assert 'href="/analitico"' not in participant_nav
 
 
 def test_dashboard_hides_event_management_when_user_has_no_visible_records(client, admin_user):
@@ -965,6 +1029,12 @@ def test_events_api_allows_extensao_participant_and_certificate_access_without_e
     _login_user(client, seeded['extensao_username'])
     page_res = client.get('/eventos_admin')
     assert page_res.status_code == 200
+    page_html = page_res.get_data(as_text=True)
+    assert 'events-admin-page' in page_html
+    assert 'events-admin-main-table' in page_html
+    assert 'participants-table' in page_html
+    assert 'id="tabelaEventos"' in page_html
+    assert 'id="modalParticipantes"' in page_html
 
     res = client.get('/api/eventos_admin')
     assert res.status_code == 200
@@ -1279,6 +1349,61 @@ def test_users_admin_page_reuses_rich_csv_import_flow(client, admin_user):
     assert '/api/importar_usuarios_csv/status/${jobId}' in html
     assert 'Criadas' in html
     assert 'Atualizadas' in html
+
+
+def test_mobile_first_management_pages_render_new_layout_markers(client, app, admin_user):
+    event_id = _create_event_for_certs(app)
+
+    with app.app_context():
+        admin = db.session.get(User, 'admin_test')
+        admin.can_create_events = True
+        db.session.commit()
+
+    _login_admin(client)
+
+    create_res = client.get('/criar_evento')
+    edit_res = client.get(f'/editar_evento/{event_id}')
+    profile_res = client.get('/perfil')
+    courses_res = client.get('/cursos')
+    institutional_res = client.get('/certificados_institucionais')
+
+    assert create_res.status_code == 200
+    create_html = create_res.get_data(as_text=True)
+    assert 'event-form-page' in create_html
+    assert 'event-form-page__actions' in create_html
+    assert 'event-form-page__map-actions' in create_html
+    assert 'id="mainEventForm"' in create_html
+    assert 'id="activitiesList"' in create_html
+
+    assert edit_res.status_code == 200
+    edit_html = edit_res.get_data(as_text=True)
+    assert 'event-form-page' in edit_html
+    assert 'event-form-page__breadcrumb' in edit_html
+    assert 'event-form-page__subheader' in edit_html
+    assert 'id="mainEventForm"' in edit_html
+
+    assert profile_res.status_code == 200
+    profile_html = profile_res.get_data(as_text=True)
+    assert 'profile-page' in profile_html
+    assert 'profile-page__hero' in profile_html
+    assert 'profile-page__tabs' in profile_html
+    assert 'id="profileTabs"' in profile_html
+    assert 'id="tabela-atividades"' in profile_html
+
+    assert courses_res.status_code == 200
+    courses_html = courses_res.get_data(as_text=True)
+    assert 'courses-admin-page' in courses_html
+    assert 'courses-admin-page__filters' in courses_html
+    assert 'courses-admin-page__table-shell' in courses_html
+    assert 'id="tabelaCursos"' in courses_html
+
+    assert institutional_res.status_code == 200
+    institutional_html = institutional_res.get_data(as_text=True)
+    assert 'institutional-certs-page' in institutional_html
+    assert 'institutional-certs-page__table-shell' in institutional_html
+    assert 'institutional-certs-modal' in institutional_html
+    assert 'id="tabelaInstitucionais"' in institutional_html
+    assert 'id="tabelaDestinatarios"' in institutional_html
 
 
 def test_importar_usuarios_csv_start_and_status_update_existing_user(client, app, admin_user, monkeypatch):

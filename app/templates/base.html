@@ -22,54 +22,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     <style>
-        .navbar .nav-link-custom {
-            color: #475569;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-        }
-
-        .navbar .nav-link-custom:hover {
-            color: #044d84;
-        }
-
-        .navbar .nav-link-custom.active {
-            color: #044d84;
-            font-weight: 700;
-        }
-
-        .navbar .nav-link-custom.active::after {
-            content: "";
-            position: absolute;
-            left: 0;
-            bottom: -3px;
-            width: 100%;
-            height: 1px;
-            background-color: #044d84;
-            border-radius: 999px;
-        }
-
-        .navbar .nav-profile-link {
-            color: #212529;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .navbar .nav-profile-link:hover {
-            color: #044d84;
-        }
-
-        .navbar .nav-profile-link.active {
-            color: #044d84;
-        }
-
-        .navbar .nav-profile-link.active .fw-bold {
-            font-weight: 700;
-        }
-
         .session-warning-modal .modal-content {
             border: 0;
             border-radius: 28px;
@@ -279,90 +231,102 @@
     {% set current_tab = request.args.get('tab') %}
     {% set open_checkin = request.args.get('open_checkin') %}
 
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container">
-            <a class="navbar-brand fs-4" href="{{ url_for('main.index') }}">
+    <nav class="navbar navbar-expand-lg app-navbar sticky-top">
+        <div class="container app-navbar__container">
+            <a class="navbar-brand fs-4 app-navbar__brand" href="{{ url_for('main.index') }}">
                 <i class="fa-solid fa-ticket me-2"></i>EuroEventos
             </a>
 
-            <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse"
-                data-bs-target="#navbarMain">
-                <i class="fa-solid fa-bars fs-4 text-dark"></i>
+            <button class="navbar-toggler border-0 shadow-none d-lg-none app-navbar__toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain"
+                aria-label="Abrir menu principal">
+                <i class="fa-solid fa-bars fs-4"></i>
             </button>
 
-            <div class="collapse navbar-collapse justify-content-end mt-2 mt-lg-0" id="navbarMain">
-                <div class="d-flex align-items-center flex-column flex-lg-row gap-1">
+            <div class="collapse navbar-collapse app-navbar__panel" id="navbarMain">
+                <div class="app-navbar__body">
+                    <div class="app-navbar__links" aria-label="Menu principal">
+                        <a href="{{ url_for('main.validar_busca') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.validar_busca' %}active{% endif %}">
+                            <i class="fa-solid fa-shield"></i>
+                            <span>Validar</span>
+                        </a>
 
-                    <a href="{{ url_for('main.validar_busca') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.validar_busca' %}active{% endif %}">
-                        <i class="fa-solid fa-shield me-1"></i> Validar
-                    </a>
+                        <a href="{{ url_for('main.index', open_checkin=1) }}#checkin-digital"
+                            class="nav-link-custom {% if current_endpoint == 'main.index' and open_checkin == '1' %}active{% endif %}">
+                            <i class="fa-solid fa-qrcode"></i>
+                            <span>Presença</span>
+                        </a>
 
-                    <a href="{{ url_for('main.index', open_checkin=1) }}#checkin-digital"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.index' and open_checkin == '1' %}active{% endif %}">
-                        <i class="fa-solid fa-qrcode me-1"></i> Presença
-                    </a>
+                        <a href="{{ url_for('main.meus_eventos') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.meus_eventos' %}active{% endif %}">
+                            <i class="fa-solid fa-award"></i>
+                            <span>Participações</span>
+                        </a>
 
-                    <a href="{{ url_for('main.meus_eventos') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.meus_eventos' %}active{% endif %}">
-                        <i class="fa-solid fa-award me-1"></i> Participações
-                    </a>
+                        <a href="{{ url_for('main.perfil_usuario', tab='certificados') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.perfil_usuario' and current_tab == 'certificados' %}active{% endif %}">
+                            <i class="fa-solid fa-certificate"></i>
+                            <span>Certificados</span>
+                        </a>
 
-                    <a href="{{ url_for('main.perfil_usuario', tab='certificados') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.perfil_usuario' and current_tab == 'certificados' %}active{% endif %}">
-                        <i class="fa-solid fa-certificate me-1"></i> Certificados
-                    </a>
+                        {% if user.role in ['admin', 'gestor'] %}
+                        <a href="{{ url_for('main.gerenciar_cursos') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.gerenciar_cursos' %}active{% endif %}">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                            <span>Cursos</span>
+                        </a>
 
-                    {% if user.role in ['admin', 'gestor'] %}
-                    <a href="{{ url_for('main.gerenciar_cursos') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.gerenciar_cursos' %}active{% endif %}">
-                        <i class="fa-solid fa-graduation-cap me-1"></i> Cursos
-                    </a>
+                        <a href="{{ url_for('main.gerenciar_usuarios') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.gerenciar_usuarios' %}active{% endif %}">
+                            <i class="fa-solid fa-users-gear"></i>
+                            <span>Usuários</span>
+                        </a>
+                        {% endif %}
 
-                    <a href="{{ url_for('main.gerenciar_usuarios') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.gerenciar_usuarios' %}active{% endif %}">
-                        <i class="fa-solid fa-users-gear me-1"></i> Usuários
-                    </a>
-                    {% endif %}
+                        {% if user.role in ['admin', 'coordenador', 'gestor', 'extensao'] or user.can_create_events %}
+                        <a href="{{ url_for('main.gerenciar_eventos') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.gerenciar_eventos' %}active{% endif %}">
+                            <i class="fa-solid fa-calendar-check"></i>
+                            <span>Eventos</span>
+                        </a>
+                        {% endif %}
 
-                    {% if user.role in ['admin', 'coordenador', 'gestor', 'extensao'] or user.can_create_events %}
-                    <a href="{{ url_for('main.gerenciar_eventos') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.gerenciar_eventos' %}active{% endif %}">
-                        <i class="fa-solid fa-calendar-check me-1"></i> Eventos
-                    </a>
-                    {% endif %}
+                        {% if user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
+                        <a href="{{ url_for('main.certificados_institucionais_page') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.certificados_institucionais_page' %}active{% endif %}">
+                            <i class="fa-solid fa-school"></i>
+                            <span>Acadêmicos</span>
+                        </a>
+                        {% endif %}
 
-                    {% if user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
-                    <a href="{{ url_for('main.certificados_institucionais_page') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.certificados_institucionais_page' %}active{% endif %}">
-                        <i class="fa-solid fa-school me-1"></i> Acadêmicos
-                    </a>
-                    {% endif %}
-
-                    {% if user.role in ['admin', 'coordenador', 'gestor'] %}
-                    <a href="{{ url_for('main.analitico_page') }}"
-                        class="nav-link-custom me-lg-3 {% if current_endpoint == 'main.analitico_page' %}active{% endif %}">
-                        <i class="fa-solid fa-chart-line me-1"></i> Analítico
-                    </a>
-                    {% endif %}
+                        {% if user.role in ['admin', 'coordenador', 'gestor'] %}
+                        <a href="{{ url_for('main.analitico_page') }}"
+                            class="nav-link-custom {% if current_endpoint == 'main.analitico_page' %}active{% endif %}">
+                            <i class="fa-solid fa-chart-line"></i>
+                            <span>Analítico</span>
+                        </a>
+                        {% endif %}
+                    </div>
 
                     {% if user.role %}
-                    <div class="text-center text-lg-end">
+                    <div class="app-navbar__account">
                         <a href="{{ url_for('main.perfil_usuario') }}"
                             class="nav-profile-link {% if current_endpoint == 'main.perfil_usuario' and current_tab != 'certificados' %}active{% endif %}">
+                            <span class="app-navbar__profile-eyebrow">Conta</span>
                             <div class="fw-bold">
                                 <i class="fa-solid fa-address-card me-1"></i>Meus Dados
                             </div>
                         </a>
-                        <span class="badge bg-indigo-100 text-indigo-700 border border-indigo-200"
-                            style="background:#e0e7ff; color:#4338ca;">
-                            {{ user.role|upper }}
-                        </span>
+                        <div class="app-navbar__account-meta">
+                            <span class="badge app-navbar__role-badge">
+                                {{ user.role|upper }}
+                            </span>
+                            <a href="{{ url_for('main.logout') }}" class="btn btn-outline-warning btn-sm app-navbar__logout">
+                                <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sair
+                            </a>
+                        </div>
                     </div>
-
-                    <a href="{{ url_for('main.logout') }}" class="btn btn-outline-warning btn-sm w-15 w-lg-auto">
-                        <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sair
-                    </a>
                     {% endif %}
                 </div>
             </div>

@@ -118,26 +118,26 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-3 py-md-4 fade-in-up">
+<div class="container py-3 py-md-4 fade-in-up profile-page">
     <!-- Header do Perfil do Usuário com Estatísticas -->
-    <div class="glass-panel p-4 mb-5 border-top border-2 border-primary bg-white shadow-sm">
-        <div class="row align-items-center">
+    <div class="glass-panel p-4 mb-5 border-top border-2 border-primary bg-white shadow-sm profile-page__hero">
+        <div class="row align-items-center profile-page__hero-grid">
             <div class="col-md-auto text-center mb-3 mb-md-0">
                 <div class="bg-indigo-50 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm" style="width: 90px; height: 90px;">
                     <i class="fa-solid fa-user-graduate fa-2x"></i>
                 </div>
             </div>
-            <div class="col-md text-center text-md-start border-end-md">
+            <div class="col-md text-center text-md-start border-end-md profile-page__identity">
                 <h3 class="fw-bold mb-1 text-slate-900">{{ user.nome }}</h3>
-                <div class="text-muted d-flex flex-wrap justify-content-center justify-content-md-start gap-3 small mb-2">
+                <div class="text-muted d-flex flex-wrap justify-content-center justify-content-md-start gap-3 small mb-2 profile-page__meta">
                     <span><i class="fa-solid fa-id-card me-1"></i>{{ user.cpf }}</span>
                     <span><i class="fa-solid fa-graduation-cap me-1"></i>RA: {{ user.ra or 'N/A' }}</span>
                 </div>
-                <div class="badge bg-slate-100 text-color-primary border border-slate-200 px-3 py-2 rounded-pill">
+                <div class="badge bg-slate-100 text-color-primary border border-slate-200 px-3 py-2 rounded-pill profile-page__course-badge">
                     <i class="fa-solid fa-book-open me-1"></i> {{ user.curso or 'Curso não informado' }}
                 </div>
             </div>
-            <div class="col-md-6 mt-6 mt-md-0 mt-2">
+            <div class="col-md-6 mt-6 mt-md-0 mt-2 profile-page__stats">
                 <div class="row text-center g-2">
                     <div class="col-4">
                         <div class="p-2 bg-light rounded-4 border profile-stat-card">
@@ -162,7 +162,7 @@
         </div>
     </div>
 
-    <div class="profile-actions mb-4">
+    <div class="profile-actions profile-page__actions mb-4">
         <button class="btn btn-action btn-profile-edit shadow-sm" onclick="abrirModalPerfilDados()">
             <i class="fa-solid fa-user-pen me-2"></i>Atualizar Dados Cadastrais
         </button>
@@ -172,7 +172,7 @@
     </div>
 
     <!-- Navegação por Abas -->
-    <ul class="nav nav-pills nav-fill mb-4 profile-tabs-wrap" id="profileTabs" role="tablist">
+    <ul class="nav nav-pills nav-fill mb-4 profile-tabs-wrap profile-page__tabs" id="profileTabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active rounded-3 fw-bold" data-bs-toggle="pill" data-bs-target="#tab-eventos" onclick="carregarHistorico('events', 1)">
                 <i class="fa-solid fa-calendar-day me-2"></i>Histórico de Eventos
@@ -192,14 +192,14 @@
 
     <div class="tab-content" id="profileTabsContent">
         <!-- Tab Eventos -->
-        <div class="tab-pane fade show active" id="tab-eventos">
-            <div id="lista-eventos" class="row row-cols-1 row-cols-md-2 g-4"></div>
+        <div class="tab-pane fade show active profile-page__tab-pane" id="tab-eventos">
+            <div id="lista-eventos" class="row row-cols-1 row-cols-md-2 g-4 profile-page__event-grid"></div>
             <nav class="mt-5"><ul class="pagination justify-content-center" id="pag-eventos"></ul></nav>
         </div>
 
         <!-- Tab Atividades -->
-        <div class="tab-pane fade" id="tab-atividades">
-            <div class="glass-panel p-0 overflow-hidden shadow-sm bg-white">
+        <div class="tab-pane fade profile-page__tab-pane" id="tab-atividades">
+            <div class="glass-panel p-0 overflow-hidden shadow-sm bg-white profile-page__activity-shell">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
@@ -219,8 +219,8 @@
         </div>
 
         <!-- Tab Certificados -->
-        <div class="tab-pane fade" id="tab-certificados">
-            <div class="row row-cols-1 row-cols-md-3 g-4" id="lista-certificados"></div>
+        <div class="tab-pane fade profile-page__tab-pane" id="tab-certificados">
+            <div class="row row-cols-1 row-cols-md-3 g-4 profile-page__certificate-grid" id="lista-certificados"></div>
             <nav class="mt-5"><ul class="pagination justify-content-center" id="pag-certificados"></ul></nav>
         </div>
     </div>
@@ -398,14 +398,14 @@
         data.items.forEach(ev => {
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
-                    <div class="glass-panel h-100 p-4 d-flex flex-column border-start border-2 border-primary bg-white shadow-sm">
+                    <div class="glass-panel h-100 p-4 d-flex flex-column border-start border-2 border-primary bg-white shadow-sm profile-page__history-card">
                         <div class="mb-1 d-flex justify-content-between align-items-start">
                             <h5 class="fw-bold text-dark m-0">${ev.nome}</h5>
                             <span class="badge bg-indigo-50 text-indigo-600 border border-indigo-100">${ev.tipo}</span>
                         </div>
                         ${ev.curso ? `<div class="text-primary x-small fw-bold mb-3"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</div>` : ''}
                         <p class="text-muted small mb-4 flex-grow-1">${ev.descricao || ''}</p>
-                        <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto profile-page__history-card-footer">
                             <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${formatIsoDate(ev.data_inicio)}</small>
                             <a href="${pathUrl(`/inscrever/${ev.token_publico}`)}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>
                         </div>
@@ -461,7 +461,7 @@
             const previewUrl = cert.preview_url || null;
             div.innerHTML += `
                 <div class="col animate__animated animate__fadeIn">
-                    <div class="glass-panel text-center p-4 bg-white border-top border-2 border-success h-100 shadow-sm">
+                    <div class="glass-panel text-center p-4 bg-white border-top border-2 border-success h-100 shadow-sm profile-page__certificate-card">
                         <div class="bg-success-subtle text-success rounded-circle d-inline-flex p-3 mb-3">
                             <i class="fa-solid fa-certificate fa-2x"></i>
                         </div>
@@ -624,5 +624,4 @@
     }
 </script>
 {% endblock %}
-
 

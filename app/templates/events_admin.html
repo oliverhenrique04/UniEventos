@@ -192,39 +192,451 @@
         position: relative;
         z-index: 1;
     }
+
+    .events-admin-page {
+        overflow-x: hidden;
+    }
+
+    .events-admin-header {
+        gap: 1rem;
+    }
+
+    .events-admin-cta {
+        width: 100%;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .events-admin-filters label {
+        display: block;
+        margin-bottom: 0.35rem;
+        color: #475569;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+    }
+
+    .events-admin-table-shell {
+        border: 1px solid #e2e8f0;
+    }
+
+    .events-admin-table thead th,
+    .participants-table thead th {
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #64748b;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        white-space: nowrap;
+    }
+
+    .events-admin-table tbody td,
+    .participants-table tbody td {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        vertical-align: middle;
+    }
+
+    .event-row-title {
+        font-size: 1rem;
+        line-height: 1.35;
+    }
+
+    .event-row-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.45rem;
+    }
+
+    .event-row-stats {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .event-row-stat {
+        min-width: 72px;
+        text-align: center;
+    }
+
+    .event-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(42px, 1fr));
+        gap: 0.5rem;
+        width: 100%;
+        max-width: 172px;
+        margin-left: auto;
+    }
+
+    .participants-modal-header {
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .participants-modal-title-wrap {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .participants-add-toggle {
+        white-space: nowrap;
+    }
+
+    .participants-add-section {
+        padding: 1rem 1rem 1.25rem;
+    }
+
+    .participants-selected {
+        gap: 0.75rem;
+    }
+
+    .participants-filters {
+        padding: 1rem;
+    }
+
+    .participants-modal-footer {
+        gap: 0.75rem;
+    }
+
+    .participants-modal-footer .pagination {
+        flex-wrap: wrap;
+    }
+
+    .participant-remove-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(239, 68, 68, 0.08);
+        text-decoration: none;
+    }
+
+    .participant-remove-btn:hover {
+        background: rgba(239, 68, 68, 0.14);
+    }
+
+    @media (min-width: 576px) {
+        .events-admin-cta {
+            width: auto;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .events-admin-page {
+            padding-top: 0.25rem;
+        }
+
+        .events-admin-filters,
+        .events-admin-table-shell {
+            border-radius: 1.15rem;
+        }
+
+        .events-admin-table-wrap,
+        .participants-table-wrap {
+            overflow: visible;
+        }
+
+        .events-admin-table thead,
+        .participants-table thead {
+            display: none;
+        }
+
+        .events-admin-table tbody tr,
+        .participants-table tbody tr {
+            display: block;
+            margin: 1rem;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 1.1rem;
+            background: #fff;
+            box-shadow: 0 18px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        .events-admin-table tbody td,
+        .participants-table tbody td {
+            display: grid;
+            grid-template-columns: minmax(0, 108px) minmax(0, 1fr);
+            gap: 0.75rem;
+            align-items: start;
+            padding: 0.65rem 0;
+            border: 0;
+        }
+
+        .events-admin-table tbody td::before,
+        .participants-table tbody td::before {
+            content: attr(data-label);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .events-admin-table tbody td[data-label="Evento"],
+        .participants-table tbody td[data-label="Nome"] {
+            display: block;
+            margin-bottom: 0.65rem;
+            padding-bottom: 0.9rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .events-admin-table tbody td[data-label="Evento"]::before,
+        .participants-table tbody td[data-label="Nome"]::before {
+            display: none;
+        }
+
+        .events-admin-table tbody td[data-label="Ações"],
+        .participants-table tbody td[data-label="Ação"] {
+            display: block;
+            margin-top: 0.4rem;
+            padding-top: 0.9rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .events-admin-table tbody td[data-label="Ações"]::before,
+        .participants-table tbody td[data-label="Ação"]::before {
+            display: block;
+            margin-bottom: 0.65rem;
+        }
+
+        .events-admin-table tbody td[colspan],
+        .participants-table tbody td[colspan] {
+            display: block;
+            padding: 0.5rem 0 !important;
+            text-align: center;
+        }
+
+        .events-admin-table tbody td[colspan]::before,
+        .participants-table tbody td[colspan]::before {
+            display: none;
+        }
+
+        .event-row-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.35rem;
+        }
+
+        .event-row-stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            width: 100%;
+        }
+
+        .event-row-stats .vr {
+            display: none;
+        }
+
+        .event-row-stat {
+            text-align: left;
+        }
+
+        .event-actions-grid {
+            max-width: none;
+            margin-left: 0;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .participants-modal-title-wrap,
+        .participants-selected,
+        .participants-modal-footer {
+            flex-direction: column;
+            align-items: stretch !important;
+        }
+
+        .participants-add-toggle,
+        .participants-selected .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .participants-table-wrap {
+            min-height: 0 !important;
+        }
+    }
+
+    @media (min-width: 768px) and (max-width: 991.98px) {
+        .events-admin-table-wrap,
+        .participants-table-wrap {
+            overflow: visible;
+            padding: 0.4rem;
+        }
+
+        .events-admin-table thead,
+        .participants-table thead {
+            display: none;
+        }
+
+        .events-admin-table tbody tr,
+        .participants-table tbody tr {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.85rem 1.15rem;
+            margin: 0 0 1rem;
+            padding: 1.1rem 1.2rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 1.15rem;
+            background: #fff;
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .events-admin-table tbody tr:last-child,
+        .participants-table tbody tr:last-child {
+            margin-bottom: 0;
+        }
+
+        .events-admin-table tbody td,
+        .participants-table tbody td {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.35rem;
+            min-width: 0;
+            padding: 0;
+            border: 0;
+            text-align: left;
+        }
+
+        .events-admin-table tbody td::before,
+        .participants-table tbody td::before {
+            content: attr(data-label);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .events-admin-table tbody td[data-label="Evento"],
+        .events-admin-table tbody td[data-label="Participação"],
+        .events-admin-table tbody td[data-label="Ações"],
+        .participants-table tbody td[data-label="Nome"],
+        .participants-table tbody td[data-label="Ação"] {
+            grid-column: 1 / -1;
+        }
+
+        .events-admin-table tbody td[data-label="Evento"],
+        .participants-table tbody td[data-label="Nome"] {
+            display: block;
+            padding-bottom: 0.95rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .events-admin-table tbody td[data-label="Evento"]::before,
+        .participants-table tbody td[data-label="Nome"]::before {
+            display: none;
+        }
+
+        .events-admin-table tbody td[data-label="Ações"],
+        .participants-table tbody td[data-label="Ação"] {
+            display: block;
+            padding-top: 0.95rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .events-admin-table tbody td[data-label="Ações"]::before,
+        .participants-table tbody td[data-label="Ação"]::before {
+            display: block;
+            margin-bottom: 0.65rem;
+        }
+
+        .events-admin-table tbody td[colspan],
+        .participants-table tbody td[colspan] {
+            display: block;
+            grid-column: 1 / -1;
+            padding: 0.5rem 0 !important;
+            text-align: center;
+        }
+
+        .events-admin-table tbody td[colspan]::before,
+        .participants-table tbody td[colspan]::before {
+            display: none;
+        }
+
+        .event-row-meta {
+            gap: 0.4rem;
+        }
+
+        .event-row-stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 120px));
+            gap: 0.75rem;
+            width: auto;
+        }
+
+        .event-row-stats .vr {
+            display: none;
+        }
+
+        .event-row-stat {
+            min-width: 0;
+            text-align: left;
+        }
+
+        .event-actions-grid {
+            max-width: none;
+            margin-left: 0;
+            grid-template-columns: repeat(3, minmax(42px, 1fr));
+        }
+
+        .participants-modal-footer {
+            flex-direction: column;
+            align-items: stretch !important;
+        }
+
+        .participants-modal-footer nav,
+        .participants-modal-footer .btn-secondary {
+            width: 100%;
+        }
+
+        .participants-modal-footer .pagination {
+            justify-content: center;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4 fade-in-up">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="container py-3 py-md-4 fade-in-up events-admin-page">
+    <div class="events-admin-header d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center mb-4">
         <div>
             <h3 class="fw-bold text-gradient mb-0"><i class="fa-solid fa-calendar-check text-primary me-2"></i>Gestão de Eventos</h3>
         </div>
         {% if user.can_create_events %}
-        <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-primary shadow-sm">
+        <a href="{{ url_for('main.criar_evento_page') }}" class="btn btn-primary shadow-sm events-admin-cta">
             <i class="fa-solid fa-plus me-2"></i> Novo Evento
         </a>
         {% endif %}
     </div>
 
     <!-- FILTERS -->
-    <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm">
+    <div class="glass-panel p-3 p-md-4 mb-4 bg-white border-top border-2 border-primary shadow-sm events-admin-filters">
         <h6 class="fw-bold mb-3 text-uppercase small text-muted"><i class="fa-solid fa-filter me-2"></i>Filtrar Eventos</h6>
-        <div class="row g-3">
-            <div class="col-md-3">
+        <div class="row g-2 g-md-3">
+            <div class="col-12 col-sm-6 col-lg-3">
                 <label class="small fw-bold">Título / Nome</label>
                 <input type="text" id="filtNome" class="form-control form-control-sm" placeholder="Ex: Simpósio...">
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-lg-3">
                 <label class="small fw-bold">Curso / Depto</label>
                 <input type="text" id="filtCurso" class="form-control form-control-sm" placeholder="Ex: TI...">
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-sm-6 col-lg-2">
                 <label class="small fw-bold">Data Início</label>
                 <input type="date" id="filtData" class="form-control form-control-sm">
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-sm-6 col-lg-2">
                 <label class="small fw-bold">Status</label>
                 <select id="filtStatus" class="form-select form-select-sm">
                     <option value="">Todos</option>
@@ -232,7 +644,7 @@
                     <option value="ENCERRADO">Encerrado</option>
                 </select>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
+            <div class="col-12 col-lg-2 d-flex align-items-end">
                 <button onclick="carregarEventos(1)" class="btn btn-primary btn-sm w-100 fw-bold">
                     <i class="fa-solid fa-magnifying-glass me-1"></i> Pesquisar
                 </button>
@@ -241,17 +653,17 @@
     </div>
 
     <!-- EVENTS TABLE -->
-    <div class="glass-panel p-0 overflow-hidden mb-4">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+    <div class="glass-panel p-0 overflow-hidden mb-4 events-admin-table-shell">
+        <div class="table-responsive events-admin-table-wrap">
+            <table class="table table-hover align-middle mb-0 events-admin-main-table events-admin-table">
                 <thead class="bg-light">
                     <tr>
-                        <th class="ps-4">Evento</th>
+                        <th class="ps-3 ps-md-4">Evento</th>
                         <th>Tipo / Status</th>
                         <th>Data Início</th>
                         <th>Participação</th>
                         <th>Responsável</th>
-                        <th class="text-end pe-4">Ações</th>
+                        <th class="text-end pe-3 pe-md-4">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabelaEventos">
@@ -261,12 +673,12 @@
         </div>
     </div>
 
-    <nav><ul class="pagination justify-content-center" id="paginacaoEventos"></ul></nav>
+    <nav class="events-admin-pagination"><ul class="pagination justify-content-center" id="paginacaoEventos"></ul></nav>
 </div>
 
 <!-- Modal Broadcast Notification -->
 <div class="modal fade" id="modalNotificacao" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-0 bg-info text-white">
                 <h5 class="modal-title fw-bold"><i class="fa-solid fa-paper-plane me-2"></i>Notificar Participantes</h5>
@@ -295,12 +707,12 @@
 
 <!-- Modal Manage Participants -->
 <div class="modal fade" id="modalParticipantes" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-fullscreen-lg-down modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 bg-dark text-white">
-                <div class="d-flex align-items-center gap-3">
+            <div class="modal-header border-0 bg-dark text-white participants-modal-header">
+                <div class="participants-modal-title-wrap">
                     <h5 class="modal-title fw-bold m-0"><i class="fa-solid fa-users me-2"></i>Participantes</h5>
-                    <button class="btn btn-sm btn-primary rounded-pill px-3" onclick="mostrarAreaAdicao()">
+                    <button class="btn btn-sm btn-primary rounded-pill px-3 participants-add-toggle" onclick="mostrarAreaAdicao()">
                         <i class="fa-solid fa-user-plus me-1"></i> Adicionar
                     </button>
                 </div>
@@ -308,10 +720,10 @@
             </div>
             <div class="modal-body p-0">
                 <!-- Add Participant Area (Hidden by default) -->
-                <div id="areaAdicao" class="p-4 bg-indigo-50 border-bottom d-none animate__animated animate__fadeIn">
+                <div id="areaAdicao" class="participants-add-section bg-indigo-50 border-bottom d-none animate__animated animate__fadeIn">
                     <h6 class="fw-bold mb-3 text-primary">Nova Inscrição Manual</h6>
                     <div class="row g-2 mb-3">
-                        <div class="col-md-7">
+                        <div class="col-12 col-md-7">
                             <div class="manual-enroll-search">
                                 <label class="small fw-bold text-muted mb-1">Buscar Participante (Nome, RA ou CPF)</label>
                                 <input type="text" id="addPartSearch" class="form-control" placeholder="Digite para buscar..." oninput="buscarParticipantesLive(this.value)">
@@ -320,7 +732,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-12 col-md-5">
                             <label class="small fw-bold text-muted mb-1">Atividade</label>
                             <select id="addPartAtividade" class="form-select">
                                 <!-- Preenchido dinamicamente -->
@@ -328,7 +740,7 @@
                         </div>
                     </div>
                     
-                    <div id="participanteSelecionado" class="alert alert-primary d-none d-flex justify-content-between align-items-center rounded-4 py-2">
+                    <div id="participanteSelecionado" class="alert alert-primary d-none d-flex justify-content-between align-items-center rounded-4 py-2 participants-selected">
                         <div>
                             <i class="fa-solid fa-user-check me-2"></i>
                             <span class="fw-bold" id="selNome"></span> 
@@ -340,49 +752,49 @@
                     <div class="mt-2 small text-muted"><i class="fa-solid fa-circle-info me-1"></i> O participante deve estar previamente cadastrado no sistema.</div>
                 </div>
 
-                <div class="p-4 bg-light border-bottom">
+                <div class="bg-light border-bottom participants-filters">
                     <div class="row g-3">
-                        <div class="col-md-3">
+                        <div class="col-12 col-md-3">
                             <input type="text" id="filtPartNome" class="form-control" placeholder="Buscar por nome..." oninput="carregarParticipantes(1)">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-6 col-md-2">
                             <input type="text" id="filtPartCpf" class="form-control" placeholder="CPF..." oninput="carregarParticipantes(1)">
                         </div>
-                        <div class="col-md-3 d-none" id="filtPartAtividadeWrapper">
+                        <div class="col-12 col-md-3 d-none" id="filtPartAtividadeWrapper">
                             <select id="filtPartAtividade" class="form-select" onchange="carregarParticipantes(1)">
                                 <option value="">Todas as atividades</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-6 col-md-2">
                             <select id="filtPartPresenca" class="form-select" onchange="carregarParticipantes(1)">
                                 <option value="">Todos (Presença)</option>
                                 <option value="true">Presentes</option>
                                 <option value="false">Ausentes</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-md-2">
                             <button class="btn btn-dark w-100" onclick="carregarParticipantes(1)">Atualizar</button>
                         </div>
                     </div>
                 </div>
                 
                 <div class="table-responsive participants-table-wrap" style="min-height: 400px;">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 participants-table">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4">Nome</th>
+                                <th class="ps-3 ps-md-4">Nome</th>
                                 <th>CPF</th>
                                 <th>Atividade</th>
                                 <th>Presença</th>
                                 <th>Distância</th>
-                                <th class="text-end pe-4">Ação</th>
+                                <th class="text-end pe-3 pe-md-4">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaParticipantes"></tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer bg-light border-0">
+            <div class="modal-footer bg-light border-0 participants-modal-footer">
                 <nav class="me-auto"><ul class="pagination pagination-sm m-0" id="paginacaoParticipantes"></ul></nav>
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
@@ -563,13 +975,13 @@
             const cursoBadge = ev.curso ? `<span class="badge text-color-primary border ms-1"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</span>` : '';
             
             const partInfo = `
-                <div class="d-flex align-items-center gap-2">
-                    <div class="text-center">
+                <div class="event-row-stats">
+                    <div class="event-row-stat">
                         <div class="fw-bold text-dark small">${ev.total_inscritos}</div>
                         <div class="text-muted x-small">Inscritos</div>
                     </div>
                     <div class="vr" style="height: 20px;"></div>
-                    <div class="text-center">
+                    <div class="event-row-stat">
                         <div class="fw-bold text-success small">${ev.total_presentes}</div>
                         <div class="text-muted x-small">Presenças</div>
                     </div>
@@ -577,19 +989,21 @@
 
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn">
-                    <td class="ps-4">
-                        <div class="fw-bold text-dark fs-6">${ev.nome}</div>
-                        <div class="d-flex align-items-center mt-1">
-                            <span class="text-muted x-small me-2">${ev.atividades.length} atividades</span>
+                    <td class="ps-3 ps-md-4 event-row-main" data-label="Evento">
+                        <div class="fw-bold text-dark fs-6 event-row-title">${ev.nome}</div>
+                        <div class="event-row-meta">
+                            <span class="text-muted x-small">${ev.atividades.length} atividades</span>
                             ${cursoBadge}
                         </div>
                     </td>
-                    <td>${tipoBadge} ${statusBadge}</td>
-                    <td><small class="fw-bold text-slate-600">${formatDateOrDash(ev.data_inicio)}</small></td>
-                    <td>${partInfo}</td>
-                    <td><span class="badge bg-light text-dark border">${ev.owner_name || ev.owner || 'Sistema'}</span></td>
-                    <td class="text-end pe-4">
-                        <div class="d-inline-grid gap-1" style="grid-template-columns: repeat(3, minmax(42px, 1fr)); min-width: 132px;">
+                    <td data-label="Tipo / Status">
+                        <div class="d-flex flex-wrap align-items-center gap-2">${tipoBadge} ${statusBadge}</div>
+                    </td>
+                    <td data-label="Data Início"><small class="fw-bold text-slate-600">${formatDateOrDash(ev.data_inicio)}</small></td>
+                    <td data-label="Participação">${partInfo}</td>
+                    <td data-label="Responsável"><span class="badge bg-light text-dark border">${ev.owner_name || ev.owner || 'Sistema'}</span></td>
+                    <td class="text-end pe-3 pe-md-4 event-row-actions-cell" data-label="Ações">
+                        <div class="event-actions-grid">
                             ${ev.can_edit ? `
                             <a href="${pathUrl(`/editar_evento/${ev.id}`)}" class="btn btn-sm btn-light border" title="Editar Evento">
                                 <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
@@ -990,14 +1404,14 @@
 
             tbody.innerHTML += `
                 <tr class="animate__animated animate__fadeIn">
-                    <td class="ps-4 fw-bold text-dark">${p.nome}</td>
-                    <td><small class="font-monospace text-muted">${p.cpf}</small></td>
-                    <td><span class="badge bg-light text-dark border">${p.activity_name || p.atividade}</span></td>
-                    <td>${toggleBtn}</td>
-                    <td>${distHtml}</td>
-                    <td class="text-end pe-4">
+                    <td class="ps-3 ps-md-4 fw-bold text-dark participant-row-main" data-label="Nome">${p.nome}</td>
+                    <td data-label="CPF"><small class="font-monospace text-muted">${p.cpf}</small></td>
+                    <td data-label="Atividade"><span class="badge bg-light text-dark border">${p.activity_name || p.atividade}</span></td>
+                    <td data-label="Presença">${toggleBtn}</td>
+                    <td data-label="Distância">${distHtml}</td>
+                    <td class="text-end pe-3 pe-md-4" data-label="Ação">
                         ${EVENTO_SELECIONADO_CAN_MANAGE
-                            ? `<button class="btn btn-xs btn-link text-danger p-0" onclick="removerInscricao(${p.id})"><i class="fa-solid fa-user-xmark"></i></button>`
+                            ? `<button class="btn btn-xs btn-link text-danger p-0 participant-remove-btn" onclick="removerInscricao(${p.id})"><i class="fa-solid fa-user-xmark"></i></button>`
                             : '<span class="text-muted small">-</span>'}
                     </td>
                 </tr>
