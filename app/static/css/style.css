@@ -950,6 +950,20 @@ h6 {
 }
 
 @media (max-width: 767.98px) {
+  .institutional-certs-page {
+    padding-top: 0.25rem;
+  }
+
+  .institutional-certs-page .institutional-certs-page__filters,
+  .institutional-certs-page .institutional-certs-page__table-shell {
+    border-radius: 1.15rem;
+  }
+
+  .institutional-certs-page .institutional-certs-page__table-wrap,
+  #modalDestinatarios.institutional-certs-modal .table-responsive {
+    overflow: visible;
+  }
+
   .event-form-page .step-card > .p-4 {
     padding: 0.95rem !important;
   }
@@ -1009,6 +1023,50 @@ h6 {
     margin-right: auto;
   }
 
+  .institutional-certs-page .institutional-certs-table tbody tr,
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody tr,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody tr {
+    margin: 1rem;
+    border-radius: 1.1rem;
+    box-shadow: 0 18px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td,
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td {
+    display: grid;
+    grid-template-columns: minmax(0, 108px) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0.65rem 0;
+    text-align: left;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td::before {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-right: 0;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="title"],
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[data-label="Nome"],
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[data-label="Nome"] {
+    display: block;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="title"]::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[data-label="Nome"]::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[data-label="Nome"]::before {
+    display: none;
+  }
+
   .courses-admin-page .courses-admin-page__filter-actions,
   .institutional-certs-page .institutional-certs-page__footer,
   #modalDestinatarios.institutional-certs-modal .institutional-certs-modal__toolbar,
@@ -1057,6 +1115,11 @@ h6 {
 
   .institutional-certs-page .institutional-certs-table__actions {
     justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(42px, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 216px;
   }
 
   #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[data-cell="select"],
@@ -1070,6 +1133,31 @@ h6 {
     display: block;
     margin-bottom: 0.4rem;
   }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="actions"] {
+    margin-top: 0.4rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="actions"]::before {
+    display: block;
+    margin-bottom: 0.65rem;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[colspan],
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[colspan],
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[colspan] {
+    display: block;
+    padding: 0.5rem 0 !important;
+    text-align: center;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[colspan]::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[colspan]::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[colspan]::before {
+    display: none;
+  }
 }
 
 @media (min-width: 576px) {
@@ -1079,6 +1167,10 @@ h6 {
 
   .event-form-page .event-form-page__map-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .institutional-certs-page .institutional-certs-page__cta {
+    width: auto;
   }
 }
 
@@ -1097,10 +1189,6 @@ h6 {
 
   .courses-admin-page .courses-admin-page__actions,
   .institutional-certs-page .institutional-certs-page__pager {
-    width: auto;
-  }
-
-  .institutional-certs-page .institutional-certs-page__cta {
     width: auto;
   }
 }
@@ -1168,10 +1256,56 @@ h6 {
   .courses-admin-page .courses-admin-page__actions {
     justify-content: flex-end;
   }
+
+  .institutional-certs-page .institutional-certs-page__footer {
+    flex-direction: row;
+    align-items: center !important;
+  }
+
+  .institutional-certs-page .institutional-certs-page__pager {
+    width: auto;
+  }
 }
 
-@media (min-width: 768px) and (max-width: 1199.98px) {
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .institutional-certs-page .institutional-certs-table thead th {
+    font-size: 0.72rem;
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td {
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .institutional-certs-page .institutional-certs-table__title .fw-semibold {
+    font-size: 0.94rem;
+    line-height: 1.3;
+  }
+
+  .institutional-certs-page .institutional-certs-table__status-control {
+    min-width: 160px;
+  }
+
+  .institutional-certs-page .institutional-certs-table__actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(38px, 1fr));
+    gap: 0.35rem;
+    width: 100%;
+    max-width: 172px;
+    margin-left: auto;
+  }
+
+  .institutional-certs-page .institutional-certs-table__actions .btn {
+    width: 2.15rem;
+    height: 2.15rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
   .institutional-certs-page .institutional-certs-page__table-wrap {
+    overflow: visible;
     padding: 0.4rem;
   }
 
@@ -1226,6 +1360,38 @@ h6 {
     grid-column: 1 / -1;
   }
 
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="title"] {
+    display: block;
+    padding-bottom: 0.95rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="title"]::before {
+    display: none;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="actions"] {
+    display: block;
+    padding-top: 0.95rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[data-cell="actions"]::before {
+    display: block;
+    margin-bottom: 0.65rem;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[colspan] {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 0.5rem 0 !important;
+    text-align: center;
+  }
+
+  .institutional-certs-page .institutional-certs-table tbody td[colspan]::before {
+    display: none;
+  }
+
   .institutional-certs-page .institutional-certs-table__status-control,
   .institutional-certs-page .institutional-certs-table__status-control .input-group {
     width: 100%;
@@ -1238,6 +1404,11 @@ h6 {
 
   .institutional-certs-page .institutional-certs-table__actions {
     justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(42px, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 216px;
   }
 
   .institutional-certs-page .institutional-certs-page__footer {
@@ -1247,5 +1418,81 @@ h6 {
 
   .institutional-certs-page .institutional-certs-page__pager {
     width: 100%;
+  }
+
+  #modalDestinatarios.institutional-certs-modal .table-responsive {
+    overflow: visible;
+    padding: 0.4rem;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios thead,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios thead {
+    display: none;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody tr,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 1.15rem;
+    margin: 0 0 1rem;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.15rem;
+    background: #fff;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody tr:last-child,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td::before {
+    content: attr(data-label);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[data-label="Nome"],
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[data-label="Nome"] {
+    grid-column: 1 / -1;
+    display: block;
+    padding-bottom: 0.95rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[data-label="Nome"]::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[data-label="Nome"]::before {
+    display: none;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[colspan],
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[colspan] {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 0.5rem 0 !important;
+    text-align: center;
+  }
+
+  #modalDestinatarios.institutional-certs-modal #tabelaBuscaUsuarios tbody td[colspan]::before,
+  #modalDestinatarios.institutional-certs-modal #tabelaDestinatarios tbody td[colspan]::before {
+    display: none;
   }
 }

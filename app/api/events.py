@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from flask import Blueprint, request, jsonify, abort, url_for
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func, case
@@ -354,6 +355,8 @@ def listar_participantes_evento(event_id):
             "cpf": e.user_cpf,
             "presente": e.presente,
             "atividade": e.activity.nome,
+            "activity_name": e.activity.nome,
+            "categoria_inscricao": e.registration_category_name,
             "distancia": round(dist) if dist is not None else None,
             "lat_checkin": e.lat_checkin,
             "lon_checkin": e.lon_checkin
@@ -406,8 +409,10 @@ def remover_inscricao(enrollment_id):
     if not event or not _user_can_manage_event_participants(event):
         return jsonify({"erro": "Acesso negado"}), 403
 
+    user_ref = SimpleNamespace(cpf=enrollment.user_cpf)
     db.session.delete(enrollment)
     db.session.commit()
+    event_service.cleanup_event_registration_if_empty(event, user_ref)
     return jsonify({"mensagem": "Inscrição removida!"})
 
 @bp.route('/me/history', methods=['GET'])

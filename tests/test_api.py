@@ -14,6 +14,7 @@ from app.models import (
 from app.extensions import db
 from openpyxl import Workbook
 from app.services.auth_service import AuthService
+from app.services.event_service import EventService
 from app.api import admin as admin_api
 from app.api import certificates as certificates_api
 
@@ -1745,6 +1746,207 @@ def test_open_events_api_can_filter_by_current_user_enrollment_status(client, ap
     not_enrolled = client.get('/api/eventos_abertos?situacao=nao_inscrito')
     assert not_enrolled.status_code == 200
     assert [item['nome'] for item in not_enrolled.get_json()['items']] == [seeded['law_event_name']]
+
+
+def test_open_events_api_respects_allowed_roles_and_exposes_registration_categories(client, app, admin_user):
+    with app.app_context():
+        professor = User(
+            username='allowed_role_professor',
+            role='professor',
+            nome='Professor Perfil',
+            cpf='30040050060',
+        )
+        professor.set_password('1234')
+        participant = User(
+            username='blocked_role_participant',
+            role='participante',
+            nome='Participante Bloqueado',
+            cpf='30040050061',
+        )
+        participant.set_password('1234')
+        db.session.add_all([professor, participant])
+        db.session.commit()
+
+        service = EventService()
+        event = service.create_event(admin_user.username, {
+            'nome': 'Evento Restrito a Docentes',
+            'descricao': 'Evento com inscricao por perfil',
+            'is_rapido': False,
+            'data_inicio': '2030-09-20',
+            'hora_inicio': '18:00',
+            'data_fim': '2030-09-20',
+            'hora_fim': '21:00',
+            'perfis_habilitados': ['professor'],
+            'categorias_inscricao': [
+                {'nome': 'Docente', 'vagas': 2},
+                {'nome': 'Ouvinte', 'vagas': -1},
+            ],
+            'atividades': [
+                {
+                    'nome': 'Mesa Docente',
+                    'local': 'Auditorio',
+                    'descricao': 'Atividade principal',
+                    'data_atv': '2030-09-20',
+                    'hora_atv': '18:30',
+                    'horas': 2,
+                    'vagas': 30,
+                }
+            ],
+        })
+        event_name = event.nome
+
+    _login_user(client, 'blocked_role_participant')
+    blocked_res = client.get('/api/eventos_abertos')
+    assert blocked_res.status_code == 200
+    assert [item['nome'] for item in blocked_res.get_json()['items']] == []
+
+    client.get('/api/logout')
+    _login_user(client, 'allowed_role_professor')
+    allowed_res = client.get('/api/eventos_abertos')
+    assert allowed_res.status_code == 200
+    payload = allowed_res.get_json()
+    assert [item['nome'] for item in payload['items']] == [event_name]
+    event_payload = payload['items'][0]
+    assert event_payload['perfis_habilitados'] == ['professor']
+    assert [item['nome'] for item in event_payload['categorias_inscricao']] == ['Docente', 'Ouvinte']
+    assert event_payload['pode_se_inscrever'] is True
+
+
+def test_toggle_inscricao_api_reuses_existing_event_category(client, app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='toggle_category_participant',
+            role='participante',
+            nome='Participante Categoria API',
+            cpf='30040050062',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.commit()
+
+        service = EventService()
+        event = service.create_event(admin_user.username, {
+            'nome': 'Evento API Categoria',
+            'descricao': 'Evento com duas atividades',
+            'is_rapido': False,
+            'data_inicio': '2030-10-10',
+            'hora_inicio': '18:00',
+            'data_fim': '2030-10-10',
+            'hora_fim': '22:00',
+            'perfis_habilitados': ['participante'],
+            'categorias_inscricao': [
+                {'nome': 'Aluno', 'vagas': 3},
+                {'nome': 'Ouvinte', 'vagas': 3},
+            ],
+            'atividades': [
+                {
+                    'nome': 'Atividade 1',
+                    'local': 'Sala 1',
+                    'descricao': 'Primeira',
+                    'data_atv': '2030-10-10',
+                    'hora_atv': '18:30',
+                    'horas': 2,
+                    'vagas': 20,
+                },
+                {
+                    'nome': 'Atividade 2',
+                    'local': 'Sala 2',
+                    'descricao': 'Segunda',
+                    'data_atv': '2030-10-10',
+                    'hora_atv': '20:00',
+                    'horas': 2,
+                    'vagas': 20,
+                },
+            ],
+        })
+        categories = {category.nome: category.id for category in event.registration_categories}
+        activity_ids = [activity.id for activity in sorted(event.activities, key=lambda activity: activity.id)]
+        participant_cpf = participant.cpf
+
+    _login_user(client, 'toggle_category_participant')
+
+    first_res = client.post('/api/toggle_inscricao', json={
+        'activity_id': activity_ids[0],
+        'acao': 'inscrever',
+        'categoria_inscricao_id': categories['Aluno'],
+    })
+    assert first_res.status_code == 200
+    assert first_res.get_json()['categoria_inscricao']['nome'] == 'Aluno'
+    assert first_res.get_json()['possui_inscricao_evento'] is True
+
+    second_res = client.post('/api/toggle_inscricao', json={
+        'activity_id': activity_ids[1],
+        'acao': 'inscrever',
+        'categoria_inscricao_id': categories['Ouvinte'],
+    })
+    assert second_res.status_code == 200
+    assert second_res.get_json()['categoria_inscricao']['nome'] == 'Aluno'
+    assert second_res.get_json()['possui_inscricao_evento'] is True
+
+    with app.app_context():
+        enrollments = Enrollment.query.filter_by(user_cpf=participant_cpf).order_by(Enrollment.activity_id).all()
+        assert len(enrollments) == 2
+        assert enrollments[0].event_registration_id == enrollments[1].event_registration_id
+
+
+def test_manual_enroll_api_and_reports_include_registration_category(client, app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='manual_category_user',
+            role='participante',
+            nome='Participante Manual Categoria',
+            cpf='30040050063',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.commit()
+
+        service = EventService()
+        event = service.create_event(admin_user.username, {
+            'nome': 'Evento Manual Categoria',
+            'descricao': 'Evento para relatorios',
+            'is_rapido': False,
+            'data_inicio': '2030-11-05',
+            'hora_inicio': '18:00',
+            'data_fim': '2030-11-05',
+            'hora_fim': '20:00',
+            'perfis_habilitados': ['participante'],
+            'categorias_inscricao': [
+                {'nome': 'Aluno', 'vagas': 5},
+                {'nome': 'Ouvinte', 'vagas': 5},
+            ],
+            'atividades': [
+                {
+                    'nome': 'Atividade Manual',
+                    'local': 'Sala Manual',
+                    'descricao': 'Atividade',
+                    'data_atv': '2030-11-05',
+                    'hora_atv': '18:30',
+                    'horas': 2,
+                    'vagas': 20,
+                }
+            ],
+        })
+        event_id = event.id
+        activity_id = event.activities[0].id
+        category_id = next(category.id for category in event.registration_categories if category.nome == 'Aluno')
+        participant_cpf = participant.cpf
+
+    _login_admin(client)
+    enroll_res = client.post('/api/inscricao_manual', json={
+        'cpf': participant_cpf,
+        'activity_id': activity_id,
+        'categoria_inscricao_id': category_id,
+    })
+    assert enroll_res.status_code == 200
+
+    participants_res = client.get(f'/api/participantes_evento/{event_id}')
+    assert participants_res.status_code == 200
+    assert participants_res.get_json()['items'][0]['categoria_inscricao'] == 'Aluno'
+
+    report_res = client.get(f'/api/relatorio_inscritos/{event_id}')
+    assert report_res.status_code == 200
+    assert report_res.get_json()['items'][0]['categoria_inscricao'] == 'Aluno'
 
 
 def test_manual_enroll_api_sends_email_notification(client, app, admin_user, monkeypatch):

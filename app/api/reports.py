@@ -30,7 +30,9 @@ def relatorio_inscritos(evt_id):
             "nome": e.nome,
             "cpf": e.user_cpf,
             "presente": e.presente,
-            "atividade": e.activity.nome if e.activity else "N/A"
+            "atividade": e.activity.nome if e.activity else "N/A",
+            "activity_name": e.activity.nome if e.activity else "N/A",
+            "categoria_inscricao": e.registration_category_name,
         } for e in pagination.items],
         "total": pagination.total,
         "pages": pagination.pages,

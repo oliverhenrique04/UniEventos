@@ -120,16 +120,16 @@
 
     <div class="glass-panel p-4 mb-4 bg-white border-top border-2 border-primary shadow-sm institutional-certs-page__filters">
         <h6 class="fw-bold mb-3 text-uppercase small text-muted"><i class="fa-solid fa-filter me-2"></i>Filtrar Certificados</h6>
-        <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-6 col-xl-4">
+        <div class="row g-2 g-md-3 align-items-end">
+                <div class="col-12 col-sm-6 col-lg-4">
                     <label class="small fw-bold">Buscar por titulo</label>
                     <input type="text" id="filtroTitulo" class="form-control form-control-sm" placeholder="Ex.: Monitoria 2026">
                 </div>
-                <div class="col-12 col-md-6 col-xl-3">
+                <div class="col-12 col-sm-6 col-lg-3">
                     <label class="small fw-bold">Categoria</label>
                     <input type="text" id="filtroCategoria" class="form-control form-control-sm" placeholder="Ex.: Iniciação científica">
                 </div>
-                <div class="col-12 col-md-6 col-xl-3">
+                <div class="col-12 col-sm-6 col-lg-3">
                     <label class="small fw-bold">Status</label>
                     <select id="filtroStatus" class="form-select form-select-sm">
                         <option value="">Todos</option>
@@ -138,8 +138,8 @@
                         <option value="ARQUIVADO">Arquivado</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-6 col-xl-2 d-grid">
-                    <button class="btn btn-primary btn-sm fw-bold" id="btnFiltrar">
+                <div class="col-12 col-lg-2 d-flex align-items-end">
+                    <button class="btn btn-primary btn-sm fw-bold w-100" id="btnFiltrar">
                         <i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar
                     </button>
                 </div>
@@ -166,7 +166,7 @@
         </div>
     </div>
 
-    <div class="d-flex flex-column flex-xl-row justify-content-between align-items-stretch align-items-xl-center mt-3 institutional-certs-page__footer">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center mt-3 institutional-certs-page__footer">
         <small class="text-muted" id="resumoPaginacao"></small>
         <div class="btn-group institutional-certs-page__pager">
             <button class="btn btn-sm btn-outline-secondary" id="btnPaginaAnterior">Anterior</button>

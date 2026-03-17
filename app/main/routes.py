@@ -47,13 +47,23 @@ def resetar_senha(token):
 def inscrever_via_link(token):
     """Public page to view event details via shared token link."""
     from app.repositories.event_repository import EventRepository
+    from app.serializers import serialize_event
     repo = EventRepository()
     event = repo.get_by_token(token)
     
     if not event:
         return render_template('404.html'), 404
         
-    return render_template('event_view.html', event=event, user=current_user)
+    serialized_event = serialize_event(
+        event,
+        current_user if current_user.is_authenticated else None,
+    )
+    return render_template(
+        'event_view.html',
+        event=event,
+        user=current_user,
+        event_payload=serialized_event,
+    )
 
 @bp.route('/designer_certificado/<int:event_id>')
 @login_required
@@ -152,13 +162,23 @@ def gerenciar_cursos():
 def confirmar_presenca_page(atv_id, token_hash):
     """Landing page for direct QR code scanning and presence confirmation."""
     from app.services.event_service import EventService
+    from app.serializers import serialize_event
     service = EventService()
     activity = service.get_activity(atv_id)
     
     if not activity:
         return render_template('404.html'), 404
         
-    return render_template('checkin_confirm.html', activity=activity, token=token_hash, user=current_user)
+    return render_template(
+        'checkin_confirm.html',
+        activity=activity,
+        token=token_hash,
+        user=current_user,
+        event_payload=serialize_event(
+            activity.event,
+            current_user if current_user.is_authenticated else None,
+        ),
+    )
 
 @bp.route('/eventos_admin')
 @login_required

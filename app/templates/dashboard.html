@@ -1109,7 +1109,7 @@
 <div class="container fade-in-up">
     {% set can_access_events_dashboard = user.role in ['admin', 'coordenador', 'gestor', 'extensao'] or user.can_create_events %}
     {% set show_events_management = can_access_events_dashboard and has_event_management_records|default(false) %}
-    {% set show_events_management_list = can_access_events_dashboard %}
+    {% set show_events_management_list = show_events_management %}
     {% set can_access_analytics_dashboard = user.role in ['admin', 'coordenador', 'gestor'] %}
     {% set can_access_academics_dashboard = user.role in ['admin', 'extensao', 'gestor', 'coordenador'] %}
 
@@ -1782,6 +1782,22 @@
                         <input type="time" id="editHoraFim" class="form-control">
                     </div>
                 </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-6">
+                        <label class="small text-muted fw-bold text-uppercase">Público habilitado</label>
+                        <div id="editEventAllowedRoles" class="rounded-4 border bg-slate-50 p-3 d-grid gap-2 mt-2"></div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <label class="small text-muted fw-bold text-uppercase mb-0">Categorias de inscrição</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addDashboardCategoryRow('registrationCategoriesListEdit')">
+                                <i class="fa-solid fa-plus me-1"></i>Adicionar
+                            </button>
+                        </div>
+                        <div id="registrationCategoriesListEdit" class="d-grid gap-2"></div>
+                        <small class="text-muted">A categoria escolhida acompanha o participante em todas as atividades do evento.</small>
+                    </div>
+                </div>
                 <h6 class="border-bottom pb-2 mb-3 fw-bold">Atividades</h6>
                 <div id="containerAtividadesEdit" class="d-grid gap-2"></div>
                 <button class="btn btn-outline-primary w-100 mt-3 border-dashed" id="btnAddAtvEdit">Adicionar
@@ -1998,6 +2014,12 @@
             emission: 85,
         },
     };
+    const EVENT_ROLE_OPTIONS = [
+        { value: 'participante', label: 'Participante' },
+        { value: 'professor', label: 'Professor' },
+        { value: 'coordenador', label: 'Coordenador' },
+        { value: 'gestor', label: 'Gestor' },
+    ];
 
     document.addEventListener("DOMContentLoaded", () => {
         if (userRole === 'admin') {
@@ -2096,6 +2118,241 @@
         if (!url.searchParams.has(paramName)) return;
         url.searchParams.delete(paramName);
         history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+
+    function getDefaultRegistrationCategory() {
+        return { id: null, nome: 'Geral', vagas: -1 };
+    }
+
+    function renderDashboardRoleCheckboxes(containerId, selectedRoles = []) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const normalizedRoles = Array.isArray(selectedRoles) && selectedRoles.length
+            ? selectedRoles
+            : EVENT_ROLE_OPTIONS.map((item) => item.value);
+
+        container.innerHTML = EVENT_ROLE_OPTIONS.map((item) => `
+            <label class="form-check">
+                <input class="form-check-input dashboard-event-role-checkbox" type="checkbox" value="${item.value}" ${normalizedRoles.includes(item.value) ? 'checked' : ''}>
+                <span class="form-check-label">${item.label}</span>
+            </label>
+        `).join('');
+    }
+
+    function buildDashboardCategoryRowHtml(category = {}) {
+        const isUnlimited = Number(category.vagas ?? -1) === -1;
+        return `
+            <div class="dashboard-registration-category-row border rounded-4 p-3 bg-white">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1">Categoria</label>
+                        <input type="hidden" class="dashboard-registration-category-id" value="${escapeAttr(category.id || '')}">
+                        <input type="text" class="form-control form-control-sm dashboard-registration-category-name" value="${escapeAttr(category.nome || '')}" placeholder="Ex: Aluno" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted mb-1">Vagas</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control dashboard-registration-category-quota" value="${!isUnlimited && Number(category.vagas || 0) > 0 ? Number(category.vagas) : ''}" ${isUnlimited ? 'disabled' : ''} min="1">
+                            <div class="input-group-text bg-white">
+                                <input class="form-check-input mt-0 dashboard-registration-category-unlimited" type="checkbox" ${isUnlimited ? 'checked' : ''} onchange="toggleDashboardCategoryQuota(this)">
+                                <small class="ms-1">∞</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDashboardCategoryRow(this)">
+                            <i class="fa-solid fa-trash-can me-1"></i>Remover
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function addDashboardCategoryRow(containerId, category = {}) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = buildDashboardCategoryRowHtml(category);
+        container.appendChild(wrapper.firstElementChild);
+    }
+
+    function removeDashboardCategoryRow(button) {
+        const row = button.closest('.dashboard-registration-category-row');
+        if (row) row.remove();
+    }
+
+    function toggleDashboardCategoryQuota(checkbox) {
+        const input = checkbox.closest('.input-group')?.querySelector('.dashboard-registration-category-quota');
+        if (!input) return;
+        input.disabled = checkbox.checked;
+        if (checkbox.checked) input.value = '';
+    }
+
+    function collectDashboardRegistrationSettings({ checkboxContainerId, categoryContainerId }) {
+        const checkboxContainer = document.getElementById(checkboxContainerId);
+        const categoryContainer = document.getElementById(categoryContainerId);
+
+        const perfisHabilitados = Array.from(
+            checkboxContainer?.querySelectorAll('.dashboard-event-role-checkbox:checked') || []
+        ).map((checkbox) => checkbox.value);
+
+        const categoriasInscricao = [];
+        categoryContainer?.querySelectorAll('.dashboard-registration-category-row').forEach((row, index) => {
+            const nome = row.querySelector('.dashboard-registration-category-name')?.value?.trim() || '';
+            if (!nome) return;
+
+            const isUnlimited = row.querySelector('.dashboard-registration-category-unlimited')?.checked;
+            categoriasInscricao.push({
+                id: row.querySelector('.dashboard-registration-category-id')?.value || undefined,
+                nome,
+                vagas: isUnlimited ? -1 : row.querySelector('.dashboard-registration-category-quota')?.value,
+                ordem: index,
+            });
+        });
+
+        return {
+            perfis_habilitados: perfisHabilitados,
+            categorias_inscricao: categoriasInscricao,
+        };
+    }
+
+    function formatDashboardCategoryQuota(category) {
+        if (!category) return '';
+        if (category.vagas === -1) return 'Ilimitada';
+        return `${category.vagas_restantes ?? 0} vaga(s) restante(s)`;
+    }
+
+    function renderDashboardCategoryBadges(eventPayload = {}) {
+        const categories = Array.isArray(eventPayload.categorias_inscricao) ? eventPayload.categorias_inscricao : [];
+        if (categories.length === 0) return '';
+
+        const badges = categories.map((category) => {
+            const badgeClass = category.selecionada
+                ? 'bg-primary text-white'
+                : 'bg-white text-dark border';
+            const quotaLabel = category.vagas === -1
+                ? 'Ilimitada'
+                : `${category.ocupacao ?? 0}/${category.vagas}`;
+            return `<span class="badge ${badgeClass} rounded-pill px-2 py-1">${escapeHtml(category.nome)} · ${escapeHtml(quotaLabel)}</span>`;
+        }).join('');
+
+        const currentCategory = eventPayload.categoria_inscricao_usuario
+            ? `<div class="small text-primary fw-semibold">Sua categoria: ${escapeHtml(eventPayload.categoria_inscricao_usuario.nome)}</div>`
+            : '';
+
+        return `
+            <div class="mb-3 p-3 rounded-4 border bg-white">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+                    <div class="small fw-bold text-uppercase text-slate-500">Categorias de inscrição</div>
+                    ${currentCategory}
+                </div>
+                <div class="d-flex flex-wrap gap-2">${badges}</div>
+            </div>
+        `;
+    }
+
+    function findOpenEventByActivityId(activityId) {
+        if (!eventosAlunoState?.items?.length) return null;
+        return eventosAlunoState.items.find((eventItem) =>
+            Array.isArray(eventItem.atividades) && eventItem.atividades.some((activity) => activity.id === activityId)
+        ) || null;
+    }
+
+    async function promptDashboardCategorySelection(eventPayload) {
+        if (!eventPayload) return null;
+        if (eventPayload.categoria_inscricao_usuario) {
+            return eventPayload.categoria_inscricao_usuario.id;
+        }
+
+        const categories = Array.isArray(eventPayload.categorias_inscricao)
+            ? eventPayload.categorias_inscricao.filter((category) => !category.lotada)
+            : [];
+
+        if (categories.length === 0) {
+            await Swal.fire('Sem vagas', 'Todas as categorias de inscrição estão lotadas.', 'warning');
+            return undefined;
+        }
+
+        if (categories.length === 1) {
+            return categories[0].id ?? null;
+        }
+
+        const inputOptions = {};
+        categories.forEach((category) => {
+            inputOptions[String(category.id)] = `${category.nome} (${formatDashboardCategoryQuota(category)})`;
+        });
+
+        const result = await Swal.fire({
+            title: 'Selecione a categoria de inscrição',
+            input: 'select',
+            inputOptions,
+            inputPlaceholder: 'Escolha uma categoria',
+            showCancelButton: true,
+            confirmButtonText: 'Continuar',
+            cancelButtonText: 'Cancelar',
+            inputValidator: (value) => (!value ? 'Selecione uma categoria.' : undefined),
+        });
+
+        if (!result.isConfirmed) {
+            return undefined;
+        }
+
+        return result.value;
+    }
+
+    function updateDashboardEventRegistrationState(eventPayload, action, explicitCategoryId, responsePayload) {
+        if (!eventPayload) return;
+
+        const hadEventRegistration = Boolean(eventPayload.possui_inscricao_evento);
+        const stillHasEventRegistration = Boolean(responsePayload?.possui_inscricao_evento);
+        const currentCategory = responsePayload?.categoria_inscricao || eventPayload.categoria_inscricao_usuario;
+
+        if (action === 'inscrever' && !hadEventRegistration) {
+            const selectedCategory = (eventPayload.categorias_inscricao || []).find((category) => {
+                if (currentCategory?.id != null) {
+                    return String(category.id) === String(currentCategory.id);
+                }
+                if (explicitCategoryId != null && explicitCategoryId !== '') {
+                    return String(category.id) === String(explicitCategoryId);
+                }
+                return currentCategory && category.nome === currentCategory.nome;
+            });
+
+            if (selectedCategory) {
+                selectedCategory.ocupacao = Number(selectedCategory.ocupacao || 0) + 1;
+                if (selectedCategory.vagas !== -1) {
+                    selectedCategory.vagas_restantes = Math.max(0, Number(selectedCategory.vagas || 0) - selectedCategory.ocupacao);
+                    selectedCategory.lotada = selectedCategory.ocupacao >= selectedCategory.vagas;
+                }
+            }
+        } else if (action === 'sair' && hadEventRegistration && !stillHasEventRegistration) {
+            const selectedCategory = (eventPayload.categorias_inscricao || []).find((category) => category.selecionada);
+            if (selectedCategory) {
+                selectedCategory.ocupacao = Math.max(0, Number(selectedCategory.ocupacao || 0) - 1);
+                if (selectedCategory.vagas !== -1) {
+                    selectedCategory.vagas_restantes = Math.max(0, Number(selectedCategory.vagas || 0) - selectedCategory.ocupacao);
+                    selectedCategory.lotada = selectedCategory.ocupacao >= selectedCategory.vagas;
+                }
+            }
+        }
+
+        (eventPayload.categorias_inscricao || []).forEach((category) => {
+            category.selecionada = Boolean(
+                stillHasEventRegistration
+                && currentCategory
+                && String(category.id ?? '') === String(currentCategory.id ?? '')
+                && category.nome === currentCategory.nome
+            );
+        });
+
+        eventPayload.categoria_inscricao_usuario = stillHasEventRegistration && currentCategory
+            ? { id: currentCategory.id ?? null, nome: currentCategory.nome }
+            : null;
+        eventPayload.possui_inscricao_evento = stillHasEventRegistration;
+        refreshOpenEventEnrollmentAvailability(eventPayload);
     }
 
     function inicializarFiltrosEventosAbertos() {
@@ -3465,6 +3722,22 @@
         }
     }
 
+    function canCurrentUserAccessOpenEvent(eventPayload) {
+        if (!eventPayload) return false;
+        if (['admin', 'extensao'].includes(userRole)) return true;
+        const allowedRoles = Array.isArray(eventPayload.perfis_habilitados) ? eventPayload.perfis_habilitados : [];
+        return allowedRoles.length === 0 || allowedRoles.includes(userRole);
+    }
+
+    function refreshOpenEventEnrollmentAvailability(eventPayload) {
+        if (!eventPayload) return;
+        const hasEventRegistration = Boolean(eventPayload.possui_inscricao_evento);
+        eventPayload.pode_se_inscrever = hasEventRegistration || canCurrentUserAccessOpenEvent(eventPayload);
+        eventPayload.motivo_bloqueio_inscricao = eventPayload.pode_se_inscrever
+            ? null
+            : 'Seu perfil não está habilitado para este evento.';
+    }
+
     function renderEventosAluno(data, div) {
         div.innerHTML = '';
 
@@ -3483,53 +3756,61 @@
         let html = '';
 
         for (const ev of data.items) {
-            let htmlAtividades = '';
+            refreshOpenEventEnrollmentAvailability(ev);
+            const tipoLabel = ev.tipo === 'PADRAO' ? 'Padrão' : 'Rápido';
+            const dataBR = (ev.data_inicio || '').split('-').reverse().join('/');
+            const eventEnrollmentBlocked = !ev.pode_se_inscrever && !ev.possui_inscricao_evento;
+            const categorySummaryHtml = renderDashboardCategoryBadges(ev);
 
+            let htmlAtividades = '';
             for (const a of ev.atividades) {
                 const isFull = a.vagas !== -1 && a.total_inscritos >= a.vagas;
+                const acao = a.inscrito ? 'sair' : 'inscrever';
+                const actionBlocked = acao === 'inscrever' && (eventEnrollmentBlocked || isFull);
                 const btnClass = a.inscrito
                     ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
-                    : (isFull ? 'btn-light disabled' : 'btn-outline-primary');
-
+                    : (actionBlocked ? 'btn-light disabled' : 'btn-outline-primary');
                 const btnText = a.inscrito
                     ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
                     : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever');
 
-                const acao = a.inscrito ? 'sair' : 'inscrever';
-
                 let vagasStatus = '';
-                if (a.vagas == -1) {
+                if (a.vagas === -1) {
                     vagasStatus = '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>';
                 } else {
-                    const perc = Math.round((a.total_inscritos / a.vagas) * 100);
+                    const perc = Math.round((Number(a.total_inscritos || 0) / Number(a.vagas || 1)) * 100);
                     const color = perc > 90 ? 'danger' : (perc > 70 ? 'warning' : 'primary');
-                    vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle rounded-pill px-2">${a.vagas - a.total_inscritos} vagas</span>`;
+                    vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle rounded-pill px-2">${Math.max(0, Number(a.vagas || 0) - Number(a.total_inscritos || 0))} vagas</span>`;
                 }
 
                 htmlAtividades += `
           <div class="p-3 bg-white rounded-4 mb-3 border shadow-sm transition-fast ${a.inscrito ? 'border-primary' : ''}">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div class="pe-2">
-                <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : 'text-slate-800'}">${a.nome}</h6>
+                <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : 'text-slate-800'}">${escapeHtml(a.nome)}</h6>
                 <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
-                  <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.carga_horaria}h</span>
-                  <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${a.local || 'Auditório'}</span>
-                  ${(a.palestrantes_label || a.palestrante) ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${a.palestrantes_label || a.palestrante}</span>` : ''}
+                  <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${escapeHtml(a.carga_horaria)}h</span>
+                  <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${escapeHtml(a.local || 'Auditório')}</span>
+                  ${(a.palestrantes_label || a.palestrante) ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${escapeHtml(a.palestrantes_label || a.palestrante)}</span>` : ''}
                 </div>
               </div>
               ${vagasStatus}
             </div>
-                        <button onclick="toggleInscricao(event, ${a.id}, '${acao}')" data-atv-id="${a.id}" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;">
+            <button onclick="toggleInscricao(this, ${a.id}, '${acao}')" data-atv-id="${a.id}" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;" ${actionBlocked ? 'disabled aria-disabled="true"' : ''}>
               ${btnText}
             </button>
           </div>
         `;
             }
 
-            const dataBR = (ev.data_inicio || '').split('-').reverse().join('/');
-            
-            ev.tipo = ev.tipo === 'PADRAO' ? 'Padrão' : 'Rápido';
-
+            const blockedAlert = eventEnrollmentBlocked
+                ? `
+                <div class="alert alert-warning rounded-4 border-0 shadow-sm mb-3">
+                    <div class="fw-bold small mb-1"><i class="fa-solid fa-lock me-2"></i>Inscrição indisponível</div>
+                    <div class="small mb-0">${escapeHtml(ev.motivo_bloqueio_inscricao || 'Seu perfil não está habilitado para este evento.')}</div>
+                </div>
+                `
+                : '';
 
             html += `
         <div class="col animate__animated animate__fadeIn">
@@ -3537,23 +3818,26 @@
             <div class="d-flex gap-4 align-items-center p-3 bg-slate-100 border-bottom">
               ${ev.curso ? `
             <span class="badge badge-curso bg-white bg-opacity-40 text-color-primary border-0 small text-uppercase fw-bold" style="letter-spacing: 1px;">
-                <i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}
+                <i class="fa-solid fa-graduation-cap me-1"></i>${escapeHtml(ev.curso)}
             </span>
             ` : ''}
             </div>
             <div class="p-4 bg-primary text-white">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <div class="d-flex gap-2">
-                  <span class="badge bg-white bg-opacity-20 text-color-primary border-0 small text-uppercase fw-bold" style="letter-spacing: 1px;">${ev.tipo}</span>
+                  <span class="badge bg-white bg-opacity-20 text-color-primary border-0 small text-uppercase fw-bold" style="letter-spacing: 1px;">${tipoLabel}</span>
                 </div>
-                <small class="fw-bold opacity-75"><i class="fa-regular fa-calendar-days me-1"></i>${dataBR}</small>
+                <small class="fw-bold opacity-75"><i class="fa-regular fa-calendar-days me-1"></i>${escapeHtml(dataBR)}</small>
               </div>
-              <h5 class="fw-bold m-0 fs-5">${ev.nome}</h5>
+              <h5 class="fw-bold m-0 fs-5">${escapeHtml(ev.nome)}</h5>
             </div>
             <div class="p-4 flex-grow-1 bg-slate-50">
               <p class="text-muted small mb-4" style="line-height: 1.6;">
-                ${ev.descricao || 'Participe deste evento acadêmico e emita seu certificado de horas complementares.'}
+                ${escapeHtml(ev.descricao || 'Participe deste evento acadêmico e emita seu certificado de horas complementares.')}
               </p>
+
+              ${blockedAlert}
+              ${categorySummaryHtml}
 
               <div class="atividades-list">
                 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -3573,25 +3857,39 @@
         renderPaginacao(data.current_page, data.pages, 'paginacaoAluno', carregarEventosAluno);
     }
 
-    async function toggleInscricao(event, atvId, acao) {
+    async function toggleInscricao(trigger, atvId, acao) {
         if (pendingEnrollmentActions.has(atvId)) return;
 
-        const btn = event.currentTarget;
-        const originalHtml = btn.innerHTML;
+        const eventPayload = findOpenEventByActivityId(atvId);
+        let selectedCategoryId = null;
+
+        if (acao === 'inscrever' && eventPayload && !eventPayload.possui_inscricao_evento) {
+            selectedCategoryId = await promptDashboardCategorySelection(eventPayload);
+            if (selectedCategoryId === undefined) {
+                return;
+            }
+        }
+
+        const btn = trigger instanceof HTMLElement ? trigger : trigger?.currentTarget || null;
+        const originalHtml = btn?.innerHTML || '';
         pendingEnrollmentActions.add(atvId);
 
         const activityButtons = document.querySelectorAll(`button[data-atv-id="${atvId}"]`);
-        activityButtons.forEach((b) => {
-            b.dataset.prevHtml = b.innerHTML;
-            b.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            b.disabled = true;
+        activityButtons.forEach((button) => {
+            button.dataset.prevHtml = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            button.disabled = true;
         });
 
         try {
             const res = await fetch(apiUrl('/api/toggle_inscricao'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity_id: atvId, acao })
+                body: JSON.stringify({
+                    activity_id: atvId,
+                    acao,
+                    categoria_inscricao_id: selectedCategoryId,
+                })
             });
 
             const json = await res.json();
@@ -3599,7 +3897,7 @@
             if (res.ok) {
                 if (eventosAlunoState?.items?.length) {
                     for (const ev of eventosAlunoState.items) {
-                        const atv = ev.atividades?.find((x) => x.id === atvId);
+                        const atv = ev.atividades?.find((item) => item.id === atvId);
                         if (!atv) continue;
 
                         if (acao === 'inscrever' && !atv.inscrito) {
@@ -3609,10 +3907,12 @@
                             atv.inscrito = false;
                             atv.total_inscritos = Math.max(0, Number(atv.total_inscritos || 0) - 1);
                         }
+
+                        updateDashboardEventRegistrationState(ev, acao, selectedCategoryId, json);
+                        refreshOpenEventEnrollmentAvailability(ev);
                         break;
                     }
 
-                    // Keep cache coherent for the current filter/page key.
                     if (eventosAlunoLastQuery && eventosAlunoCache.has(eventosAlunoLastQuery)) {
                         eventosAlunoCache.set(eventosAlunoLastQuery, {
                             ts: Date.now(),
@@ -3623,7 +3923,6 @@
                     const div = document.getElementById('listaEventosAluno');
                     if (div) renderEventosAluno(eventosAlunoState, div);
                 } else {
-                    // Fallback when there is no local state loaded.
                     const active = document.querySelector('#paginacaoAluno .page-item.active .page-link')?.innerText;
                     const page = Number(active) || 1;
                     await carregarEventosAluno(page);
@@ -3633,18 +3932,18 @@
             } else {
                 Swal.fire('Atenção', json.erro || json.mensagem || 'Falha ao atualizar inscrição.', 'warning');
             }
-        } catch (e) {
+        } catch (_) {
             Swal.fire('Erro', 'Falha de comunicação ao atualizar inscrição.', 'error');
         } finally {
             pendingEnrollmentActions.delete(atvId);
-            activityButtons.forEach((b) => {
-                if (b.dataset.prevHtml) {
-                    b.innerHTML = b.dataset.prevHtml;
-                    delete b.dataset.prevHtml;
+            activityButtons.forEach((button) => {
+                if (button.dataset.prevHtml) {
+                    button.innerHTML = button.dataset.prevHtml;
+                    delete button.dataset.prevHtml;
                 } else {
-                    b.innerHTML = originalHtml;
+                    button.innerHTML = originalHtml;
                 }
-                b.disabled = false;
+                button.disabled = false;
             });
         }
     }
@@ -3719,6 +4018,9 @@
                 const status = i.presente
                     ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="fa-solid fa-circle-check me-1"></i> Validado</span>'
                     : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill"><i class="fa-solid fa-clock me-1"></i> Ausente</span>';
+                const categoriaBadge = i.categoria_inscricao
+                    ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">${escapeHtml(i.categoria_inscricao)}</span>`
+                    : '<span class="badge bg-light text-muted border rounded-pill">Sem categoria</span>';
 
                 html += `
           <div class="list-group-item ps-4 py-3 d-flex justify-content-between align-items-center border-0 border-bottom animate__animated animate__fadeIn">
@@ -3728,6 +4030,8 @@
                 <span><i class="fa-solid fa-fingerprint me-1 text-slate-300"></i>${i.cpf}</span>
                 <span class="text-slate-200">|</span>
                 <span class="text-primary fw-semibold"><i class="fa-solid fa-tag me-1 text-primary-300"></i>${i.activity_name || i.atividade || ''}</span>
+                <span class="text-slate-200">|</span>
+                ${categoriaBadge}
               </div>
             </div>
             ${status}
@@ -3832,6 +4136,16 @@
         document.getElementById('editDataFim').value = ev.data_fim || '';
         document.getElementById('editHoraFim').value = ev.hora_fim || '';
 
+        renderDashboardRoleCheckboxes('editEventAllowedRoles', ev.perfis_habilitados);
+        const categoriesContainer = document.getElementById('registrationCategoriesListEdit');
+        if (categoriesContainer) {
+            categoriesContainer.innerHTML = '';
+            const categories = Array.isArray(ev.categorias_inscricao) && ev.categorias_inscricao.length
+                ? ev.categorias_inscricao
+                : [getDefaultRegistrationCategory()];
+            categories.forEach((category) => addDashboardCategoryRow('registrationCategoriesListEdit', category));
+        }
+
         const container = document.getElementById('containerAtividadesEdit');
         container.innerHTML = '';
 
@@ -3843,6 +4157,19 @@
     }
 
     async function salvarEdicaoEvento() {
+        const registrationSettings = collectDashboardRegistrationSettings({
+            checkboxContainerId: 'editEventAllowedRoles',
+            categoryContainerId: 'registrationCategoriesListEdit',
+        });
+        if (!registrationSettings.perfis_habilitados.length) {
+            Swal.fire('Erro', 'Selecione ao menos um perfil habilitado para inscrição.', 'warning');
+            return;
+        }
+        if (!registrationSettings.categorias_inscricao.length) {
+            Swal.fire('Erro', 'Cadastre ao menos uma categoria de inscrição.', 'warning');
+            return;
+        }
+
         const payload = {
             id: document.getElementById('editEvId').value,
             nome: document.getElementById('editEvNome').value,
@@ -3851,7 +4178,8 @@
             hora_inicio: document.getElementById('editHoraIni').value,
             data_fim: document.getElementById('editDataFim').value,
             hora_fim: document.getElementById('editHoraFim').value,
-            atividades: coletarAtividades('containerAtividadesEdit')
+            atividades: coletarAtividades('containerAtividadesEdit'),
+            ...registrationSettings,
         };
 
         try {
@@ -3860,12 +4188,13 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            const json = await res.json();
             if (res.ok) {
                 bootstrap.Modal.getInstance(document.getElementById('modalEditarEvento')).hide();
                 carregarEventosGestor(1);
                 Toast.fire({ icon: 'success', title: 'Evento atualizado!' });
             } else {
-                Swal.fire('Erro', 'Não foi possível salvar as alterações.', 'error');
+                Swal.fire('Erro', json.erro || 'Não foi possível salvar as alterações.', 'error');
             }
         } catch (err) {
             Swal.fire('Erro', 'Falha na conexão.', 'error');

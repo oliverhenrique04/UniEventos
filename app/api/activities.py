@@ -15,13 +15,50 @@ def toggle_inscricao():
     data = request.json
     atv_id = int(data.get('activity_id'))
     acao = data.get('acao')
+    category_id = data.get('categoria_inscricao_id')
+    activity = event_service.get_activity(atv_id)
     
-    enrollment, message = event_service.toggle_enrollment(current_user, atv_id, acao)
+    enrollment, message = event_service.toggle_enrollment(
+        current_user,
+        atv_id,
+        acao,
+        category_id=category_id,
+        actor_user=current_user,
+    )
     
-    if enrollment is None and message in ["Atividade não encontrada", "Lotado!", "Ação inválida"]:
-        return jsonify({"erro": message}), 400 if message != "Atividade não encontrada" else 404
-        
-    return jsonify({"mensagem": message})
+    if enrollment is None and message in [
+        "Atividade não encontrada",
+        "Lotado!",
+        "Ação inválida",
+        "Selecione uma categoria de inscrição.",
+        "Categoria de inscrição inválida.",
+        "Categoria de inscrição lotada.",
+        "Seu perfil não está habilitado para este evento.",
+    ]:
+        if message == "Atividade não encontrada":
+            return jsonify({"erro": message}), 404
+        if message == "Seu perfil não está habilitado para este evento.":
+            return jsonify({"erro": message}), 403
+        return jsonify({"erro": message}), 400
+
+    current_registration = None
+    if activity and activity.event:
+        current_registration = event_service.get_event_registration(activity.event.id, current_user.cpf)
+
+    payload = {"mensagem": message}
+    if current_registration and current_registration.category:
+        payload["categoria_inscricao"] = {
+            "id": current_registration.category.id,
+            "nome": current_registration.category.nome,
+        }
+    else:
+        payload["categoria_inscricao"] = None
+    payload["possui_inscricao_evento"] = bool(
+        current_registration
+        or (activity and activity.event and event_service.user_has_event_enrollment(activity.event.id, current_user.cpf))
+    )
+
+    return jsonify(payload)
 
 @bp.route('/qrcode_atividade/<int:atv_id>')
 def qrcode_atividade(atv_id):
@@ -62,6 +99,7 @@ def validar_presenca():
     token_full = data_rcv.get('token', '')
     user_lat = data_rcv.get('latitude')
     user_lon = data_rcv.get('longitude')
+    category_id = data_rcv.get('categoria_inscricao_id')
 
     try:
         parts = token_full.split(":")
@@ -88,10 +126,23 @@ def validar_presenca():
             return jsonify({"erro": f"Você está muito longe do local do evento ({int(dist)}m)"}), 403
 
     success, message, enrollment = event_service.confirm_attendance(
-        current_user, atv_id, evt_id, lat=user_lat, lon=user_lon
+        current_user,
+        atv_id,
+        evt_id,
+        lat=user_lat,
+        lon=user_lon,
+        category_id=category_id,
     )
     
     if not success:
+        if message == "Atividade não encontrada":
+            return jsonify({"erro": message}), 404
+        if message in {
+            "Selecione uma categoria de inscrição.",
+            "Categoria de inscrição inválida.",
+            "Categoria de inscrição lotada.",
+        }:
+            return jsonify({"erro": message}), 400
         return jsonify({"erro": message}), 403
         
     return jsonify({

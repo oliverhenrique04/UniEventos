@@ -68,6 +68,17 @@
                         {{ event.descricao or 'Nenhuma descrição disponível para este evento.' }}
                     </p>
 
+                    <div id="event-access-alert" class="mt-4">
+                        {% if user.is_authenticated and event_payload.motivo_bloqueio_inscricao and not event_payload.possui_inscricao_evento %}
+                        <div class="alert alert-warning rounded-4 border-0 shadow-sm mb-0">
+                            <div class="fw-bold mb-1"><i class="fa-solid fa-lock me-2"></i>Inscrição indisponível</div>
+                            <div class="small mb-0">{{ event_payload.motivo_bloqueio_inscricao }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div id="event-category-summary" class="mt-4"></div>
+
                     <div class="row g-3 mt-4">
                         <div class="col-sm-6">
                             <div class="p-3 bg-slate-50 rounded-4 border">
@@ -118,31 +129,191 @@
 
 {% block scripts %}
 <script>
-    const eventId = {{ event.id }};
-    const isParticipant = {{ 'true' if user.is_authenticated and user.role == 'participante' else 'false' }};
+    const eventData = {{ event_payload|tojson }};
+    const eventId = eventData.id;
     const isAuthenticated = {{ 'true' if user.is_authenticated else 'false' }};
+    const currentUserRole = {{ (user.role if user.is_authenticated else none)|tojson }};
     const pendingEnrollmentActions = new Set();
-
-    // Monta a lista em JS com loop Jinja (sem comprehension, compatível com Jinja2)
-    const activitiesData = [
-        {% for a in event.activities %}
-    {
-        id: {{ a.id }},
-        nome: {{ (a.nome or '') | tojson }},
-        horas: {{ a.carga_horaria if a.carga_horaria is not none else 0 }},
-        local: {{ (a.local or '') | tojson }},
-        palestrante: {{ (a.palestrante or '') | tojson }},
-        palestrantes_label: {{ (a.palestrantes_label or '') | tojson }},
-        vagas: {{ a.vagas if a.vagas is not none else -1 }},
-        total_inscritos: {{ a.enrollments | length }},
-        inscrito: {{ 'true' if user.is_authenticated and (a.enrollments | selectattr('user_cpf', 'equalto', user.cpf) | list | length > 0) else 'false' }}
-    } {% if not loop.last %}, {% endif %}
-    {% endfor %}
-  ];
+    const activitiesData = (eventData.atividades || []).map((activity) => ({ ...activity }));
 
     document.addEventListener('DOMContentLoaded', () => {
+        renderAccessAlert();
+        renderCategorySummary();
         renderAtividades(activitiesData);
     });
+
+    function userRoleCanAccessEvent() {
+        if (!isAuthenticated || !currentUserRole) return false;
+        if (currentUserRole === 'admin' || currentUserRole === 'extensao') return true;
+        const allowedRoles = Array.isArray(eventData.perfis_habilitados) ? eventData.perfis_habilitados : [];
+        return allowedRoles.length === 0 || allowedRoles.includes(currentUserRole);
+    }
+
+    function renderAccessAlert() {
+        const container = document.getElementById('event-access-alert');
+        if (!container) return;
+
+        if (!isAuthenticated || !eventData.motivo_bloqueio_inscricao || eventData.possui_inscricao_evento) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="alert alert-warning rounded-4 border-0 shadow-sm mb-0">
+                <div class="fw-bold mb-1"><i class="fa-solid fa-lock me-2"></i>Inscrição indisponível</div>
+                <div class="small mb-0">${escapeHtml(eventData.motivo_bloqueio_inscricao)}</div>
+            </div>
+        `;
+    }
+
+    function formatCategoryQuota(category) {
+        if (!category) return '';
+        if (category.vagas === -1) return 'Ilimitada';
+        return `${category.vagas_restantes ?? 0} vaga(s) restante(s)`;
+    }
+
+    function setCurrentCategory(category) {
+        eventData.categoria_inscricao_usuario = category
+            ? { id: category.id ?? null, nome: category.nome }
+            : null;
+
+        (eventData.categorias_inscricao || []).forEach((item) => {
+            item.selecionada = Boolean(
+                category
+                && item.nome === category.nome
+                && String(item.id ?? '') === String(category.id ?? '')
+            );
+        });
+    }
+
+    function renderCategorySummary() {
+        const container = document.getElementById('event-category-summary');
+        if (!container) return;
+
+        const categories = Array.isArray(eventData.categorias_inscricao) ? eventData.categorias_inscricao : [];
+        if (categories.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const currentCategory = eventData.categoria_inscricao_usuario;
+        const badges = categories.map((category) => {
+            const badgeClass = category.selecionada
+                ? 'bg-primary text-white'
+                : 'bg-light text-dark border';
+            const subtitle = category.vagas === -1
+                ? 'Ilimitada'
+                : `${category.ocupacao}/${category.vagas}`;
+            return `
+                <span class="badge ${badgeClass} rounded-pill px-3 py-2">
+                    ${escapeHtml(category.nome)} · ${escapeHtml(subtitle)}
+                </span>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="p-3 bg-slate-50 rounded-4 border">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <div class="small fw-bold text-uppercase text-slate-500">Categorias de inscrição</div>
+                    ${currentCategory ? `<span class="small text-primary fw-semibold">Sua categoria: ${escapeHtml(currentCategory.nome)}</span>` : ''}
+                </div>
+                <div class="d-flex flex-wrap gap-2">${badges}</div>
+            </div>
+        `;
+    }
+
+    async function ensureCategorySelection() {
+        if (eventData.categoria_inscricao_usuario) {
+            return eventData.categoria_inscricao_usuario.id;
+        }
+
+        const availableCategories = (eventData.categorias_inscricao || []).filter((category) => !category.lotada);
+        if (availableCategories.length === 0) {
+            await Swal.fire('Sem vagas', 'Todas as categorias de inscrição estão lotadas.', 'warning');
+            return undefined;
+        }
+
+        if (availableCategories.length === 1) {
+            return availableCategories[0].id ?? null;
+        }
+
+        const inputOptions = {};
+        availableCategories.forEach((category) => {
+            inputOptions[String(category.id)] = `${category.nome} (${formatCategoryQuota(category)})`;
+        });
+
+        const result = await Swal.fire({
+            title: 'Selecione a categoria de inscrição',
+            input: 'select',
+            inputOptions,
+            inputPlaceholder: 'Escolha uma categoria',
+            showCancelButton: true,
+            confirmButtonText: 'Continuar',
+            cancelButtonText: 'Cancelar',
+            inputValidator: (value) => (!value ? 'Selecione uma categoria.' : undefined),
+        });
+
+        if (!result.isConfirmed) {
+            return undefined;
+        }
+
+        return result.value;
+    }
+
+    function updateCategoryStateAfterEnrollment(action, explicitCategoryId, responsePayload) {
+        const hadEventRegistration = Boolean(eventData.possui_inscricao_evento);
+        const stillHasEventRegistration = Boolean(responsePayload?.possui_inscricao_evento);
+        const currentCategory = responsePayload?.categoria_inscricao || eventData.categoria_inscricao_usuario;
+
+        if (action === 'inscrever' && !hadEventRegistration) {
+            const selectedCategory = (eventData.categorias_inscricao || []).find((category) => {
+                if (currentCategory && currentCategory.id != null) {
+                    return String(category.id) === String(currentCategory.id);
+                }
+                if (explicitCategoryId != null && explicitCategoryId !== '') {
+                    return String(category.id) === String(explicitCategoryId);
+                }
+                return currentCategory && category.nome === currentCategory.nome;
+            }) || (eventData.categorias_inscricao || [])[0];
+
+            if (selectedCategory) {
+                selectedCategory.ocupacao = Number(selectedCategory.ocupacao || 0) + 1;
+                if (selectedCategory.vagas !== -1) {
+                    selectedCategory.vagas_restantes = Math.max(0, Number(selectedCategory.vagas || 0) - selectedCategory.ocupacao);
+                    selectedCategory.lotada = selectedCategory.ocupacao >= selectedCategory.vagas;
+                }
+                setCurrentCategory({
+                    id: currentCategory?.id ?? selectedCategory.id ?? null,
+                    nome: currentCategory?.nome ?? selectedCategory.nome,
+                });
+            }
+        } else if (action === 'sair' && hadEventRegistration && !stillHasEventRegistration) {
+            const selectedCategory = (eventData.categorias_inscricao || []).find((category) => category.selecionada);
+            if (selectedCategory) {
+                selectedCategory.ocupacao = Math.max(0, Number(selectedCategory.ocupacao || 0) - 1);
+                if (selectedCategory.vagas !== -1) {
+                    selectedCategory.vagas_restantes = Math.max(0, Number(selectedCategory.vagas || 0) - selectedCategory.ocupacao);
+                    selectedCategory.lotada = selectedCategory.ocupacao >= selectedCategory.vagas;
+                }
+            }
+            setCurrentCategory(null);
+        } else if (currentCategory) {
+            setCurrentCategory(currentCategory);
+        }
+
+        eventData.possui_inscricao_evento = stillHasEventRegistration;
+        if (stillHasEventRegistration) {
+            eventData.pode_se_inscrever = true;
+            eventData.motivo_bloqueio_inscricao = null;
+        } else {
+            eventData.pode_se_inscrever = userRoleCanAccessEvent();
+            eventData.motivo_bloqueio_inscricao = eventData.pode_se_inscrever
+                ? null
+                : 'Seu perfil não está habilitado para este evento.';
+        }
+        renderAccessAlert();
+        renderCategorySummary();
+    }
 
     function renderAtividades(list) {
         const mobile = document.getElementById('lista-atividades-mobile');
@@ -171,7 +342,7 @@
             let btnHtml = '';
             if (!isAuthenticated) {
                 btnHtml = `<a href="${pathUrl('{{ url_for('main.index') }}')}" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
-            } else if (isParticipant) {
+            } else if (eventData.pode_se_inscrever) {
                 const isDisabled = !a.inscrito && isFull;
                 const btnClass = a.inscrito
                     ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
@@ -184,10 +355,10 @@
                 const acao = a.inscrito ? 'sair' : 'inscrever';
 
                 btnHtml = `
-          <button onclick="toggleInscricao(event, ${a.id}, '${acao}')"
+          <button onclick="toggleInscricao(this, ${a.id}, '${acao}')"
                         data-atv-id="${a.id}"
             ${isDisabled ? 'disabled aria-disabled="true"' : ''}
-            class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
+                        class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
             style="font-size: 0.65rem;">
             ${btnText}
           </button>
@@ -234,17 +405,25 @@
             .replaceAll("'", '&#39;');
     }
 
-    async function toggleInscricao(event, atvId, acao) {
+    async function toggleInscricao(trigger, atvId, acao) {
         if (pendingEnrollmentActions.has(atvId)) return;
 
-        const btn = event.currentTarget;
-        const originalHtml = btn.innerHTML;
-        pendingEnrollmentActions.add(atvId);
+            const btn = trigger instanceof HTMLElement ? trigger : trigger?.currentTarget || null;
+            const originalHtml = btn?.innerHTML || '';
+            pendingEnrollmentActions.add(atvId);
+            const selectedCategoryId = acao === 'inscrever'
+                ? await ensureCategorySelection()
+                : undefined;
 
-        const activityButtons = document.querySelectorAll(`button[data-atv-id="${atvId}"]`);
-        activityButtons.forEach((b) => {
-            b.dataset.prevHtml = b.innerHTML;
-            b.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            if (acao === 'inscrever' && selectedCategoryId === undefined) {
+                pendingEnrollmentActions.delete(atvId);
+                return;
+            }
+
+            const activityButtons = document.querySelectorAll(`button[data-atv-id="${atvId}"]`);
+            activityButtons.forEach((b) => {
+                b.dataset.prevHtml = b.innerHTML;
+                b.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
             b.disabled = true;
         });
 
@@ -252,7 +431,11 @@
             const res = await fetch(apiUrl('/api/toggle_inscricao'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity_id: atvId, acao })
+                body: JSON.stringify({
+                    activity_id: atvId,
+                    acao,
+                    categoria_inscricao_id: selectedCategoryId,
+                })
             });
 
             const json = await res.json();
@@ -268,6 +451,7 @@
                         target.total_inscritos = Math.max(0, Number(target.total_inscritos || 0) - 1);
                     }
                 }
+                updateCategoryStateAfterEnrollment(acao, selectedCategoryId, json);
                 renderAtividades(activitiesData);
                 Toast.fire({ icon: 'success', title: json.mensagem || 'Inscrição atualizada.' });
             } else {

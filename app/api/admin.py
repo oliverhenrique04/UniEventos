@@ -348,9 +348,18 @@ def inscricao_manual():
     if not EventService.can_add_event_participants(current_user, event):
         return jsonify({"erro": "Acesso negado para este evento."}), 403
 
-    success, msg = admin_service.manual_enroll(data.get('cpf'), activity_id)
+    success, msg = admin_service.manual_enroll(
+        data.get('cpf'),
+        activity_id,
+        actor_user=current_user,
+        category_id=data.get('categoria_inscricao_id'),
+    )
     
-    if success: return jsonify({"mensagem": msg})
+    if success:
+        return jsonify({"mensagem": msg})
+
+    if msg == "Seu perfil não está habilitado para este evento.":
+        return jsonify({"erro": msg}), 403
     return jsonify({"erro": msg}), 400
 
 @bp.route('/editar_usuario', methods=['POST'])

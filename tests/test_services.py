@@ -12,7 +12,7 @@ from app.services.admin_service import AdminService
 from app.services.email_template_service import EmailTemplateService
 from app.models import User
 from app.extensions import db
-from app.models import Event, Course, Activity, Enrollment
+from app.models import Event, Course, Activity, Enrollment, EventRegistration
 from openpyxl import Workbook
 
 def test_auth_service_register(app):
@@ -64,6 +64,230 @@ def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin
     assert event.tipo == 'RAPIDO'
     assert event.data_inicio == date.today()
     assert event.data_fim == date.today()
+
+
+def test_event_service_create_persists_allowed_roles_and_registration_categories(app, admin_user):
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento com Perfis e Categorias',
+        'descricao': 'Desc',
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-05-01',
+        'hora_inicio': '10:00',
+        'data_fim': '2030-05-01',
+        'hora_fim': '12:00',
+        'perfis_habilitados': ['participante', 'professor'],
+        'categorias_inscricao': [
+            {'nome': 'Aluno', 'vagas': 3},
+            {'nome': 'Comunidade Externa', 'vagas': -1},
+        ],
+    })
+
+    assert event.allowed_roles_list == ['participante', 'professor']
+    assert [(item.nome, item.vagas) for item in event.registration_categories] == [
+        ('Aluno', 3),
+        ('Comunidade Externa', -1),
+    ]
+
+
+def test_event_service_reuses_event_registration_category_and_cleans_up_after_last_unenroll(app, admin_user):
+    participant = User(
+        username='participant_category_flow',
+        role='participante',
+        nome='Participante Categoria',
+        cpf='12345000001',
+    )
+    participant.set_password('1234')
+    db.session.add(participant)
+    db.session.commit()
+
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento com Duas Atividades',
+        'descricao': 'Desc',
+        'is_rapido': False,
+        'data_inicio': '2030-06-10',
+        'hora_inicio': '18:00',
+        'data_fim': '2030-06-10',
+        'hora_fim': '22:00',
+        'perfis_habilitados': ['participante'],
+        'categorias_inscricao': [
+            {'nome': 'Aluno', 'vagas': 2},
+            {'nome': 'Ouvinte', 'vagas': 5},
+        ],
+        'atividades': [
+            {
+                'nome': 'Atividade 1',
+                'local': 'Sala 1',
+                'descricao': 'Primeira',
+                'data_atv': '2030-06-10',
+                'hora_atv': '18:30',
+                'horas': 2,
+                'vagas': 10,
+            },
+            {
+                'nome': 'Atividade 2',
+                'local': 'Sala 2',
+                'descricao': 'Segunda',
+                'data_atv': '2030-06-10',
+                'hora_atv': '20:30',
+                'horas': 2,
+                'vagas': 10,
+            },
+        ],
+    })
+
+    categories = {category.nome: category for category in event.registration_categories}
+    activities = sorted(event.activities, key=lambda activity: activity.id)
+
+    enrollment1, message1 = service.toggle_enrollment(
+        participant,
+        activities[0].id,
+        'inscrever',
+        category_id=categories['Aluno'].id,
+        actor_user=participant,
+    )
+    assert message1 == 'Inscrição Realizada!'
+    assert enrollment1 is not None
+
+    enrollment2, message2 = service.toggle_enrollment(
+        participant,
+        activities[1].id,
+        'inscrever',
+        category_id=categories['Ouvinte'].id,
+        actor_user=participant,
+    )
+    assert message2 == 'Inscrição Realizada!'
+    assert enrollment2 is not None
+    assert enrollment1.event_registration_id == enrollment2.event_registration_id
+
+    registration = EventRegistration.query.filter_by(event_id=event.id, user_cpf=participant.cpf).first()
+    assert registration is not None
+    assert registration.category_id == categories['Aluno'].id
+
+    _, leave_message_1 = service.toggle_enrollment(participant, activities[0].id, 'sair', actor_user=participant)
+    assert leave_message_1 == 'Desinscrição realizada.'
+    assert EventRegistration.query.filter_by(event_id=event.id, user_cpf=participant.cpf).first() is not None
+
+    _, leave_message_2 = service.toggle_enrollment(participant, activities[1].id, 'sair', actor_user=participant)
+    assert leave_message_2 == 'Desinscrição realizada.'
+    assert EventRegistration.query.filter_by(event_id=event.id, user_cpf=participant.cpf).first() is None
+
+
+def test_event_service_blocks_category_quota_before_creating_activity_enrollment(app, admin_user):
+    participant_a = User(
+        username='quota_user_a',
+        role='participante',
+        nome='Quota A',
+        cpf='12345000002',
+    )
+    participant_a.set_password('1234')
+    participant_b = User(
+        username='quota_user_b',
+        role='participante',
+        nome='Quota B',
+        cpf='12345000003',
+    )
+    participant_b.set_password('1234')
+    db.session.add_all([participant_a, participant_b])
+    db.session.commit()
+
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento com Cota',
+        'descricao': 'Desc',
+        'is_rapido': False,
+        'data_inicio': '2030-07-10',
+        'hora_inicio': '18:00',
+        'data_fim': '2030-07-10',
+        'hora_fim': '20:00',
+        'perfis_habilitados': ['participante'],
+        'categorias_inscricao': [{'nome': 'Aluno', 'vagas': 1}],
+        'atividades': [
+            {
+                'nome': 'Atividade Unica',
+                'local': 'Sala',
+                'descricao': 'Atividade',
+                'data_atv': '2030-07-10',
+                'hora_atv': '18:30',
+                'horas': 2,
+                'vagas': 20,
+            }
+        ],
+    })
+
+    category = event.registration_categories[0]
+    activity = event.activities[0]
+
+    enrollment_a, message_a = service.toggle_enrollment(
+        participant_a,
+        activity.id,
+        'inscrever',
+        category_id=category.id,
+        actor_user=participant_a,
+    )
+    assert message_a == 'Inscrição Realizada!'
+    assert enrollment_a is not None
+
+    enrollment_b, message_b = service.toggle_enrollment(
+        participant_b,
+        activity.id,
+        'inscrever',
+        category_id=category.id,
+        actor_user=participant_b,
+    )
+    assert enrollment_b is None
+    assert message_b == 'Categoria de inscrição lotada.'
+    assert Enrollment.query.filter_by(activity_id=activity.id, user_cpf=participant_b.cpf).first() is None
+
+
+def test_event_service_confirm_attendance_creates_event_registration_for_fast_event_checkin(app, admin_user):
+    participant = User(
+        username='checkin_category_user',
+        role='participante',
+        nome='Participante Checkin',
+        cpf='12345000004',
+    )
+    participant.set_password('1234')
+    db.session.add(participant)
+    db.session.commit()
+
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento Rapido com Categoria',
+        'descricao': 'Desc',
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-08-01',
+        'hora_inicio': '19:00',
+        'data_fim': '2030-08-01',
+        'hora_fim': '21:00',
+        'perfis_habilitados': ['participante'],
+        'categorias_inscricao': [{'nome': 'Aluno', 'vagas': 10}],
+    })
+
+    category = event.registration_categories[0]
+    activity = event.activities[0]
+
+    success, message, enrollment = service.confirm_attendance(
+        participant,
+        activity.id,
+        event.id,
+        lat=-15.80,
+        lon=-47.90,
+        category_id=category.id,
+    )
+
+    assert success is True
+    assert message == 'Presença confirmada!'
+    assert enrollment is not None
+    assert enrollment.presente is True
+
+    registration = EventRegistration.query.filter_by(event_id=event.id, user_cpf=participant.cpf).first()
+    assert registration is not None
+    assert registration.category_id == category.id
+    assert enrollment.event_registration_id == registration.id
 
 
 def test_event_service_can_manage_event_allows_coordinator_course_scope_but_keeps_delete_owner_only(app):

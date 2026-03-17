@@ -105,7 +105,7 @@
         </div>
 
         <div class="row g-4 event-form-page__layout">
-            <div class="col-lg-8 event-form-page__main">
+            <div class="col-lg-12 event-form-page__main">
                 <!-- STEP 1: CONFIGURAÇÃO BÁSICA -->
                 <div class="step-card">
                     <div class="step-header">
@@ -127,6 +127,42 @@
                         <div class="mb-4">
                             <label class="form-label fw-bold text-slate-700">Descrição Detalhada</label>
                             <textarea class="form-control" id="evDesc" rows="4" placeholder="Descreva os objetivos...">{{ event.descricao or '' }}</textarea>
+                        </div>
+
+                        <div class="row g-4 mb-4">
+                            <div class="col-lg-6">
+                                <label class="form-label fw-bold text-slate-700">Público Habilitado</label>
+                                <div class="rounded-4 border bg-slate-50 p-3 d-grid gap-2">
+                                    {% set allowed_roles = event.allowed_roles_list or ['participante', 'professor', 'coordenador', 'gestor'] %}
+                                    <label class="form-check">
+                                        <input class="form-check-input event-role-checkbox" type="checkbox" value="participante" {% if 'participante' in allowed_roles %}checked{% endif %}>
+                                        <span class="form-check-label">Participante</span>
+                                    </label>
+                                    <label class="form-check">
+                                        <input class="form-check-input event-role-checkbox" type="checkbox" value="professor" {% if 'professor' in allowed_roles %}checked{% endif %}>
+                                        <span class="form-check-label">Professor</span>
+                                    </label>
+                                    <label class="form-check">
+                                        <input class="form-check-input event-role-checkbox" type="checkbox" value="coordenador" {% if 'coordenador' in allowed_roles %}checked{% endif %}>
+                                        <span class="form-check-label">Coordenador</span>
+                                    </label>
+                                    <label class="form-check">
+                                        <input class="form-check-input event-role-checkbox" type="checkbox" value="gestor" {% if 'gestor' in allowed_roles %}checked{% endif %}>
+                                        <span class="form-check-label">Gestor</span>
+                                    </label>
+                                </div>
+                                <small class="text-muted">Mudanças de público afetam novas inscrições; inscrições já existentes permanecem válidas.</small>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                    <label class="form-label fw-bold text-slate-700 mb-0">Categorias de Inscrição</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCategoryRow()">
+                                        <i class="fa-solid fa-plus me-1"></i> Adicionar Categoria
+                                    </button>
+                                </div>
+                                <div id="registrationCategoriesList" class="d-grid gap-2"></div>
+                                <small class="text-muted">Categorias ocupadas não poderão ser removidas ou ter a cota reduzida abaixo da ocupação atual.</small>
+                            </div>
                         </div>
 
                         <div class="mb-4">
@@ -233,7 +269,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-4 event-form-page__sidebar">
+            <div class="col-lg-12 event-form-page__sidebar">
                 <div class="glass-panel p-3 bg-white border-top border-2 border-warning mb-4 shadow-sm">
                     <h6 class="fw-bold mb-2 small"><i class="fa-solid fa-circle-info text-warning me-2"></i>Importante</h6>
                     <p class="x-small text-muted mb-0">Ao salvar, as atividades antigas serão substituídas pelas novas se você adicionar/remover itens. Certifique-se de manter as atividades que já possuem inscrições se desejar preservar os dados.</p>
@@ -266,6 +302,20 @@
             hora_atv: {{ ((atv.hora_atv.strftime('%H:%M') if atv.hora_atv else '')) | tojson }}
         },
         {% endfor %}
+    ];
+    const initialRegistrationCategories = [
+        {% if event.registration_categories %}
+            {% for category in event.registration_categories %}
+            {
+                id: {{ category.id }},
+                nome: {{ (category.nome or '')|tojson }},
+                vagas: {{ category.vagas if category.vagas is not none else -1 }},
+                ordem: {{ category.ordem if category.ordem is not none else loop.index0 }}
+            }{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        {% else %}
+            { id: null, nome: 'Geral', vagas: -1, ordem: 0 }
+        {% endif %}
     ];
 
     function refreshRadiusBadge() {
@@ -368,6 +418,7 @@
         if (currentType === 'PADRAO') {
             initialActivities.forEach(atv => addAtvRow(atv));
         }
+        initialRegistrationCategories.forEach((category) => addCategoryRow(category));
 
         const rapidCheckin = initialActivities.find(a => a.nome === 'Check-in Presença');
         if (rapidCheckin && rapidCheckin.horas != null) {
@@ -489,6 +540,83 @@
         return speakers;
     }
 
+    function buildCategoryRowHtml(category = {}, canRemove = true) {
+        const isUnlimited = Number(category.vagas ?? -1) === -1;
+        return `
+            <div class="registration-category-row border rounded-4 p-3 bg-white">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1">Categoria</label>
+                        <input type="hidden" class="registration-category-id" value="${escapeAttr(category.id || '')}">
+                        <input type="text" class="form-control form-control-sm registration-category-name" value="${escapeAttr(category.nome || '')}" placeholder="Ex: Aluno" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted mb-1">Vagas</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control registration-category-quota" value="${!isUnlimited && Number(category.vagas || 0) > 0 ? Number(category.vagas) : ''}" ${isUnlimited ? 'disabled' : ''} min="1">
+                            <div class="input-group-text bg-white">
+                                <input class="form-check-input mt-0 registration-category-unlimited" type="checkbox" ${isUnlimited ? 'checked' : ''} onchange="toggleCategoryQuota(this)">
+                                <small class="ms-1">∞</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCategoryRow(this)" ${canRemove ? '' : 'disabled'}>
+                            <i class="fa-solid fa-trash-can me-1"></i>Remover
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function addCategoryRow(category = {}) {
+        const container = document.getElementById('registrationCategoriesList');
+        if (!container) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = buildCategoryRowHtml(category, true);
+        container.appendChild(wrapper.firstElementChild);
+    }
+
+    function removeCategoryRow(button) {
+        const row = button.closest('.registration-category-row');
+        if (row) row.remove();
+    }
+
+    function toggleCategoryQuota(checkbox) {
+        const input = checkbox.closest('.input-group').querySelector('.registration-category-quota');
+        if (!input) return;
+        input.disabled = checkbox.checked;
+        if (checkbox.checked) input.value = '';
+    }
+
+    function collectRegistrationSettings() {
+        const selectedRoles = Array.from(document.querySelectorAll('.event-role-checkbox:checked'))
+            .map((checkbox) => checkbox.value);
+        const categories = [];
+
+        document.querySelectorAll('.registration-category-row').forEach((row, index) => {
+            const nome = row.querySelector('.registration-category-name')?.value?.trim() || '';
+            if (!nome) return;
+            const isUnlimited = row.querySelector('.registration-category-unlimited')?.checked;
+            const vagas = isUnlimited
+                ? -1
+                : row.querySelector('.registration-category-quota')?.value;
+            categories.push({
+                id: row.querySelector('.registration-category-id')?.value || undefined,
+                nome,
+                vagas,
+                ordem: index
+            });
+        });
+
+        return {
+            perfis_habilitados: selectedRoles,
+            categorias_inscricao: categories,
+        };
+    }
+
     function addAtvRow(data = {}) {
         const id = 'atv_' + Math.random().toString(36).substr(2, 9);
         const speakers = normalizeSpeakersPayload(data);
@@ -579,6 +707,16 @@
             }
         }
 
+        const registrationSettings = collectRegistrationSettings();
+        if (!registrationSettings.perfis_habilitados.length) {
+            Swal.fire('Validação', 'Selecione ao menos um perfil habilitado para inscrição.', 'warning');
+            return;
+        }
+        if (!registrationSettings.categorias_inscricao.length) {
+            Swal.fire('Validação', 'Cadastre ao menos uma categoria de inscrição.', 'warning');
+            return;
+        }
+
         const btn = e.target.querySelector('button[type="submit"]');
         btn.disabled = true;
 
@@ -612,7 +750,9 @@
             hora_fim: document.getElementById('evHoraFim').value,
             is_rapido: currentType === 'RAPIDO',
             carga_horaria_rapida: currentType === 'RAPIDO' ? document.getElementById('evRapidoHoras').value : null,
-            atividades: activities
+            atividades: activities,
+            perfis_habilitados: registrationSettings.perfis_habilitados,
+            categorias_inscricao: registrationSettings.categorias_inscricao,
         };
 
         try {

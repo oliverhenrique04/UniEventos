@@ -2,7 +2,20 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.enrollment_repository import EnrollmentRepository
 from app.services.notification_service import NotificationService
-from app.models import Event, Activity, ActivitySpeaker, Enrollment, Course, User, db
+from app.models import (
+    Activity,
+    ActivitySpeaker,
+    Course,
+    DEFAULT_EVENT_ALLOWED_ROLES,
+    DEFAULT_EVENT_REGISTRATION_CATEGORY_NAME,
+    Enrollment,
+    Event,
+    EventAllowedRole,
+    EventRegistration,
+    EventRegistrationCategory,
+    User,
+    db,
+)
 import secrets
 from datetime import datetime, date
 from flask import current_app
@@ -117,6 +130,342 @@ class EventService:
         activity.sync_legacy_speaker_fields()
 
     @staticmethod
+    def _normalize_allowed_roles_payload(raw_roles, default_if_missing=False):
+        if raw_roles is None:
+            return list(DEFAULT_EVENT_ALLOWED_ROLES) if default_if_missing else None
+
+        normalized = []
+        seen = set()
+        for raw_role in raw_roles:
+            role = str(raw_role or '').strip().lower()
+            if not role:
+                continue
+            if role not in DEFAULT_EVENT_ALLOWED_ROLES:
+                raise ValueError(f'Perfil de inscrição inválido: {role}.')
+            if role not in seen:
+                seen.add(role)
+                normalized.append(role)
+
+        if not normalized:
+            raise ValueError('Selecione ao menos um perfil habilitado para inscrição.')
+
+        return [role for role in DEFAULT_EVENT_ALLOWED_ROLES if role in seen]
+
+    @staticmethod
+    def _normalize_category_quota(value):
+        raw = str(value).strip() if value is not None else ''
+        if not raw:
+            return -1
+
+        try:
+            vagas = int(raw)
+        except (TypeError, ValueError):
+            raise ValueError('Quantidade de vagas inválida para a categoria de inscrição.')
+
+        if vagas == -1:
+            return -1
+        if vagas <= 0:
+            raise ValueError('A quantidade de vagas da categoria deve ser maior que zero ou ilimitada.')
+        return vagas
+
+    def _normalize_registration_categories_payload(self, raw_categories, default_if_missing=False):
+        if raw_categories is None:
+            if not default_if_missing:
+                return None
+            raw_categories = [{'nome': DEFAULT_EVENT_REGISTRATION_CATEGORY_NAME, 'vagas': -1, 'ordem': 0}]
+
+        normalized = []
+        seen = set()
+        for idx, raw_category in enumerate(raw_categories):
+            if not isinstance(raw_category, dict):
+                continue
+
+            nome = str(raw_category.get('nome') or '').strip()
+            if not nome:
+                continue
+
+            normalized_name = nome.casefold()
+            if normalized_name in seen:
+                raise ValueError(f'A categoria de inscrição "{nome}" está duplicada.')
+            seen.add(normalized_name)
+
+            try:
+                category_id = int(raw_category.get('id')) if raw_category.get('id') not in (None, '') else None
+            except (TypeError, ValueError):
+                category_id = None
+
+            normalized.append({
+                'id': category_id,
+                'nome': nome,
+                'vagas': self._normalize_category_quota(raw_category.get('vagas', -1)),
+                'ordem': idx,
+            })
+
+        if not normalized:
+            raise ValueError('Cadastre ao menos uma categoria de inscrição.')
+
+        return normalized
+
+    @staticmethod
+    def get_event_allowed_roles(event):
+        if not event:
+            return list(DEFAULT_EVENT_ALLOWED_ROLES)
+        if getattr(event, 'allowed_roles', None):
+            roles = [item.role for item in event.allowed_roles if item.role]
+            if roles:
+                return roles
+        return list(DEFAULT_EVENT_ALLOWED_ROLES)
+
+    @staticmethod
+    def can_self_enroll(user):
+        if not user:
+            return False
+        if user.role in ['admin', 'extensao']:
+            return True
+        return bool(getattr(user, 'role', None) in DEFAULT_EVENT_ALLOWED_ROLES)
+
+    def is_event_role_allowed_for_user(self, event, user):
+        if not event or not user or not getattr(user, 'role', None):
+            return False
+        return user.role in set(self.get_event_allowed_roles(event))
+
+    def ensure_event_registration_defaults(self, event):
+        if not event:
+            return event
+
+        changed = False
+        if not getattr(event, 'allowed_roles', None):
+            for role in DEFAULT_EVENT_ALLOWED_ROLES:
+                event.allowed_roles.append(EventAllowedRole(role=role))
+            changed = True
+
+        if not getattr(event, 'registration_categories', None):
+            event.registration_categories.append(EventRegistrationCategory(
+                nome=DEFAULT_EVENT_REGISTRATION_CATEGORY_NAME,
+                vagas=-1,
+                ordem=0,
+            ))
+            changed = True
+
+        if changed:
+            db.session.flush()
+
+        return event
+
+    def get_event_registration(self, event_id, user_cpf):
+        normalized_cpf = normalize_cpf(user_cpf)
+        if not normalized_cpf:
+            return None
+        return EventRegistration.query.filter_by(event_id=event_id, user_cpf=normalized_cpf).first()
+
+    def get_event_registration_for_user(self, event, user):
+        if not event or not user or not getattr(user, 'cpf', None):
+            return None
+        return self.get_event_registration(event.id, user.cpf)
+
+    def user_has_event_enrollment(self, event_id, user_cpf):
+        normalized_cpf = normalize_cpf(user_cpf)
+        if not normalized_cpf:
+            return False
+        return (
+            Enrollment.query
+            .join(Activity, Enrollment.activity_id == Activity.id)
+            .filter(Activity.event_id == event_id, Enrollment.user_cpf == normalized_cpf)
+            .first()
+            is not None
+        )
+
+    def get_event_category_occupancy(self, category):
+        if not category or not getattr(category, 'id', None):
+            return 0
+        return (
+            db.session.query(db.func.count(EventRegistration.id))
+            .filter(EventRegistration.category_id == category.id)
+            .scalar()
+            or 0
+        )
+
+    def get_event_categories(self, event, ensure_defaults=False):
+        if ensure_defaults:
+            self.ensure_event_registration_defaults(event)
+
+        categories = list(getattr(event, 'registration_categories', []) or [])
+        if categories:
+            return categories
+
+        return [EventRegistrationCategory(
+            id=None,
+            event_id=getattr(event, 'id', None),
+            nome=DEFAULT_EVENT_REGISTRATION_CATEGORY_NAME,
+            vagas=-1,
+            ordem=0,
+        )]
+
+    def resolve_registration_category(self, event, category_id=None, ensure_defaults=False):
+        categories = self.get_event_categories(event, ensure_defaults=ensure_defaults)
+
+        if category_id not in (None, ''):
+            try:
+                category_id = int(category_id)
+            except (TypeError, ValueError):
+                return None
+
+            for category in categories:
+                if category.id == category_id:
+                    return category
+            return None
+
+        if len(categories) == 1:
+            return categories[0]
+        return None
+
+    def can_user_access_open_event(self, user, event):
+        if not user or not event:
+            return False
+        if user.role in ['admin', 'extensao']:
+            return True
+        if self.get_event_registration_for_user(event, user):
+            return True
+        if self.user_has_event_enrollment(event.id, user.cpf):
+            return True
+        return self.is_event_role_allowed_for_user(event, user)
+
+    def can_user_start_event_registration(self, event, subject_user, actor_user=None):
+        if not event or not subject_user:
+            return False
+        if self.get_event_registration_for_user(event, subject_user):
+            return True
+        if self.user_has_event_enrollment(event.id, subject_user.cpf):
+            return True
+        if actor_user and actor_user.username == subject_user.username and actor_user.role in ['admin', 'extensao']:
+            return True
+        return self.is_event_role_allowed_for_user(event, subject_user)
+
+    def ensure_event_registration(self, event, subject_user, category_id=None, actor_user=None):
+        if not event or not subject_user:
+            return None, 'Evento ou usuário inválido.'
+
+        self.ensure_event_registration_defaults(event)
+
+        existing_registration = self.get_event_registration_for_user(event, subject_user)
+        if existing_registration:
+            return existing_registration, None
+
+        if self.user_has_event_enrollment(event.id, subject_user.cpf):
+            category = self.resolve_registration_category(event, category_id, ensure_defaults=True)
+            if not category:
+                category = self.resolve_registration_category(event, ensure_defaults=True)
+            if not category:
+                return None, 'Selecione uma categoria de inscrição.'
+
+            registration = EventRegistration(
+                event_id=event.id,
+                user_cpf=subject_user.cpf,
+                category_id=category.id,
+            )
+            saved_registration = db.session.merge(registration)
+            db.session.flush()
+            return saved_registration, None
+
+        if not self.can_user_start_event_registration(event, subject_user, actor_user=actor_user):
+            return None, 'Seu perfil não está habilitado para este evento.'
+
+        category = self.resolve_registration_category(event, category_id, ensure_defaults=True)
+        if category_id not in (None, '') and not category:
+            return None, 'Categoria de inscrição inválida.'
+        if not category:
+            return None, 'Selecione uma categoria de inscrição.'
+
+        occupancy = self.get_event_category_occupancy(category)
+        if category.vagas != -1 and occupancy >= category.vagas:
+            return None, 'Categoria de inscrição lotada.'
+
+        registration = EventRegistration(
+            event_id=event.id,
+            user_cpf=subject_user.cpf,
+            category_id=category.id,
+        )
+        db.session.add(registration)
+        try:
+            db.session.flush()
+        except IntegrityError:
+            db.session.rollback()
+            existing_registration = self.get_event_registration(event.id, subject_user.cpf)
+            if existing_registration:
+                return existing_registration, None
+            raise
+
+        return registration, None
+
+    def cleanup_event_registration_if_empty(self, event, user):
+        if not event or not user or not getattr(user, 'cpf', None):
+            return
+
+        registration = self.get_event_registration_for_user(event, user)
+        if not registration:
+            return
+
+        remaining_enrollments = (
+            Enrollment.query
+            .join(Activity, Enrollment.activity_id == Activity.id)
+            .filter(Activity.event_id == event.id, Enrollment.user_cpf == user.cpf)
+            .count()
+        )
+        if remaining_enrollments == 0:
+            db.session.delete(registration)
+            db.session.commit()
+
+    def _sync_event_allowed_roles(self, event, allowed_roles):
+        current_roles = {item.role: item for item in event.allowed_roles}
+        incoming_roles = set(allowed_roles or [])
+
+        for role, role_obj in current_roles.items():
+            if role not in incoming_roles:
+                db.session.delete(role_obj)
+
+        for role in DEFAULT_EVENT_ALLOWED_ROLES:
+            if role in incoming_roles and role not in current_roles:
+                event.allowed_roles.append(EventAllowedRole(role=role))
+
+    def _sync_event_registration_categories(self, event, categories_data):
+        existing_categories = {category.id: category for category in event.registration_categories if category.id}
+        incoming_ids = set()
+
+        for position, category_data in enumerate(categories_data):
+            category_id = category_data.get('id')
+            nome = category_data.get('nome')
+            vagas = category_data.get('vagas', -1)
+
+            if category_id and category_id in existing_categories:
+                category = existing_categories[category_id]
+                occupancy = self.get_event_category_occupancy(category)
+                if vagas != -1 and vagas < occupancy:
+                    raise ValueError(
+                        f'Não é possível reduzir as vagas da categoria "{category.nome}" abaixo da ocupação atual ({occupancy}).'
+                    )
+                category.nome = nome
+                category.vagas = vagas
+                category.ordem = position
+                incoming_ids.add(category_id)
+            else:
+                event.registration_categories.append(EventRegistrationCategory(
+                    nome=nome,
+                    vagas=vagas,
+                    ordem=position,
+                ))
+
+        for category_id, category in existing_categories.items():
+            if category_id in incoming_ids:
+                continue
+
+            occupancy = self.get_event_category_occupancy(category)
+            if occupancy > 0:
+                raise ValueError(
+                    f'Não é possível remover a categoria "{category.nome}" porque ela já possui {occupancy} inscrição(ões).'
+                )
+            db.session.delete(category)
+
+    @staticmethod
     def can_create_events(user):
         return bool(user and getattr(user, 'can_create_events', False))
 
@@ -226,6 +575,14 @@ class EventService:
         """Creates a new event and its associated activities."""
         is_rapido = bool(data.get('is_rapido'))
         fast_event_hours = self._parse_fast_event_hours(data.get('carga_horaria_rapida')) if is_rapido else None
+        allowed_roles = self._normalize_allowed_roles_payload(
+            data.get('perfis_habilitados'),
+            default_if_missing=True,
+        )
+        registration_categories = self._normalize_registration_categories_payload(
+            data.get('categorias_inscricao'),
+            default_if_missing=True,
+        )
         token = secrets.token_urlsafe(12)
         data_inicio = self._parse_date(data.get('data_inicio'))
         data_fim = self._parse_date(data.get('data_fim'))
@@ -260,6 +617,9 @@ class EventService:
             status='ABERTO'
         )
         self.event_repo.save(event)
+        self._sync_event_allowed_roles(event, allowed_roles)
+        self._sync_event_registration_categories(event, registration_categories)
+        db.session.flush()
         
         if is_rapido:
             self._create_default_checkin_activity(event, fast_event_hours)
@@ -375,6 +735,8 @@ class EventService:
 
         is_rapido = bool(data.get('is_rapido'))
         fast_event_hours = self._parse_fast_event_hours(data.get('carga_horaria_rapida')) if is_rapido else None
+        allowed_roles = self._normalize_allowed_roles_payload(data.get('perfis_habilitados'))
+        registration_categories = self._normalize_registration_categories_payload(data.get('categorias_inscricao'))
             
         # Safe coordinate parsing to prevent crashes on invalid input
         try:
@@ -393,6 +755,29 @@ class EventService:
         event.hora_inicio = self._parse_time(data.get('hora_inicio', event.hora_inicio))
         event.data_fim = self._parse_date(data.get('data_fim', event.data_fim))
         event.hora_fim = self._parse_time(data.get('hora_fim', event.hora_fim))
+
+        if allowed_roles is None:
+            allowed_roles = self.get_event_allowed_roles(event)
+        if registration_categories is None:
+            if event.registration_categories:
+                registration_categories = [
+                    {
+                        'id': category.id,
+                        'nome': category.nome,
+                        'vagas': category.vagas,
+                        'ordem': int(category.ordem or index),
+                    }
+                    for index, category in enumerate(event.registration_categories)
+                ]
+            else:
+                registration_categories = self._normalize_registration_categories_payload(
+                    None,
+                    default_if_missing=True,
+                )
+
+        self._sync_event_allowed_roles(event, allowed_roles)
+        self._sync_event_registration_categories(event, registration_categories)
+        db.session.flush()
         
         # Non-destructive activity synchronization
         if 'atividades' in data or is_rapido:
@@ -555,6 +940,23 @@ class EventService:
         query = Event.query.filter(Event.status == 'ABERTO')
         joined_course = False
 
+        if user and getattr(user, 'role', None) not in ['admin', 'extensao']:
+            user_cpf = getattr(user, 'cpf', None)
+            has_existing_registration = False
+            if user_cpf:
+                has_existing_registration = or_(
+                    Event.registrations.any(EventRegistration.user_cpf == user_cpf),
+                    Event.activities.any(
+                        Activity.enrollments.any(Enrollment.user_cpf == user_cpf)
+                    ),
+                )
+
+            query = query.filter(or_(
+                ~Event.allowed_roles.any(),
+                Event.allowed_roles.any(EventAllowedRole.role == getattr(user, 'role', None)),
+                has_existing_registration,
+            ))
+
         if filters:
             if filters.get('nome'):
                 query = query.filter(Event.nome.ilike(f"%{filters['nome']}%"))
@@ -590,8 +992,11 @@ class EventService:
                     Activity.speakers.any(ActivitySpeaker.nome.ilike(search)),
                 )))
             if filters.get('situacao') in {'inscrito', 'nao_inscrito'} and user and getattr(user, 'cpf', None):
-                user_is_enrolled = Event.activities.any(
-                    Activity.enrollments.any(Enrollment.user_cpf == user.cpf)
+                user_is_enrolled = or_(
+                    Event.registrations.any(EventRegistration.user_cpf == user.cpf),
+                    Event.activities.any(
+                        Activity.enrollments.any(Enrollment.user_cpf == user.cpf)
+                    ),
                 )
                 if filters['situacao'] == 'inscrito':
                     query = query.filter(user_is_enrolled)
@@ -602,7 +1007,17 @@ class EventService:
 
     def get_event_participants_paginated(self, event_id, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of participants enrolled in an event."""
-        query = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(Activity.event_id == event_id)
+        from sqlalchemy.orm import joinedload
+
+        query = (
+            Enrollment.query
+            .join(Activity, Enrollment.activity_id == Activity.id)
+            .filter(Activity.event_id == event_id)
+            .options(
+                joinedload(Enrollment.activity),
+                joinedload(Enrollment.event_registration).joinedload(EventRegistration.category),
+            )
+        )
         if filters:
             if filters.get('nome'):
                 query = query.filter(Enrollment.nome.ilike(f"%{filters['nome']}%"))
@@ -682,25 +1097,55 @@ class EventService:
     def get_enrollment(self, activity_id, user_cpf):
         return self.enrollment_repo.get_by_user_and_activity(user_cpf, activity_id)
 
-    def toggle_enrollment(self, user, activity_id, action):
+    def toggle_enrollment(self, user, activity_id, action, category_id=None, actor_user=None):
         """Handles user enrollment and disenrollment logic."""
         activity = self.activity_repo.get_by_id(activity_id)
-        if not activity: return None, "Atividade não encontrada"
+        if not activity:
+            return None, "Atividade não encontrada"
+
+        event = activity.event
         existing = self.get_enrollment(activity_id, user.cpf)
 
         if action == 'inscrever':
-            if existing: return existing, "Já inscrito"
+            if existing:
+                return existing, "Já inscrito"
+
+            registration, registration_error = self.ensure_event_registration(
+                event,
+                user,
+                category_id=category_id,
+                actor_user=actor_user or user,
+            )
+            if registration_error:
+                return None, registration_error
+
             current_count = len(activity.enrollments)
             if activity.vagas != -1 and current_count >= activity.vagas:
                 return None, "Lotado!"
             
-            enrollment = Enrollment(activity_id=activity_id, user_cpf=user.cpf, nome=user.nome, presente=False)
+            enrollment = Enrollment(
+                activity_id=activity_id,
+                user_cpf=user.cpf,
+                event_registration_id=registration.id if registration else None,
+                nome=user.nome,
+                presente=False,
+            )
             try:
                 saved = self.enrollment_repo.save(enrollment)
             except IntegrityError:
                 # Covers concurrent insert attempts after uniqueness hardening.
                 existing = self.get_enrollment(activity_id, user.cpf)
                 if existing:
+                    if not existing.event_registration_id:
+                        refreshed_registration, _ = self.ensure_event_registration(
+                            event,
+                            user,
+                            category_id=category_id,
+                            actor_user=actor_user or user,
+                        )
+                        if refreshed_registration:
+                            existing.event_registration_id = refreshed_registration.id
+                            self.enrollment_repo.save(existing)
                     return existing, "Já inscrito"
                 raise
             if user.email:
@@ -726,22 +1171,77 @@ class EventService:
                 )
             return saved, "Inscrição Realizada!"
         elif action == 'sair':
-            if existing: self.enrollment_repo.delete(existing)
+            if existing:
+                self.enrollment_repo.delete(existing)
+                self.cleanup_event_registration_if_empty(event, user)
             return None, "Desinscrição realizada."
         return None, "Ação inválida"
 
-    def confirm_attendance(self, user, activity_id, event_id, lat=None, lon=None):
+    def manual_enroll_user(self, actor_user, subject_user, activity_id, category_id=None):
         activity = self.get_activity(activity_id)
-        if not activity: return False, "Atividade não encontrada", None
+        if not activity:
+            return False, "Atividade inválida.", None
+
+        existing = self.get_enrollment(activity_id, subject_user.cpf)
+        if existing:
+            return False, "Usuário já está inscrito nesta atividade.", existing
+
+        enrollment, message = self.toggle_enrollment(
+            subject_user,
+            activity_id,
+            'inscrever',
+            category_id=category_id,
+            actor_user=actor_user,
+        )
+        if not enrollment:
+            return False, message, None
+
+        enrollment.presente = True
+        self.enrollment_repo.save(enrollment)
+        return True, "Inscrição realizada com sucesso.", enrollment
+
+    def confirm_attendance(self, user, activity_id, event_id, lat=None, lon=None, category_id=None):
+        activity = self.get_activity(activity_id)
+        if not activity:
+            return False, "Atividade não encontrada", None
+
+        event = activity.event
         enrollment = self.get_enrollment(activity_id, user.cpf)
 
         if not enrollment:
             if activity.nome == "Check-in Presença":
-                enrollment = Enrollment(activity_id=activity_id, user_cpf=user.cpf, nome=user.nome, presente=True, lat_checkin=lat, lon_checkin=lon)
+                registration, registration_error = self.ensure_event_registration(
+                    event,
+                    user,
+                    category_id=category_id,
+                    actor_user=user,
+                )
+                if registration_error:
+                    return False, registration_error, None
+
+                enrollment = Enrollment(
+                    activity_id=activity_id,
+                    user_cpf=user.cpf,
+                    event_registration_id=registration.id if registration else None,
+                    nome=user.nome,
+                    presente=True,
+                    lat_checkin=lat,
+                    lon_checkin=lon,
+                )
                 self.enrollment_repo.save(enrollment)
             else:
                 return False, "Você não se inscreveu nesta atividade.", None
         else:
+            if not enrollment.event_registration_id:
+                registration, registration_error = self.ensure_event_registration(
+                    event,
+                    user,
+                    category_id=category_id,
+                    actor_user=user,
+                )
+                if registration_error:
+                    return False, registration_error, None
+                enrollment.event_registration_id = registration.id if registration else None
             enrollment.presente = True
             enrollment.lat_checkin = lat
             enrollment.lon_checkin = lon

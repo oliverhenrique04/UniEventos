@@ -16,12 +16,15 @@ class ReportService:
 
     def get_event_enrollment_report_paginated(self, event_id: int, page=1, per_page=15, filter_nome=None):
         """Generates a paginated report of all enrollments for an event with eager loading."""
-        from app.models import Enrollment, Activity
+        from app.models import Activity, Enrollment, EventRegistration
         from sqlalchemy.orm import joinedload
         
         query = Enrollment.query.join(Activity, Enrollment.activity_id == Activity.id).filter(
             Activity.event_id == event_id
-        ).options(joinedload(Enrollment.activity))
+        ).options(
+            joinedload(Enrollment.activity),
+            joinedload(Enrollment.event_registration).joinedload(EventRegistration.category),
+        )
         
         if filter_nome:
             query = query.filter(Enrollment.nome.ilike(f"%{filter_nome}%"))

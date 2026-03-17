@@ -1,5 +1,6 @@
 from app.models import User, Enrollment, Activity, Event, Course, db
 from app.repositories.user_repository import UserRepository
+from app.services.event_service import EventService
 from app.services.notification_service import NotificationService
 from sqlalchemy import or_, func
 from flask import current_app
@@ -17,6 +18,7 @@ class AdminService:
     """
     def __init__(self):
         self.user_repo = UserRepository()
+        self.event_service = EventService()
         self.notification_service = NotificationService()
 
     @staticmethod
@@ -173,7 +175,7 @@ class AdminService:
         db.session.commit()
         return True
 
-    def manual_enroll(self, user_cpf, activity_id):
+    def manual_enroll(self, user_cpf, activity_id, actor_user=None, category_id=None):
         """Manually enrolls a user into an activity."""
         try:
             activity_id = int(activity_id)
@@ -186,19 +188,15 @@ class AdminService:
         if not user or not activity:
             return False, "Usuário ou Atividade não encontrados."
             
-        # Always use normalized persisted CPF from user record.
-        existing = Enrollment.query.filter_by(user_cpf=user.cpf, activity_id=activity_id).first()
-        if existing:
-            return False, "Usuário já está inscrito nesta atividade."
-            
-        enrollment = Enrollment(
-            activity_id=activity_id,
-            user_cpf=user.cpf,
-            nome=user.nome,
-            presente=True # Admin manual enroll often implies immediate presence or force entry
+        success, message, enrollment = self.event_service.manual_enroll_user(
+            actor_user or user,
+            user,
+            activity_id,
+            category_id=category_id,
         )
-        db.session.add(enrollment)
-        db.session.commit()
+        if not success:
+            return False, message
+
         try:
             self._notify_manual_enrollment(user, activity)
         except Exception:
@@ -207,7 +205,7 @@ class AdminService:
                 user.username,
                 activity_id,
             )
-        return True, "Inscrição realizada com sucesso."
+        return True, message
 
     def _notify_manual_enrollment(self, user, activity):
         """Notify a participant when staff manually add them to an event activity."""

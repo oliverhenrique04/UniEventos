@@ -170,6 +170,8 @@
 
 {% block scripts %}
 <script>
+    const eventData = {{ event_payload|tojson }};
+
     /**
      * Logic to close the window or redirect back.
      * Some browsers block window.close() if not opened by script, 
@@ -208,6 +210,53 @@
         });
     }
 
+    async function ensureCheckinCategorySelection() {
+        if (eventData?.categoria_inscricao_usuario) {
+            return eventData.categoria_inscricao_usuario.id;
+        }
+
+        const categories = Array.isArray(eventData?.categorias_inscricao)
+            ? eventData.categorias_inscricao.filter((category) => !category.lotada)
+            : [];
+
+        if (categories.length === 0) {
+            if (Array.isArray(eventData?.categorias_inscricao) && eventData.categorias_inscricao.length > 0) {
+                await Swal.fire('Sem vagas', 'Todas as categorias de inscrição estão lotadas.', 'warning');
+                return undefined;
+            }
+            return null;
+        }
+
+        if (categories.length === 1) {
+            return categories[0].id ?? null;
+        }
+
+        const inputOptions = {};
+        categories.forEach((category) => {
+            const quotaLabel = category.vagas === -1
+                ? 'Ilimitada'
+                : `${category.vagas_restantes ?? 0} vaga(s) restante(s)`;
+            inputOptions[String(category.id)] = `${category.nome} (${quotaLabel})`;
+        });
+
+        const result = await Swal.fire({
+            title: 'Selecione a categoria de inscrição',
+            input: 'select',
+            inputOptions,
+            inputPlaceholder: 'Escolha uma categoria',
+            showCancelButton: true,
+            confirmButtonText: 'Continuar',
+            cancelButtonText: 'Cancelar',
+            inputValidator: (value) => (!value ? 'Selecione uma categoria.' : undefined),
+        });
+
+        if (!result.isConfirmed) {
+            return undefined;
+        }
+
+        return result.value;
+    }
+
     async function confirmarPresencaDireta() {
         const btn = document.getElementById('btn-confirmar');
         const content = document.getElementById('checkin-content');
@@ -221,6 +270,13 @@
         // Loading State
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Sincronizando GPS...';
         btn.disabled = true;
+
+        const selectedCategoryId = await ensureCheckinCategorySelection();
+        if (selectedCategoryId === undefined) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            return;
+        }
 
         let coords = { latitude: null, longitude: null };
         try {
@@ -240,7 +296,8 @@
                 body: JSON.stringify({
                     token: "CHECKIN:{{ activity.event_id }}:{{ activity.id }}:{{ token }}",
                     latitude: coords.latitude,
-                    longitude: coords.longitude
+                    longitude: coords.longitude,
+                    categoria_inscricao_id: selectedCategoryId,
                 })
             });
             const json = await res.json();

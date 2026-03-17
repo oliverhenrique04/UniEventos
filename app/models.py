@@ -6,6 +6,11 @@ from sqlalchemy.sql import operators
 from app.utils import normalize_cpf
 
 
+EVENT_ALLOWED_ROLE_VALUES = ('participante', 'professor', 'coordenador', 'gestor')
+DEFAULT_EVENT_ALLOWED_ROLES = EVENT_ALLOWED_ROLE_VALUES
+DEFAULT_EVENT_REGISTRATION_CATEGORY_NAME = 'Geral'
+
+
 class CPFDigitsType(TypeDecorator):
     """Stores CPF as 11 digits and normalizes bound values for comparisons."""
 
@@ -66,6 +71,11 @@ class User(UserMixin, db.Model):
         'InstitutionalCertificateRecipient',
         back_populates='linked_user',
         foreign_keys='InstitutionalCertificateRecipient.user_username',
+    )
+    event_registrations = db.relationship(
+        'EventRegistration',
+        back_populates='user',
+        foreign_keys='EventRegistration.user_cpf',
     )
 
     @property
@@ -184,6 +194,24 @@ class Event(db.Model):
 
     course_obj = db.relationship('Course', backref='events')
     activities = db.relationship('Activity', backref='event', cascade="all, delete-orphan")
+    allowed_roles = db.relationship(
+        'EventAllowedRole',
+        back_populates='event',
+        cascade='all, delete-orphan',
+        order_by='EventAllowedRole.role',
+    )
+    registration_categories = db.relationship(
+        'EventRegistrationCategory',
+        back_populates='event',
+        cascade='all, delete-orphan',
+        order_by='(EventRegistrationCategory.ordem, EventRegistrationCategory.id)',
+    )
+    registrations = db.relationship(
+        'EventRegistration',
+        back_populates='event',
+        cascade='all, delete-orphan',
+        order_by='EventRegistration.id',
+    )
 
     @property
     def curso(self):
@@ -202,6 +230,89 @@ class Event(db.Model):
         course = Course.query.filter(Course.nome.ilike(normalized)).first()
         if course:
             self.course_id = course.id
+
+    @property
+    def allowed_roles_list(self):
+        if self.allowed_roles:
+            return [item.role for item in self.allowed_roles if item.role]
+        return list(DEFAULT_EVENT_ALLOWED_ROLES)
+
+    @property
+    def registration_categories_list(self):
+        return list(self.registration_categories or [])
+
+
+class EventAllowedRole(db.Model):
+    """Represents one authenticated profile allowed to enroll in an event."""
+    __tablename__ = 'event_allowed_roles'
+
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), primary_key=True)
+    role = db.Column(db.String(20), primary_key=True)
+
+    event = db.relationship('Event', back_populates='allowed_roles')
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "role in ('participante', 'professor', 'coordenador', 'gestor')",
+            name='ck_event_allowed_role_value',
+        ),
+        db.Index('ix_event_allowed_roles_role', 'role'),
+    )
+
+
+class EventRegistrationCategory(db.Model):
+    """Registration category with optional quota for one event."""
+    __tablename__ = 'event_registration_categories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
+    nome = db.Column(db.String(80), nullable=False)
+    vagas = db.Column(db.Integer, nullable=False, default=-1)
+    ordem = db.Column(db.Integer, nullable=False, default=0)
+
+    event = db.relationship('Event', back_populates='registration_categories')
+    registrations = db.relationship(
+        'EventRegistration',
+        back_populates='category',
+        order_by='EventRegistration.id',
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('event_id', 'nome', name='uq_event_registration_category_event_name'),
+        db.Index('ix_event_registration_categories_event_id', 'event_id'),
+        db.Index('ix_event_registration_categories_ordem', 'ordem'),
+    )
+
+
+class EventRegistration(db.Model):
+    """Represents a unique user registration at the event level."""
+    __tablename__ = 'event_registrations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
+    user_cpf = db.Column(CPFDigitsType(), db.ForeignKey('users.cpf'), nullable=False)
+    category_id = db.Column(
+        db.Integer,
+        db.ForeignKey('event_registration_categories.id'),
+        nullable=False,
+    )
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    event = db.relationship('Event', back_populates='registrations')
+    user = db.relationship('User', back_populates='event_registrations', foreign_keys=[user_cpf])
+    category = db.relationship('EventRegistrationCategory', back_populates='registrations')
+    enrollments = db.relationship(
+        'Enrollment',
+        back_populates='event_registration',
+        order_by='Enrollment.id',
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('event_id', 'user_cpf', name='uq_event_registration_event_user'),
+        db.Index('ix_event_registrations_event_id', 'event_id'),
+        db.Index('ix_event_registrations_user_cpf', 'user_cpf'),
+        db.Index('ix_event_registrations_category_id', 'category_id'),
+    )
 
 
 class Activity(db.Model):
@@ -340,6 +451,11 @@ class Enrollment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'))
     user_cpf = db.Column(CPFDigitsType(), db.ForeignKey('users.cpf'))
+    event_registration_id = db.Column(
+        db.Integer,
+        db.ForeignKey('event_registrations.id'),
+        nullable=True,
+    )
     nome = db.Column(db.String(100))  # Snapshot of name
     presente = db.Column(db.Boolean, default=False)
     cert_hash = db.Column(db.String(64), unique=True, nullable=True) # For validation
@@ -353,9 +469,31 @@ class Enrollment(db.Model):
     lat_checkin = db.Column(db.Float, nullable=True)
     lon_checkin = db.Column(db.Float, nullable=True)
 
+    event_registration = db.relationship('EventRegistration', back_populates='enrollments')
+
     __table_args__ = (
         db.UniqueConstraint('activity_id', 'user_cpf', name='uq_activity_enrollment_user_activity'),
     )
+
+    @property
+    def registration_category(self):
+        if self.event_registration and self.event_registration.category:
+            return self.event_registration.category
+
+        activity = getattr(self, 'activity', None)
+        event = getattr(activity, 'event', None) if activity else None
+        if not event:
+            return None
+
+        for registration in getattr(event, 'registrations', []) or []:
+            if registration.user_cpf == self.user_cpf:
+                return registration.category
+        return None
+
+    @property
+    def registration_category_name(self):
+        category = self.registration_category
+        return category.nome if category else DEFAULT_EVENT_REGISTRATION_CATEGORY_NAME
 
 
 class InstitutionalCertificate(db.Model):
