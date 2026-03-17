@@ -416,96 +416,64 @@
     }
     
     .glass-card-premium {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
         border-radius: 2rem;
         transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .qr-hero-container {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 3rem;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 20px 50px rgba(0, 0, 0, 0.3), 0 0 80px rgba(59, 130, 246, 0.2);
+    .projector-topbar {
         position: relative;
-        overflow: hidden;
-        animation: pulse-glow 4s infinite alternate;
+        z-index: 2;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.9rem;
+        padding: 1rem;
     }
 
-    @keyframes pulse-glow {
-        0% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.1); }
-        100% { box-shadow: 0 0 80px rgba(59, 130, 246, 0.3); }
-    }
-    
-    .qr-scanner-line {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 2px;
-        background: linear-gradient(to right, transparent, #3b82f6, transparent);
-        box-shadow: 0 0 20px 2px #3b82f6;
-        animation: scan 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        z-index: 10;
-    }
-    
-    @keyframes scan {
-        0% { top: -5%; }
-        50% { top: 105%; }
-        100% { top: -5%; }
+    .projector-brand {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.85rem;
+        flex: 1 1 240px;
+        min-width: 0;
     }
 
-    .timer-circle {
-        position: relative;
-        width: 100px;
-        height: 100px;
+    .projector-brand-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.85rem;
+        border-radius: 1.25rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.24);
+        flex-shrink: 0;
     }
 
-    .timer-circle svg {
-        transform: rotate(-90deg);
-        width: 100px;
-        height: 100px;
+    .projector-brand-copy {
+        min-width: 0;
     }
 
-    .timer-circle circle {
-        fill: none;
-        stroke-width: 6;
-        stroke-linecap: round;
-    }
-
-    .timer-circle .bg {
-        stroke: rgba(255, 255, 255, 0.05);
-    }
-
-    .timer-circle .progress {
-        stroke: #6366f1;
-        stroke-dasharray: 314;
-        stroke-dashoffset: 0;
-        transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
-    }
-
-    .timer-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 1.5rem;
-        color: white;
-        text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+    .projector-event-title {
+        margin: 0;
+        font-size: clamp(1.05rem, 2vw, 1.75rem);
+        line-height: 1.1;
+        overflow-wrap: anywhere;
     }
 
     .status-pill-live {
-        background:#ffffff6e;
-        border: 1px solid #ffffff6e;
+        background: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         color: #fff;
-        padding: 0.5rem 1.25rem;
+        padding: 0.45rem 0.95rem;
         border-radius: 100px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.1em;
@@ -532,8 +500,11 @@
         backdrop-filter: blur(20px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 100px;
-        padding: 0.75rem 1.5rem;
+        padding: 0.75rem 1rem;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        flex: 1 1 320px;
+        min-width: 260px;
+        max-width: 480px;
     }
 
     .projector-select {
@@ -543,6 +514,7 @@
         font-weight: 700 !important;
         cursor: pointer;
         padding-right: 2.5rem !important;
+        min-width: 0;
     }
 
     .projector-select option {
@@ -550,10 +522,448 @@
         color: white;
     }
 
+    .projector-close-btn {
+        min-height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .projector-mobile-selector {
+        position: relative;
+        z-index: 2;
+        padding: 0 1rem 1rem;
+    }
+
+    .projector-mobile-selector-card {
+        padding: 0.85rem;
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+
+    .projector-stage-body {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0 1rem 1rem;
+    }
+
+    .projector-stage-shell {
+        width: 100%;
+        max-width: 1680px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .projector-qr-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        min-width: 0;
+        text-align: center;
+    }
+
+    .qr-hero-container {
+        width: 720px;
+        background: white;
+        padding: 1rem;
+        border-radius: 1.75rem;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 20px 50px rgba(0, 0, 0, 0.28), 0 0 70px rgba(59, 130, 246, 0.18);
+        position: relative;
+        overflow: hidden;
+        animation: pulse-glow 4s infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+        0% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.1); }
+        100% { box-shadow: 0 0 80px rgba(59, 130, 246, 0.28); }
+    }
+
+    .qr-scanner-line {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(to right, transparent, #3b82f6, transparent);
+        box-shadow: 0 0 20px 2px #3b82f6;
+        animation: scan 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        z-index: 10;
+    }
+
+    @keyframes scan {
+        0% { top: -5%; }
+        50% { top: 105%; }
+        100% { top: -5%; }
+    }
+
+    .projector-qr-image {
+        display: block;
+        width: min(100%, 500px);
+        max-height: min(52vh, 480px);
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+        position: relative;
+        z-index: 5;
+        margin: 0 auto;
+    }
+
+    .projector-qr-meta {
+        width: min(100%, 560px);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.9rem;
+        padding: 0.85rem 1rem;
+        border-radius: 1.5rem;
+        background: rgba(15, 23, 42, 0.34);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+
+    .projector-qr-meta-copy {
+        min-width: 0;
+        text-align: left;
+    }
+
+    .projector-qr-title {
+        font-size: 1.05rem;
+        letter-spacing: 0.01em;
+    }
+
+    .projector-qr-subtitle {
+        margin: 0;
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.72);
+    }
+
+    .timer-circle {
+        position: relative;
+        width: 84px;
+        height: 84px;
+        flex-shrink: 0;
+    }
+
+    .timer-circle svg {
+        transform: rotate(-90deg);
+        width: 84px;
+        height: 84px;
+    }
+
+    .timer-circle circle {
+        fill: none;
+        stroke-width: 5;
+        stroke-linecap: round;
+    }
+
+    .timer-circle .bg {
+        stroke: rgba(255, 255, 255, 0.05);
+    }
+
+    .timer-circle .progress {
+        stroke: #6366f1;
+        stroke-dasharray: 314;
+        stroke-dashoffset: 0;
+        transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+    }
+
+    .timer-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 1.15rem;
+        color: white;
+        text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+    }
+
+    .projector-side-card {
+        width: 100%;
+        min-height: 100%;
+        padding: 1.2rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1.25rem;
+    }
+
+    .projector-side-copy {
+        margin: 0;
+    }
+
+    .projector-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.16);
+        border: 1px solid rgba(96, 165, 250, 0.2);
+        color: #93c5fd;
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 0.9rem;
+    }
+
+    .projector-activity-title {
+        font-size: clamp(1.55rem, 4vw, 3.35rem);
+        line-height: 1.02;
+        margin: 0 0 1rem;
+        overflow-wrap: anywhere;
+    }
+
+    .projector-description {
+        margin: 0;
+        font-size: clamp(0.98rem, 1.8vw, 1.15rem);
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.74);
+        max-width: 36rem;
+    }
+
+    .projector-feature-list {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .projector-feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.85rem;
+        padding: 0.95rem 1rem;
+        border-radius: 1.35rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .projector-feature-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: rgba(59, 130, 246, 0.18);
+        color: #93c5fd;
+    }
+
+    .projector-feature-icon.is-geo {
+        background: rgba(14, 165, 233, 0.16);
+        color: #7dd3fc;
+    }
+
+    .projector-feature-copy {
+        min-width: 0;
+    }
+
+    .projector-feature-title {
+        margin: 0;
+        font-size: 0.98rem;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .projector-feature-text {
+        margin: 0.2rem 0 0;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.65);
+    }
+
+    .projector-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: auto;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .projector-footer-logo {
+        height: 34px;
+        width: auto;
+        filter: brightness(0) invert(1);
+        opacity: 0.55;
+    }
+
+    .projector-footer-divider {
+        width: 1px;
+        height: 28px;
+        background: rgba(255, 255, 255, 0.18);
+    }
+
+    .projector-footer-copy {
+        margin: 0;
+        font-size: 0.68rem;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.55);
+    }
+
+    .projector-empty-state {
+        max-width: 34rem;
+        margin: auto;
+        padding: 1.4rem;
+    }
+
+    @media (max-width: 575.98px) {
+        .projector-close-btn {
+            width: 100%;
+        }
+
+        .projector-qr-meta-copy {
+            text-align: center;
+        }
+    }
+
+    @media (min-width: 576px) {
+        .projector-topbar {
+            padding: 1.25rem 1.25rem 0.75rem;
+        }
+
+        .projector-mobile-selector {
+            padding: 0 1.25rem 1rem;
+        }
+
+        .projector-stage-body {
+            padding: 0 1.25rem 1.25rem;
+        }
+
+        .projector-side-card,
+        .projector-empty-state {
+            padding: 1.4rem;
+        }
+
+        .qr-hero-container {
+            padding: 1.35rem;
+            border-radius: 2.15rem;
+        }
+
+        .timer-circle,
+        .timer-circle svg {
+            width: 92px;
+            height: 92px;
+        }
+
+        .timer-text {
+            font-size: 1.3rem;
+        }
+    }
+
+    @media (min-width: 768px) {
+        .projector-topbar {
+            align-items: center;
+        }
+
+        .projector-mobile-selector {
+            padding: 0 1.5rem 1rem;
+        }
+
+        .projector-stage-body {
+            padding: 0 1.5rem 1.5rem;
+        }
+
+        .projector-stage-shell {
+            gap: 1.35rem;
+        }
+
+        .qr-hero-container {
+            padding: 1.65rem;
+        }
+
+        .projector-qr-meta {
+            justify-content: flex-start;
+        }
+
+        .projector-side-card,
+        .projector-empty-state {
+            padding: 1.6rem;
+        }
+
+        .timer-circle,
+        .timer-circle svg {
+            width: 100px;
+            height: 100px;
+        }
+
+        .timer-text {
+            font-size: 1.5rem;
+        }
+    }
+
     @media (min-width: 992px) {
-        .timer-circle { width: 110px; height: 110px; }
-        .timer-circle svg { width: 110px; height: 110px; }
-        .timer-text { font-size: 1.75rem; }
+        .projector-topbar {
+            padding: 1.5rem 1.75rem 1rem;
+        }
+
+        .projector-stage-body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 1.75rem 1.75rem;
+        }
+
+        .projector-stage-shell {
+            grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
+            gap: 1.6rem;
+        }
+
+        .qr-hero-container {
+            padding: 2.1rem;
+        }
+
+        .projector-qr-image {
+            max-height: min(60vh, 520px);
+        }
+
+        .projector-side-card {
+            padding: 1.9rem;
+        }
+
+        .timer-circle,
+        .timer-circle svg {
+            width: 110px;
+            height: 110px;
+        }
+
+        .timer-text {
+            font-size: 1.75rem;
+        }
+    }
+
+    @media (min-width: 1200px) {
+        .projector-stage-body {
+            padding: 0 2rem 2rem;
+        }
+
+        .projector-stage-shell {
+            grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.85fr);
+            gap: 2rem;
+        }
+
+        .projector-side-card {
+            padding: 2.15rem;
+        }
     }
 
     .analytics-hero {
@@ -1819,119 +2229,103 @@
                 <div class="position-absolute translate-middle rounded-circle bg-indigo-600 bg-opacity-10 blur-3xl" style="width: 50vw; height: 50vw; bottom: -10%; right: -10%;"></div>
             </div>
 
-            <!-- Top Control Bar (Professional) -->
-            <div class="w-100 p-4 d-flex justify-content-between align-items-center" style="z-index: 1000;">
-                <div class="d-flex align-items-center">
-                    <div class="bg-white bg-opacity-10 backdrop-blur p-3 rounded-4 me-3 border border-white border-opacity-10">
+            <div class="projector-topbar">
+                <div class="projector-brand">
+                    <div class="projector-brand-icon">
                         <i class="fa-solid fa-graduation-cap fs-4"></i>
                     </div>
-                    <div>
-                        <h4 class="m-0 fw-bold tracking-tight text-white" id="projEventName">EuroEventos</h4>
-                        <div class="status-pill-live mt-1"><span></span> Ao Vivo</div>
+                    <div class="projector-brand-copy">
+                        <h4 class="projector-event-title fw-bold tracking-tight text-white" id="projEventName">EuroEventos</h4>
+                        <div class="status-pill-live mt-2"><span></span> Ao Vivo</div>
                     </div>
                 </div>
 
-                <!-- Central Activity Controller (Floating) -->
                 <div class="floating-control-panel d-none d-md-flex align-items-center gap-3">
                     <i class="fa-solid fa-layer-group text-primary"></i>
                     <select id="selectAtividadeProjetor" class="form-select projector-select" onchange="mudarAtividadeProjetor()"></select>
                 </div>
 
-                <button class="btn btn-white bg-white text-dark rounded-pill px-4 fw-bold shadow-lg border-0 hover-scale" onclick="fecharProjetor()">
+                <button class="btn btn-white bg-white text-dark rounded-pill px-4 fw-bold shadow-lg border-0 projector-close-btn" onclick="fecharProjetor()">
                     <i class="fa-solid fa-xmark me-2"></i> Sair
                 </button>
             </div>
 
-            <!-- Mobile Selector (Visible only on mobile) -->
-            <div class="d-md-none px-4 mb-4" style="z-index: 1000;">
-                <div class="p-3 bg-white bg-opacity-10 rounded-4 border border-white border-opacity-10 backdrop-blur">
+            <div class="projector-mobile-selector d-md-none">
+                <div class="projector-mobile-selector-card">
                     <select id="selectAtividadeProjetorMobile" class="form-select projector-select w-100" onchange="syncAndChange(this)"></select>
                 </div>
             </div>
 
-            <!-- Main Stage -->
-            <div class="modal-body d-flex flex-column justify-content-center align-items-center p-4 p-lg-5 flex-grow-1 overflow-visible" style="z-index: 10;">
-                
+            <div class="modal-body projector-stage-body flex-grow-1 overflow-visible">
                 <div id="projector-main-ui" class="d-none w-100 animate__animated animate__fadeIn">
-                    <div class="container-fluid h-100">
-                        <div class="row align-items-stretch justify-content-center g-5">
-                            
-                            <!-- QR Hero Section (70%) -->
-                            <div class="col-12 col-xl-8 d-flex flex-column align-items-center justify-content-center text-center">
-                                <div class="qr-hero-container mb-5" id="qrContainer">
-                                    <div class="qr-scanner-line"></div>
-                                    <img id="imgQrDinamico" src=""
-                                        class="img-fluid" style="height: min(55vh, 500px); aspect-ratio: 1/1; object-fit: contain; position: relative; z-index: 5;">
-                                </div>
-
-                                <div class="d-flex align-items-center gap-4 bg-opacity-5 p-3 px-4 rounded-pill backdrop-blur border border-white border-opacity-10">
-                                    <div class="timer-circle">
-                                        <svg>
-                                            <circle class="bg" cx="50" cy="50" r="45"></circle>
-                                            <circle class="progress" id="timerProgress" cx="50" cy="50" r="45"></circle>
-                                        </svg>
-                                        <div class="timer-text" id="timerDisplay">30s</div>
-                                    </div>
-                                    <div class="text-start">
-                                        <h5 class="fw-bold m-0 text-white tracking-tight">Código QR Dinâmico</h5>
-                                        <p class="text-white-50 x-small mb-0">Atualização de segurança ativada</p>
-                                    </div>
-                                </div>
+                    <div class="projector-stage-shell">
+                        <section class="projector-qr-panel">
+                            <div class="qr-hero-container" id="qrContainer">
+                                <div class="qr-scanner-line"></div>
+                                <img id="imgQrDinamico" src="" class="projector-qr-image" alt="Codigo QR dinamico de check-in">
                             </div>
 
-                            <!-- Context Details Section (30%) -->
-                            <div class="col-12 col-xl-4 d-flex">
-                                <div class="glass-card-premium p-5 w-100 d-flex flex-column justify-content-between shadow-2xl">
-                                    <div>
-                                        <div class="mb-5">
-                                            <h6 class="text-primary fw-bold text-uppercase letter-spacing-2 small mb-3">Atividade em Curso</h6>
-                                            <h1 class="display-5 fw-bold text-white mb-4 line-clamp-3" id="projActivityName">Selecione a atividade</h1>
-                                            <p class="lead text-white-50 opacity-80" style="line-height: 1.6;">Aponte sua câmera para o código ao lado para registrar sua presença e garantir suas horas.</p>
-                                        </div>
+                            <div class="projector-qr-meta">
+                                <div class="timer-circle">
+                                    <svg viewBox="0 0 100 100" aria-hidden="true">
+                                        <circle class="bg" cx="50" cy="50" r="45"></circle>
+                                        <circle class="progress" id="timerProgress" cx="50" cy="50" r="45"></circle>
+                                    </svg>
+                                    <div class="timer-text" id="timerDisplay">30s</div>
+                                </div>
+                                <div class="projector-qr-meta-copy">
+                                    <h5 class="projector-qr-title fw-bold m-0 text-white tracking-tight">Código QR Dinâmico</h5>
+                                    <p class="projector-qr-subtitle mb-0">Atualização de segurança ativada</p>
+                                </div>
+                            </div>
+                        </section>
 
-                                        <div class="d-grid gap-4 mt-5">
-                                            <div class="d-flex align-items-center gap-4 p-4 rounded-4 bg-opacity-5 border border-white border-opacity-10 transition-all hover-glass">
-                                                <div class=" bg-opacity-20 p-3 rounded-circle">
-                                                    <i class="fa-solid fa-fingerprint biometria-icon fs-4"></i>
-                                                </div>
-                                                <div>
-                                                    <h6 class="fw-bold m-0 text-white">Biometria Digital</h6>
-                                                    <p class="text-white-50 x-small mb-0">Validação individual por dispositivo</p>
-                                                </div>
-                                            </div>
-                                            <div class="d-flex align-items-center gap-4 p-4 rounded-4  bg-opacity-5 border border-white border-opacity-10 transition-all hover-glass">
-                                                <div class="bg-indigo-500 bg-opacity-20 p-3 rounded-circle">
-                                                    <i class="fa-solid fa-location-dot text-indigo-400 fs-4"></i>
-                                                </div>
-                                                <div>
-                                                    <h6 class="fw-bold m-0 text-white">Geofencing</h6>
-                                                    <p class="text-white-50 x-small mb-0">Verificação de proximidade ativa</p>
-                                                </div>
-                                            </div>
+                        <aside class="d-flex">
+                            <div class="glass-card-premium projector-side-card shadow-2xl">
+                                <div class="projector-side-copy">
+                                    <h6 class="projector-kicker">Atividade em Curso</h6>
+                                    <h1 class="projector-activity-title fw-bold text-white line-clamp-3" id="projActivityName">Selecione a atividade</h1>
+                                    <p class="projector-description">Aponte sua câmera para o código ao lado para registrar sua presença e garantir suas horas.</p>
+                                </div>
+
+                                <div class="projector-feature-list">
+                                    <div class="projector-feature-item">
+                                        <div class="projector-feature-icon">
+                                            <i class="fa-solid fa-fingerprint fs-4"></i>
+                                        </div>
+                                        <div class="projector-feature-copy">
+                                            <h6 class="projector-feature-title">Biometria Digital</h6>
+                                            <p class="projector-feature-text">Validação individual por dispositivo</p>
                                         </div>
                                     </div>
-
-                                    <div class="mt-5 pt-5 border-top border-white border-opacity-10">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <img src="{{ url_for('static', filename='file/logo_nuted.png') }}" alt="NUTED" style="height: 40px; filter: brightness(0) invert(1); opacity: 0.5;">
-                                            <div class="vr bg-white opacity-20" style="height: 30px;"></div>
-                                            <small class="text-white-50 font-monospace" style="font-size: 0.65rem;">EuroEventos v1.0 <br> © 2026 Institucional</small>
+                                    <div class="projector-feature-item">
+                                        <div class="projector-feature-icon is-geo">
+                                            <i class="fa-solid fa-location-dot fs-4"></i>
+                                        </div>
+                                        <div class="projector-feature-copy">
+                                            <h6 class="projector-feature-title">Geofencing</h6>
+                                            <p class="projector-feature-text">Verificação de proximidade ativa</p>
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="projector-footer">
+                                    <img src="{{ url_for('static', filename='file/logo_nuted.png') }}" alt="NUTED" class="projector-footer-logo">
+                                    <div class="projector-footer-divider"></div>
+                                    <small class="projector-footer-copy font-monospace">EuroEventos v1.0 <br> © 2026 Institucional</small>
+                                </div>
                             </div>
-                        </div>
+                        </aside>
                     </div>
                 </div>
 
-                <!-- Empty State -->
-                <div id="msgSelect" class="text-center animate__animated animate__fadeIn my-auto p-5 glass-card-premium" style="max-width: 500px;">
+                <div id="msgSelect" class="text-center animate__animated animate__fadeIn my-auto glass-card-premium projector-empty-state">
                     <div class="bg-primary bg-opacity-10 p-4 rounded-circle d-inline-flex mb-4">
                         <i class="fa-solid fa-display fa-4x text-primary opacity-75"></i>
                     </div>
                     <h3 class="fw-bold text-white mb-3">Modo de Projeção Ativo</h3>
                     <p class="text-white-50 mb-4">Escolha uma atividade no seletor superior para exibir o código QR de registro de presença para os participantes.</p>
-                    <div class="d-md-none bg-white bg-opacity-10 p-3 rounded-4">
+                    <div class="d-md-none projector-mobile-selector-card mt-4">
                         <i class="fa-solid fa-arrow-up text-primary me-2"></i> <small class="fw-bold">Use o seletor acima</small>
                     </div>
                 </div>
