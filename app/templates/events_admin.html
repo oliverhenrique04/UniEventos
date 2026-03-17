@@ -1056,29 +1056,29 @@
                     <td class="text-end pe-3 pe-md-4 event-row-actions-cell" data-label="Ações">
                         <div class="event-actions-grid">
                             ${ev.can_edit ? `
-                            <a href="${pathUrl(`/editar_evento/${ev.id}`)}" class="btn btn-sm btn-light border" title="Editar Evento">
+                            <a href="${pathUrl(`/editar_evento/${ev.id}`)}" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Editar Evento">
                                 <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
                             </a>` : `
-                            <button class="btn btn-sm btn-light border" title="Somente consulta" disabled>
+                            <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Somente consulta" disabled>
                                 <i class="fa-solid fa-pen-to-square text-muted"></i>
                             </button>`}
-                            <button class="btn btn-sm btn-light border" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Registro de Presença">
+                            <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" onclick="abrirProjetorGestao(${ev.id})" title="Projetar Registro de Presença">
                                 <i class="fa-solid fa-display text-primary"></i>
                             </button>
-                            <button class="btn btn-sm btn-light border" onclick="abrirParticipantes(${ev.id})" title="Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>
+                            <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" onclick="abrirParticipantes(${ev.id})" title="Participantes" ${ev.can_manage_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-users-viewfinder text-primary"></i>
                             </button>
-                            <button class="btn btn-sm btn-light border" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_notify_participants ? '' : 'disabled'}>
+                            <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" onclick="abrirModalNotificacao(${ev.id}, '${ev.nome}')" title="Notificar Participantes" ${ev.can_notify_participants ? '' : 'disabled'}>
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
                             ${ev.can_view_certificates ? `
-                            <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Certificado">
+                            <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificado">
                                 <i class="fa-solid fa-certificate text-warning"></i>
                             </a>` : `
-                            <button class="btn btn-sm btn-light border" title="Certificado indisponível" disabled>
+                            <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificado indisponível" disabled>
                                 <i class="fa-solid fa-certificate text-muted"></i>
                             </button>`}
-                            <button class="btn btn-sm btn-light border text-danger" onclick="confirmarExcluirEvento(${ev.id})" ${ev.can_delete ? '' : 'disabled'}>
+                            <button class="btn btn-sm btn-light border text-danger d-flex align-items-center justify-content-center" onclick="confirmarExcluirEvento(${ev.id})" ${ev.can_delete ? '' : 'disabled'}>
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </div>
