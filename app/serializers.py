@@ -80,6 +80,7 @@ def serialize_event(event, current_user=None):
 
     can_edit = False
     can_delete = False
+    can_delete_permission = False
     can_manage_participants = False
     can_add_participants = False
     can_notify_participants = False
@@ -92,18 +93,31 @@ def serialize_event(event, current_user=None):
     can_self_enroll = False
     has_event_registration = False
     enrollment_block_reason = None
+    delete_block_reason = None
+    delete_block_status = {
+        'linked_event_registrations_count': 0,
+        'linked_enrollments_count': 0,
+        'has_linked_records': False,
+        'delete_block_reason': None,
+    }
 
     if current_user:
         from app.services.event_service import EventService
 
         can_edit = EventService.can_edit_event(current_user, event)
-        can_delete = EventService.can_delete_event(current_user, event)
+        can_delete_permission = EventService.can_delete_event(current_user, event)
         can_manage_participants = EventService.can_manage_event_participants(current_user, event)
         can_add_participants = EventService.can_add_event_participants(current_user, event)
         can_notify_participants = EventService.can_notify_event_participants(current_user, event)
         can_view_certificates = EventService.can_view_event_certificates(current_user, event)
         can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
         service = EventService()
+        delete_block_status = service.get_event_delete_block_status(event)
+        can_delete = can_delete_permission and not delete_block_status['has_linked_records']
+        if not can_delete_permission:
+            delete_block_reason = 'Sem permissão para excluir este evento.'
+        elif delete_block_status['has_linked_records']:
+            delete_block_reason = delete_block_status['delete_block_reason']
         allowed_roles = service.get_event_allowed_roles(event)
         current_registration = service.get_event_registration_for_user(event, current_user)
         has_legacy_enrollment = any(
@@ -192,6 +206,11 @@ def serialize_event(event, current_user=None):
         'motivo_bloqueio_inscricao': enrollment_block_reason,
         'can_edit': can_edit,
         'can_delete': can_delete,
+        'can_delete_permission': can_delete_permission,
+        'linked_event_registrations_count': delete_block_status['linked_event_registrations_count'],
+        'linked_enrollments_count': delete_block_status['linked_enrollments_count'],
+        'has_linked_records': delete_block_status['has_linked_records'],
+        'delete_block_reason': delete_block_reason,
         'can_manage_participants': can_manage_participants,
         'can_add_participants': can_add_participants,
         'can_notify_participants': can_notify_participants,

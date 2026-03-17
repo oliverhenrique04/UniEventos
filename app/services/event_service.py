@@ -568,6 +568,39 @@ class EventService:
         return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
 
     @staticmethod
+    def get_event_delete_block_status(event):
+        if not event:
+            return {
+                'linked_event_registrations_count': 0,
+                'linked_enrollments_count': 0,
+                'has_linked_records': False,
+                'delete_block_reason': None,
+            }
+
+        linked_event_registrations_count = EventRegistration.query.filter_by(
+            event_id=event.id
+        ).count()
+        linked_enrollments_count = (
+            Enrollment.query
+            .join(Activity, Enrollment.activity_id == Activity.id)
+            .filter(Activity.event_id == event.id)
+            .count()
+        )
+        has_linked_records = (
+            linked_event_registrations_count > 0 or linked_enrollments_count > 0
+        )
+
+        return {
+            'linked_event_registrations_count': linked_event_registrations_count,
+            'linked_enrollments_count': linked_enrollments_count,
+            'has_linked_records': has_linked_records,
+            'delete_block_reason': (
+                'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+                if has_linked_records else None
+            ),
+        }
+
+    @staticmethod
     def can_manage_event(user, event):
         return EventService.can_edit_event(user, event)
 
@@ -1080,6 +1113,10 @@ class EventService:
         if not event: return False, "Evento não encontrado"
         if not self.can_delete_event(user, event):
             return False, "Permissão negada"
+
+        delete_block_status = self.get_event_delete_block_status(event)
+        if delete_block_status['has_linked_records']:
+            return False, delete_block_status['delete_block_reason']
 
         event_name = event.nome
         event_type = event.tipo

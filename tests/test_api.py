@@ -5,6 +5,7 @@ from app.models import (
     Event,
     Activity,
     Enrollment,
+    EventRegistration,
     Course,
     User,
     InstitutionalCertificateCategory,
@@ -1137,6 +1138,100 @@ def test_gestor_can_edit_and_delete_only_own_events(client, app):
 
     delete_res = client.delete(f'/api/deletar_evento/{event_id}')
     assert delete_res.status_code == 200
+
+
+def test_delete_event_returns_400_and_admin_payload_blocks_when_event_has_registration(client, app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='event_delete_registration_participant',
+            role='participante',
+            nome='Participante Registro',
+            cpf='30040050060',
+            email='event_delete_registration@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.commit()
+
+        service = EventService()
+        event = service.create_event('admin_test', {
+            'nome': 'Evento API Bloqueado por Inscricao',
+            'descricao': 'Evento com inscricao vinculada',
+            'is_rapido': True,
+            'carga_horaria_rapida': 2,
+            'data_inicio': '2030-10-01',
+            'hora_inicio': '19:00',
+        })
+        db.session.add(EventRegistration(
+            event_id=event.id,
+            user_cpf=participant.cpf,
+            category_id=event.registration_categories[0].id,
+        ))
+        db.session.commit()
+        event_id = event.id
+
+    _login_admin(client)
+
+    delete_res = client.delete(f'/api/deletar_evento/{event_id}')
+    assert delete_res.status_code == 400
+    assert delete_res.get_json() == {
+        'erro': 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.',
+        'linked_event_registrations_count': 1,
+        'linked_enrollments_count': 0,
+    }
+
+    list_res = client.get('/api/eventos_admin')
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    blocked_item = next(item for item in payload['items'] if item['id'] == event_id)
+    assert blocked_item['can_delete'] is False
+    assert blocked_item['can_delete_permission'] is True
+    assert blocked_item['linked_event_registrations_count'] == 1
+    assert blocked_item['linked_enrollments_count'] == 0
+    assert blocked_item['has_linked_records'] is True
+    assert blocked_item['delete_block_reason'] == 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+
+
+def test_delete_event_returns_400_when_event_has_legacy_enrollment(client, app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='event_delete_legacy_participant',
+            role='participante',
+            nome='Participante Legado API',
+            cpf='30040050061',
+            email='event_delete_legacy@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.commit()
+
+        service = EventService()
+        event = service.create_event('admin_test', {
+            'nome': 'Evento API Bloqueado por Matricula',
+            'descricao': 'Evento com matricula legada',
+            'is_rapido': True,
+            'carga_horaria_rapida': 2,
+            'data_inicio': '2030-10-02',
+            'hora_inicio': '19:00',
+        })
+        db.session.add(Enrollment(
+            activity_id=event.activities[0].id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=False,
+        ))
+        db.session.commit()
+        event_id = event.id
+
+    _login_admin(client)
+
+    delete_res = client.delete(f'/api/deletar_evento/{event_id}')
+    assert delete_res.status_code == 400
+    assert delete_res.get_json() == {
+        'erro': 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.',
+        'linked_event_registrations_count': 0,
+        'linked_enrollments_count': 1,
+    }
 
 
 def test_dashboard_analytics_professor_owner_filter_remains_disabled(client, app):
@@ -2377,6 +2472,97 @@ def test_institutional_certificates_allow_extensao_edit_but_only_delete_own_reco
         assert updated_cert.titulo == 'Certificado Engenharia A - Ajustado'
         assert preserved_foreign_cert is not None
         assert deleted_own_cert is None
+
+
+def test_institutional_certificates_block_delete_when_any_recipient_exists(client, app, admin_user):
+    with app.app_context():
+        category = InstitutionalCertificateCategory(nome='Bloqueio Exclusao')
+        db.session.add(category)
+        db.session.flush()
+
+        pending_cert = InstitutionalCertificate(
+            created_by_username='admin_test',
+            titulo='Certificado Com Destinatario Pendente',
+            category_id=category.id,
+            descricao='Nao deve ser excluido',
+            data_emissao=date.today().isoformat(),
+            signer_name='Coord. Admin',
+            status='RASCUNHO',
+        )
+        delivered_cert = InstitutionalCertificate(
+            created_by_username='admin_test',
+            titulo='Certificado Com Destinatario Enviado',
+            category_id=category.id,
+            descricao='Nao deve ser excluido',
+            data_emissao=date.today().isoformat(),
+            signer_name='Coord. Admin',
+            status='ENVIADO',
+        )
+        db.session.add_all([pending_cert, delivered_cert])
+        db.session.flush()
+
+        db.session.add_all([
+            InstitutionalCertificateRecipient(
+                certificate_id=pending_cert.id,
+                nome='Aluno Pendente',
+                email='pending_delete@test.local',
+                cpf='40050060070',
+                cert_hash='PENDINGBLOCK001',
+                cert_entregue=False,
+            ),
+            InstitutionalCertificateRecipient(
+                certificate_id=delivered_cert.id,
+                nome='Aluno Enviado',
+                email='delivered_delete@test.local',
+                cpf='40050060071',
+                cert_hash='DELIVERBLOCK001',
+                cert_entregue=True,
+            ),
+        ])
+        db.session.commit()
+        pending_cert_id = pending_cert.id
+        delivered_cert_id = delivered_cert.id
+
+    _login_admin(client)
+
+    list_res = client.get('/api/institutional_certificates')
+    assert list_res.status_code == 200
+    payload = list_res.get_json()
+    by_id = {item['id']: item for item in payload['items']}
+    assert by_id[pending_cert_id]['can_delete'] is False
+    assert by_id[pending_cert_id]['can_delete_permission'] is True
+    assert by_id[pending_cert_id]['linked_recipients_count'] == 1
+    assert by_id[pending_cert_id]['has_linked_records'] is True
+    assert by_id[pending_cert_id]['delete_block_reason'] == 'Não é possível excluir o certificado porque existem destinatários vinculados.'
+    assert by_id[delivered_cert_id]['can_delete'] is False
+    assert by_id[delivered_cert_id]['linked_recipients_count'] == 1
+    assert by_id[delivered_cert_id]['has_linked_records'] is True
+
+    detail_res = client.get(f'/api/institutional_certificates/{pending_cert_id}')
+    assert detail_res.status_code == 200
+    detail_payload = detail_res.get_json()
+    assert detail_payload['can_delete'] is False
+    assert detail_payload['can_delete_permission'] is True
+    assert detail_payload['linked_recipients_count'] == 1
+    assert detail_payload['has_linked_records'] is True
+    assert detail_payload['delete_block_reason'] == 'Não é possível excluir o certificado porque existem destinatários vinculados.'
+
+    delete_pending_res = client.delete(f'/api/institutional_certificates/{pending_cert_id}')
+    delete_delivered_res = client.delete(f'/api/institutional_certificates/{delivered_cert_id}')
+    assert delete_pending_res.status_code == 400
+    assert delete_pending_res.get_json() == {
+        'erro': 'Não é possível excluir o certificado porque existem destinatários vinculados.',
+        'linked_recipients_count': 1,
+    }
+    assert delete_delivered_res.status_code == 400
+    assert delete_delivered_res.get_json() == {
+        'erro': 'Não é possível excluir o certificado porque existem destinatários vinculados.',
+        'linked_recipients_count': 1,
+    }
+
+    with app.app_context():
+        assert db.session.get(InstitutionalCertificate, pending_cert_id) is not None
+        assert db.session.get(InstitutionalCertificate, delivered_cert_id) is not None
 
 
 def test_institutional_certificates_allow_coordinator_read_only_only_for_own_course(client, app):

@@ -461,6 +461,7 @@ let searchUsersPage = 1;
 let searchUsersTotalPages = 1;
 let searchUsersTotal = 0;
 let searchUsersDebounceTimer = null;
+const CERTIFICADOS_CACHE = new Map();
 const selectedUsersMap = new Map();
 let recipientsPage = 1;
 let recipientsTotalPages = 1;
@@ -714,6 +715,15 @@ function uiSuccess(message) {
     Toast.fire({ icon: 'success', title: message || 'Operacao concluida com sucesso.' });
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function formatDateDisplay(value) {
     if (!value) return '-';
     const parts = String(value).split('-');
@@ -735,11 +745,13 @@ async function carregarCertificadosInstitucionais(page = 1) {
     const data = await resp.json();
 
     if (!resp.ok) {
+        CERTIFICADOS_CACHE.clear();
         tabelaBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-4">${data.erro || 'Erro ao carregar dados'}</td></tr>`;
         return;
     }
 
     if (!data.items || !data.items.length) {
+        CERTIFICADOS_CACHE.clear();
         renderCertificatesEmpty();
         totalPaginas = 1;
         atualizarControlesPaginacao(0, 1, 1);
@@ -750,6 +762,8 @@ async function carregarCertificadosInstitucionais(page = 1) {
     totalPaginas = data.pages || 1;
     atualizarControlesPaginacao(data.total || 0, data.current_page || 1, totalPaginas);
     renderPaginacao(data.current_page || 1, totalPaginas);
+    CERTIFICADOS_CACHE.clear();
+    (data.items || []).forEach(item => CERTIFICADOS_CACHE.set(item.id, item));
 
     tabelaBody.innerHTML = data.items.map(item => `
         <tr class="animate__animated animate__fadeIn">
@@ -785,8 +799,8 @@ async function carregarCertificadosInstitucionais(page = 1) {
                            <button class="btn btn-sm btn-light border" onclick="enviarCertificado(${item.id}, this)" title="Enviar"><i class="fa-solid fa-paper-plane text-success"></i></button>
                            <button class="btn btn-sm btn-light border" onclick="duplicarCertificado(${item.id})" title="Duplicar"><i class="fa-regular fa-copy text-indigo-600"></i></button>
                            ${item.can_delete
-                                ? `<button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir"><i class="fa-solid fa-trash-can text-danger"></i></button>`
-                                : `<button class="btn btn-sm btn-light border" title="Somente o autor pode excluir" disabled><i class="fa-solid fa-trash-can text-muted"></i></button>`}`
+                                ? `<button class="btn btn-sm btn-light border" onclick="excluirCertificado(${item.id})" title="Excluir certificado"><i class="fa-solid fa-trash-can text-danger"></i></button>`
+                                : `<button class="btn btn-sm btn-light border" title="${escapeHtml(item.delete_block_reason || 'Sem permissao para excluir este certificado.')}" disabled><i class="fa-solid fa-trash-can text-muted"></i></button>`}`
                         : `${item.can_view_designer
                                 ? `<button class="btn btn-sm btn-light border" onclick="abrirDesignerCertificado(${item.id})" title="Visualizar layout"><i class="fa-regular fa-eye text-warning"></i></button>`
                                 : `<button class="btn btn-sm btn-light border" title="Somente consulta" disabled><i class="fa-solid fa-lock text-muted"></i></button>`}`}
@@ -975,9 +989,15 @@ async function duplicarCertificado(id) {
 }
 
 async function excluirCertificado(id) {
+    const cert = CERTIFICADOS_CACHE.get(id);
+    if (cert && !cert.can_delete) {
+        uiError(cert.delete_block_reason || 'Sem permissao para excluir este certificado.');
+        return;
+    }
+
     const confirmacao = await Swal.fire({
         title: 'Excluir certificado?',
-        text: 'Essa acao nao pode ser desfeita.',
+        text: 'Essa ação não pode ser desfeita.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sim, excluir',
