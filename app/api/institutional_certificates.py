@@ -59,6 +59,29 @@ def _can_delete_institutional_certificate(cert):
     return False
 
 
+def _get_institutional_certificate_delete_block_status(cert):
+    if not cert:
+        return {
+            'linked_recipients_count': 0,
+            'has_linked_records': False,
+            'delete_block_reason': None,
+        }
+
+    linked_recipients_count = InstitutionalCertificateRecipient.query.filter_by(
+        certificate_id=cert.id
+    ).count()
+    has_linked_records = linked_recipients_count > 0
+
+    return {
+        'linked_recipients_count': linked_recipients_count,
+        'has_linked_records': has_linked_records,
+        'delete_block_reason': (
+            'Não é possível excluir o certificado porque existem destinatários vinculados.'
+            if has_linked_records else None
+        ),
+    }
+
+
 def _coordinator_course_id():
     if current_user.role != 'coordenador':
         return None
@@ -132,6 +155,41 @@ def _count_visible_recipients(certificate_id):
     return _apply_institutional_recipient_view_scope(
         InstitutionalCertificateRecipient.query.filter_by(certificate_id=certificate_id)
     ).count()
+
+
+def _serialize_institutional_certificate_payload(cert, include_template=False):
+    delete_permission = _can_delete_institutional_certificate(cert)
+    delete_block_status = _get_institutional_certificate_delete_block_status(cert)
+    payload = {
+        'id': cert.id,
+        'titulo': cert.titulo,
+        'categoria': cert.categoria,
+        'category_id': cert.category_id,
+        'descricao': cert.descricao,
+        'data_emissao': cert.data_emissao,
+        'signer_name': cert.signer_name,
+        'cert_bg_path': cert.cert_bg_path,
+        'status': cert.status,
+        'created_by_username': cert.created_by_username,
+        'created_by_name': cert.creator.nome if cert.creator else None,
+        'recipients_count': _count_visible_recipients(cert.id),
+        'linked_recipients_count': delete_block_status['linked_recipients_count'],
+        'has_linked_records': delete_block_status['has_linked_records'],
+        'delete_block_reason': (
+            'Sem permissão para excluir este certificado.'
+            if not delete_permission
+            else delete_block_status['delete_block_reason']
+        ),
+        'can_edit': _can_edit_institutional_certificate(cert),
+        'can_delete_permission': delete_permission,
+        'can_delete': delete_permission and not delete_block_status['has_linked_records'],
+        'can_view_designer': _can_view_institutional_certificate_designer(cert),
+    }
+    if cert.created_at:
+        payload['created_at'] = cert.created_at.isoformat()
+    if include_template:
+        payload['template'] = json.loads(cert.cert_template_json or '{}')
+    return payload
 
 
 def _parse_date_iso(date_str):
@@ -603,21 +661,7 @@ def list_institutional_certificates():
 
     return jsonify({
         'items': [
-            {
-                'id': item.id,
-                'titulo': item.titulo,
-                'categoria': item.categoria,
-                'category_id': item.category_id,
-                'data_emissao': item.data_emissao,
-                'status': item.status,
-                'recipients_count': _count_visible_recipients(item.id),
-                'created_by_username': item.created_by_username,
-                'created_by_name': item.creator.nome if item.creator else None,
-                'created_at': item.created_at.isoformat() if item.created_at else None,
-                'can_edit': _can_edit_institutional_certificate(item),
-                'can_delete': _can_delete_institutional_certificate(item),
-                'can_view_designer': _can_view_institutional_certificate_designer(item),
-            }
+            _serialize_institutional_certificate_payload(item)
             for item in pagination.items
         ],
         'total': pagination.total,
@@ -690,24 +734,7 @@ def get_institutional_certificate(certificate_id):
     if error:
         return error
 
-    return jsonify({
-        'id': cert.id,
-        'titulo': cert.titulo,
-        'categoria': cert.categoria,
-        'category_id': cert.category_id,
-        'descricao': cert.descricao,
-        'data_emissao': cert.data_emissao,
-        'signer_name': cert.signer_name,
-        'cert_bg_path': cert.cert_bg_path,
-        'template': json.loads(cert.cert_template_json or '{}'),
-        'status': cert.status,
-        'created_by_username': cert.created_by_username,
-        'created_by_name': cert.creator.nome if cert.creator else None,
-        'recipients_count': _count_visible_recipients(cert.id),
-        'can_edit': _can_edit_institutional_certificate(cert),
-        'can_delete': _can_delete_institutional_certificate(cert),
-        'can_view_designer': _can_view_institutional_certificate_designer(cert),
-    })
+    return jsonify(_serialize_institutional_certificate_payload(cert, include_template=True))
 
 
 @bp.route('/<int:certificate_id>', methods=['PUT'])
@@ -902,14 +929,11 @@ def delete_institutional_certificate(certificate_id):
     if error:
         return error
 
-    delivered_count = InstitutionalCertificateRecipient.query.filter_by(
-        certificate_id=certificate_id,
-        cert_entregue=True,
-    ).count()
-    if delivered_count > 0:
+    delete_block_status = _get_institutional_certificate_delete_block_status(cert)
+    if delete_block_status['has_linked_records']:
         return jsonify({
-            'erro': 'Nao e permitido excluir certificado com destinatarios ja enviados',
-            'delivered_count': delivered_count,
+            'erro': delete_block_status['delete_block_reason'],
+            'linked_recipients_count': delete_block_status['linked_recipients_count'],
         }), 400
 
     db.session.delete(cert)

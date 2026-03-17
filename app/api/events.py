@@ -391,8 +391,20 @@ def alternar_presenca_manual(enrollment_id):
 @login_required
 def deletar_evento(event_id):
     """Removes an event and all its data."""
+    event = event_service.get_event_by_id(event_id)
     success, msg = event_service.delete_event(event_id, current_user)
-    if success: return jsonify({"mensagem": msg})
+    if success:
+        return jsonify({"mensagem": msg})
+
+    delete_block_status = None
+    if event and event_service.can_delete_event(current_user, event):
+        delete_block_status = event_service.get_event_delete_block_status(event)
+    if delete_block_status and delete_block_status['has_linked_records']:
+        return jsonify({
+            "erro": msg,
+            "linked_event_registrations_count": delete_block_status['linked_event_registrations_count'],
+            "linked_enrollments_count": delete_block_status['linked_enrollments_count'],
+        }), 400
     return jsonify({"erro": msg}), 403
 
 @bp.route('/remover_inscricao/<int:enrollment_id>', methods=['DELETE'])

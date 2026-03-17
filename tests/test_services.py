@@ -561,6 +561,119 @@ def test_event_service_delete_event_sends_email_to_owner(app):
         assert sent_payloads[0]['to_email'] == 'owner_delete@test.local'
 
 
+def test_event_service_delete_event_blocks_when_event_has_registration(app):
+    with app.app_context():
+        owner = User(
+            username='event_owner_blocked_registration',
+            role='professor',
+            nome='Owner Blocked Registration',
+            cpf='55566677789',
+            email='owner_blocked_registration@test.local',
+            can_create_events=True,
+        )
+        participant = User(
+            username='event_participant_blocked_registration',
+            role='participante',
+            nome='Participante Bloqueado',
+            cpf='55566677790',
+            email='participant_blocked_registration@test.local',
+        )
+        owner.set_password('1234')
+        participant.set_password('1234')
+        db.session.add_all([owner, participant])
+        db.session.commit()
+
+        service = EventService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        event = service.create_event(owner.username, {
+            'nome': 'Evento Com Inscricao Vinculada',
+            'descricao': 'Desc',
+            'is_rapido': True,
+            'carga_horaria_rapida': 2,
+            'data_inicio': '2030-01-04',
+            'hora_inicio': '12:00',
+        })
+        sent_payloads.clear()
+
+        registration = EventRegistration(
+            event_id=event.id,
+            user_cpf=participant.cpf,
+            category_id=event.registration_categories[0].id,
+        )
+        db.session.add(registration)
+        db.session.commit()
+
+        status = service.get_event_delete_block_status(event)
+        success, msg = service.delete_event(event.id, owner)
+
+        assert status['linked_event_registrations_count'] == 1
+        assert status['linked_enrollments_count'] == 0
+        assert status['has_linked_records'] is True
+        assert success is False
+        assert msg == 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+        assert len(sent_payloads) == 0
+        assert db.session.get(Event, event.id) is not None
+
+
+def test_event_service_delete_event_blocks_when_event_has_legacy_enrollment(app):
+    with app.app_context():
+        owner = User(
+            username='event_owner_blocked_enrollment',
+            role='professor',
+            nome='Owner Blocked Enrollment',
+            cpf='55566677791',
+            email='owner_blocked_enrollment@test.local',
+            can_create_events=True,
+        )
+        participant = User(
+            username='event_participant_blocked_enrollment',
+            role='participante',
+            nome='Participante Legado',
+            cpf='55566677792',
+            email='participant_blocked_enrollment@test.local',
+        )
+        owner.set_password('1234')
+        participant.set_password('1234')
+        db.session.add_all([owner, participant])
+        db.session.commit()
+
+        service = EventService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        event = service.create_event(owner.username, {
+            'nome': 'Evento Com Matricula Legada',
+            'descricao': 'Desc',
+            'is_rapido': True,
+            'carga_horaria_rapida': 2,
+            'data_inicio': '2030-01-05',
+            'hora_inicio': '12:00',
+        })
+        sent_payloads.clear()
+
+        enrollment = Enrollment(
+            activity_id=event.activities[0].id,
+            user_cpf=participant.cpf,
+            nome=participant.nome,
+            presente=False,
+        )
+        db.session.add(enrollment)
+        db.session.commit()
+
+        status = service.get_event_delete_block_status(event)
+        success, msg = service.delete_event(event.id, owner)
+
+        assert status['linked_event_registrations_count'] == 0
+        assert status['linked_enrollments_count'] == 1
+        assert status['has_linked_records'] is True
+        assert success is False
+        assert msg == 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+        assert len(sent_payloads) == 0
+        assert db.session.get(Event, event.id) is not None
+
+
 def test_admin_service_manual_enroll_sends_email_to_added_user(app, admin_user):
     with app.app_context():
         participant = User(

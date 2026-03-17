@@ -1482,7 +1482,7 @@
                             <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificado indisponível" disabled>
                                 <i class="fa-solid fa-certificate text-muted"></i>
                             </button>`}
-                            <button class="btn btn-sm btn-light border text-danger d-flex align-items-center justify-content-center" onclick="confirmarExcluirEvento(${ev.id})" ${ev.can_delete ? '' : 'disabled'}>
+                            <button class="btn btn-sm btn-light border text-danger d-flex align-items-center justify-content-center" onclick="confirmarExcluirEvento(${ev.id})" title="${escapeHtml(ev.can_delete ? 'Excluir evento' : (ev.delete_block_reason || 'Sem permissão para excluir este evento.'))}" ${ev.can_delete ? '' : 'disabled'}>
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </div>
@@ -1953,10 +1953,31 @@
     }
 
     async function confirmarExcluirEvento(id) {
-        const confirm = await Swal.fire({ title: 'Excluir Evento?', text: "Isso removerá todas as atividades e inscrições vinculadas.", icon: 'warning', showCancelButton: true });
+        const ev = EVENTOS_GESTAO_CACHE.get(id);
+        if (!ev) {
+            Toast.fire({ icon: 'warning', title: 'Evento não encontrado na página atual.' });
+            return;
+        }
+        if (!ev.can_delete) {
+            Swal.fire('Exclusão bloqueada', ev.delete_block_reason || 'Sem permissão para excluir este evento.', 'warning');
+            return;
+        }
+
+        const confirm = await Swal.fire({
+            title: 'Excluir Evento?',
+            text: "Essa ação removerá o evento e suas configurações. Eventos com inscrições ou matrículas vinculadas não podem ser excluídos.",
+            icon: 'warning',
+            showCancelButton: true
+        });
         if (!confirm.isConfirmed) return;
         const res = await fetch(apiUrl(`/api/deletar_evento/${id}`), { method: 'DELETE' });
-        if (res.ok) { carregarEventos(1); Toast.fire({ icon: 'success', title: 'Evento removido.' }); }
+        const data = await res.json();
+        if (res.ok) {
+            carregarEventos(1);
+            Toast.fire({ icon: 'success', title: 'Evento removido.' });
+            return;
+        }
+        Swal.fire('Erro', data.erro || 'Falha ao excluir evento.', 'error');
     }
 
     // Reuse form from dashboard logic if needed or implement a cleaner CRUD modal
