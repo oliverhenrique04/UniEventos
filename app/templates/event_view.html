@@ -1,5 +1,82 @@
 {% extends 'base.html' %}
 
+{% block head_styles %}
+<style>
+    /* Description collapse/expand */
+    .event-description {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        line-height: 1.6;
+        margin-bottom: 0;
+        color: #495057;
+        font-size: 1.25rem;
+    }
+
+    .event-description.collapsed {
+        max-height: 120px;
+        display: -webkit-box;
+        -webkit-line-clamp: 5;
+        -webkit-box-orient: vertical;
+    }
+
+    .event-description.collapsed::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 40px;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 85%);
+    }
+
+    .event-description.expanded {
+        max-height: none;
+        overflow: visible;
+        display: block;
+        -webkit-line-clamp: unset;
+    }
+
+    .event-description-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+        font-size: 0.85rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid rgba(4, 77, 132, 0.12);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 1rem;
+    }
+
+    .event-description-toggle:hover {
+        background: rgba(4, 77, 132, 0.12);
+        border-color: rgba(4, 77, 132, 0.18);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(4, 77, 132, 0.18);
+    }
+
+    .event-description-toggle i {
+        font-size: 0.95rem;
+        transition: transform 0.3s ease;
+    }
+
+    .event-description-toggle.collapsed i {
+        transform: rotate(0deg);
+    }
+
+    .event-description-toggle.expanded i {
+        transform: rotate(180deg);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4 fade-in-up">
     {% if event.data_inicio and event.data_inicio.strftime %}
@@ -64,9 +141,7 @@
 
                 <div class="p-4">
                     <h6 class="fw-bold text-slate-400 text-uppercase letter-spacing-1 mb-3">Sobre o Evento</h6>
-                    <p class="text-slate-700 fs-5" style="line-height: 1.6; white-space: pre-wrap;">
-                        {{ event.descricao or 'Nenhuma descrição disponível para este evento.' }}
-                    </p>
+                    <div id="event-description-container"></div>
 
                     <div id="event-access-alert" class="mt-4">
                         {% if user.is_authenticated and event_payload.motivo_bloqueio_inscricao and not event_payload.possui_inscricao_evento %}
@@ -135,12 +210,72 @@
     const currentUserRole = {{ (user.role if user.is_authenticated else none)|tojson }};
     const pendingEnrollmentActions = new Set();
     const activitiesData = (eventData.atividades || []).map((activity) => ({ ...activity }));
+    const eventDescription = {{ event.descricao|tojson if event.descricao else 'null' }};
+
+    function toggleDescription(elementId) {
+        const description = document.getElementById(elementId);
+        const toggleBtn = document.getElementById(`${elementId}-toggle`);
+        if (!description || !toggleBtn) return;
+
+        const isCollapsed = description.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            description.classList.remove('collapsed');
+            description.classList.add('expanded');
+            toggleBtn.classList.remove('collapsed');
+            toggleBtn.classList.add('expanded');
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver menos';
+        } else {
+            description.classList.remove('expanded');
+            description.classList.add('collapsed');
+            toggleBtn.classList.remove('expanded');
+            toggleBtn.classList.add('collapsed');
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver mais';
+        }
+    }
+
+    function renderDescriptionWithToggle(descriptionText, elementId, maxLines = 5) {
+        if (!descriptionText) return '';
+        
+        const lines = descriptionText.split('\n').filter(line => line.trim());
+        const totalLines = lines.length;
+        const isLong = totalLines > maxLines;
+        
+        let displayText = descriptionText;
+        let showToggle = isLong;
+        
+        if (isLong) {
+            const previewLines = lines.slice(0, maxLines).join('\n');
+            displayText = previewLines;
+        }
+        
+        return `
+            <p id="${elementId}" class="event-description ${isLong ? 'collapsed' : ''}" style="white-space: pre-wrap;">
+                ${displayText}
+            </p>
+            ${showToggle ? `
+                <button id="${elementId}-toggle" onclick="toggleDescription('${elementId}')" class="event-description-toggle ${isLong ? 'collapsed' : 'expanded'}">
+                    <i class="fa-solid fa-chevron-down"></i>
+                    ${isLong ? 'Ver mais' : 'Ver menos'}
+                </button>
+            ` : ''}
+        `;
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
+        renderEventDescription();
         renderAccessAlert();
         renderCategorySummary();
         renderAtividades(activitiesData);
     });
+
+    function renderEventDescription() {
+        const container = document.getElementById('event-description-container');
+        if (!container) return;
+        
+        const description = eventDescription || 'Nenhuma descrição disponível para este evento.';
+        container.innerHTML = renderDescriptionWithToggle(description, 'event-desc-main');
+    }
 
     function userRoleCanAccessEvent() {
         if (!isAuthenticated || !currentUserRole) return false;
