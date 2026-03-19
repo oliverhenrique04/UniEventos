@@ -3080,12 +3080,16 @@
         const isCollapsed = description.classList.contains('collapsed');
         
         if (isCollapsed) {
+            // Mostrar texto completo
+            description.innerHTML = description.dataset.fullText;
             description.classList.remove('collapsed');
             description.classList.add('expanded');
             toggleBtn.classList.remove('collapsed');
             toggleBtn.classList.add('expanded');
             toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver menos';
         } else {
+            // Voltar para texto truncado
+            description.innerHTML = description.dataset.previewText;
             description.classList.remove('expanded');
             description.classList.add('collapsed');
             toggleBtn.classList.remove('expanded');
@@ -3101,18 +3105,21 @@
         const totalLines = lines.length;
         const isLong = totalLines > maxLines;
         
-        let displayText = descriptionText;
+        let previewText = descriptionText;
         let showToggle = isLong;
         
         if (isLong) {
             // Show first N lines initially
             const previewLines = lines.slice(0, maxLines).join('\n');
-            displayText = previewLines;
+            previewText = previewLines;
         }
         
         return `
-            <p id="${elementId}" class="event-description ${isLong ? 'collapsed' : ''}">
-                ${displayText}
+            <p id="${elementId}" 
+               class="event-description ${isLong ? 'collapsed' : ''}"
+               data-full-text="${escapeHtml(descriptionText).replace(/"/g, '&quot;')}"
+               data-preview-text="${escapeHtml(previewText).replace(/"/g, '&quot;')}">
+                ${previewText}
             </p>
             ${showToggle ? `
                 <button id="${elementId}-toggle" onclick="toggleDescription('${elementId}')" class="event-description-toggle ${isLong ? 'collapsed' : 'expanded'}">
@@ -4247,6 +4254,13 @@
 
     function refreshOpenEventEnrollmentAvailability(eventPayload) {
         if (!eventPayload) return;
+        if (eventPayload.inscricoes_encerradas) {
+            eventPayload.pode_se_inscrever = false;
+            if (!eventPayload.motivo_bloqueio_inscricao) {
+                eventPayload.motivo_bloqueio_inscricao = 'Inscrições encerradas para este evento.';
+            }
+            return;
+        }
         const hasEventRegistration = Boolean(eventPayload.possui_inscricao_evento);
         eventPayload.pode_se_inscrever = hasEventRegistration || canCurrentUserAccessOpenEvent(eventPayload);
         eventPayload.motivo_bloqueio_inscricao = eventPayload.pode_se_inscrever
@@ -4275,19 +4289,29 @@
             refreshOpenEventEnrollmentAvailability(ev);
             const tipoLabel = ev.tipo === 'PADRAO' ? 'Padrão' : 'Rápido';
             const dataBR = (ev.data_inicio || '').split('-').reverse().join('/');
-            const eventEnrollmentBlocked = !ev.pode_se_inscrever && !ev.possui_inscricao_evento;
+            const eventEnrollmentBlocked = Boolean(ev.inscricoes_encerradas) || (!ev.pode_se_inscrever && !ev.possui_inscricao_evento);
             const categorySummaryHtml = renderDashboardCategoryBadges(ev);
 
             let htmlAtividades = '';
             for (const a of ev.atividades) {
                 const isFull = a.vagas !== -1 && a.total_inscritos >= a.vagas;
                 const acao = a.inscrito ? 'sair' : 'inscrever';
-                const actionBlocked = acao === 'inscrever' && (eventEnrollmentBlocked || isFull);
-                const btnClass = a.inscrito
-                    ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
-                    : (actionBlocked ? 'btn-light disabled' : 'btn-outline-primary');
+                const closedBlocked = Boolean(ev.inscricoes_encerradas);
+                const actionBlocked = closedBlocked || (acao === 'inscrever' && (eventEnrollmentBlocked || isFull));
+                const blockReason = closedBlocked
+                    ? 'Evento encerrado: alterações de inscrição não são permitidas.'
+                    : (isFull && acao === 'inscrever'
+                        ? 'Atividade lotada.'
+                        : (ev.motivo_bloqueio_inscricao || 'Inscrição indisponível para esta atividade.'));
+                const btnClass = actionBlocked
+                    ? 'btn-light disabled border'
+                    : (a.inscrito
+                        ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
+                        : 'btn-outline-primary');
                 const btnText = a.inscrito
-                    ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
+                    ? (closedBlocked
+                        ? '<i class="fa-solid fa-lock me-1"></i> Encerrado'
+                        : '<i class="fa-solid fa-user-minus me-1"></i> Sair')
                     : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever');
 
                 let vagasStatus = '';
@@ -4312,7 +4336,7 @@
               </div>
               ${vagasStatus}
             </div>
-            <button onclick="toggleInscricao(this, ${a.id}, '${acao}')" data-atv-id="${a.id}" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;" ${actionBlocked ? 'disabled aria-disabled="true"' : ''}>
+                        <button onclick="toggleInscricao(this, ${a.id}, '${acao}')" data-atv-id="${a.id}" class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill" style="font-size: 0.65rem; letter-spacing: 0.5px;" title="${actionBlocked ? escapeHtml(blockReason) : ''}" ${actionBlocked ? 'disabled aria-disabled="true"' : ''}>
               ${btnText}
             </button>
           </div>
@@ -4360,6 +4384,13 @@
                 </div>
                 ${htmlAtividades}
               </div>
+
+                            <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-3">
+                                <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${escapeHtml(dataBR)}</small>
+                                ${ev.token_publico
+                                        ? `<a href="${pathUrl(`/inscrever/${ev.token_publico}`)}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>`
+                                        : ''}
+                            </div>
             </div>
           </div>
         </div>

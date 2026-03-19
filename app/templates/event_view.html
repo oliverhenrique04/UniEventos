@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 
 {% block head_styles %}
+{% if event.latitude is not none and event.longitude is not none %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+{% endif %}
 <style>
     /* Description collapse/expand */
     .event-description {
@@ -192,6 +195,125 @@
         color: #033e68;
         text-decoration: none;
     }
+
+    /* Discrete Event Location */
+    .event-location-card {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .event-location-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.1rem 1.25rem;
+        background: transparent;
+        border: 0;
+        text-align: left;
+        color: inherit;
+    }
+
+    .event-location-toggle:hover {
+        background: rgba(4, 77, 132, 0.03);
+    }
+
+    .event-location-toggle:focus-visible {
+        outline: 2px solid rgba(4, 77, 132, 0.35);
+        outline-offset: -2px;
+    }
+
+    .event-location-summary {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.9rem;
+        min-width: 0;
+    }
+
+    .event-location-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+    }
+
+    .event-location-copy {
+        min-width: 0;
+    }
+
+    .event-location-copy p {
+        margin: 0.2rem 0 0;
+        color: #6b7280;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+
+    .event-location-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: #044d84;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .event-location-action i {
+        transition: transform 0.25s ease;
+    }
+
+    .event-location-toggle[aria-expanded="true"] .event-location-action i {
+        transform: rotate(180deg);
+    }
+
+    .event-location-panel[hidden] {
+        display: none !important;
+    }
+
+    .event-location-panel {
+        padding: 0 1.25rem 1.25rem;
+    }
+
+    .event-location-map-shell {
+        padding-top: 0.9rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .event-location-map {
+        width: 100%;
+        height: 180px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        overflow: hidden;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .event-location-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.9rem;
+    }
+
+    @media (min-width: 768px) {
+        .event-location-map {
+            height: 220px;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .event-location-toggle {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -224,6 +346,8 @@
     {% else %}
         {% set hora_fim_fmt = event.hora_fim or '-' %}
     {% endif %}
+
+    {% set has_event_location = event.latitude is not none and event.longitude is not none %}
 
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
@@ -294,6 +418,48 @@
                             </div>
                         </div>
                     </div>
+
+                    {% if has_event_location %}
+                    <div class="mt-4">
+                        <div class="info-card event-location-card" id="event-location-section">
+                            <button
+                                type="button"
+                                class="event-location-toggle"
+                                id="event-location-toggle"
+                                aria-expanded="false"
+                                aria-controls="event-location-panel">
+                                <span class="event-location-summary">
+                                    <span class="event-location-icon">
+                                        <i class="fa-solid fa-location-dot"></i>
+                                    </span>
+                                    <span class="event-location-copy">
+                                        <small class="text-muted d-block fw-bold text-uppercase" style="letter-spacing: 0.06em;">Localização</small>
+                                        <p>Visualize o local do evento.</p>
+                                    </span>
+                                </span>
+                                <span class="event-location-action">
+                                    <span id="event-location-toggle-label">Ver mapa</span>
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </span>
+                            </button>
+
+                            <div class="event-location-panel" id="event-location-panel" hidden>
+                                <div class="event-location-map-shell">
+                                    <div id="event-location-map" class="event-location-map"></div>
+                                </div>
+                                <div class="event-location-actions">
+                                    <a
+                                        href="https://www.google.com/maps/search/?api=1&query={{ event.latitude }},{{ event.longitude }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                        <i class="fa-solid fa-up-right-from-square me-1"></i>Abrir no mapa
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -325,6 +491,9 @@
 {% endblock %}
 
 {% block scripts %}
+{% if event.latitude is not none and event.longitude is not none %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endif %}
 <script>
     const eventData = {{ event_payload|tojson }};
     const eventId = eventData.id;
@@ -333,6 +502,9 @@
     const pendingEnrollmentActions = new Set();
     const activitiesData = (eventData.atividades || []).map((activity) => ({ ...activity }));
     const eventDescription = {{ event.descricao|tojson if event.descricao else 'null' }};
+    const eventLocation = {{ {'latitude': event.latitude, 'longitude': event.longitude}|tojson if event.latitude is not none and event.longitude is not none else 'null' }};
+    let eventLocationMap = null;
+    let eventLocationMapInitialized = false;
 
     function toggleDescription(elementId) {
         const description = document.getElementById(elementId);
@@ -342,12 +514,16 @@
         const isCollapsed = description.classList.contains('collapsed');
         
         if (isCollapsed) {
+            // Mostrar texto completo
+            description.innerHTML = description.dataset.fullText;
             description.classList.remove('collapsed');
             description.classList.add('expanded');
             toggleBtn.classList.remove('collapsed');
             toggleBtn.classList.add('expanded');
             toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver menos';
         } else {
+            // Voltar para texto truncado
+            description.innerHTML = description.dataset.previewText;
             description.classList.remove('expanded');
             description.classList.add('collapsed');
             toggleBtn.classList.remove('expanded');
@@ -363,17 +539,22 @@
         const totalLines = lines.length;
         const isLong = totalLines > maxLines;
         
-        let displayText = descriptionText;
+        let previewText = descriptionText;
         let showToggle = isLong;
         
         if (isLong) {
+            // Mostrar apenas as primeiras linhas
             const previewLines = lines.slice(0, maxLines).join('\n');
-            displayText = previewLines;
+            previewText = previewLines;
         }
         
         return `
-            <p id="${elementId}" class="event-description ${isLong ? 'collapsed' : ''}" style="white-space: pre-wrap;">
-                ${displayText}
+            <p id="${elementId}" 
+               class="event-description ${isLong ? 'collapsed' : ''}" 
+               style="white-space: pre-wrap;"
+               data-full-text="${escapeHtml(descriptionText).replace(/"/g, '&quot;')}"
+               data-preview-text="${escapeHtml(previewText).replace(/"/g, '&quot;')}">
+                ${previewText}
             </p>
             ${showToggle ? `
                 <button id="${elementId}-toggle" onclick="toggleDescription('${elementId}')" class="event-description-toggle ${isLong ? 'collapsed' : 'expanded'}">
@@ -389,6 +570,7 @@
         renderAccessAlert();
         renderCategorySummary();
         renderAtividades(activitiesData);
+        setupEventLocationToggle();
     });
 
     function renderEventDescription() {
@@ -397,6 +579,49 @@
         
         const description = eventDescription || 'Nenhuma descrição disponível para este evento.';
         container.innerHTML = renderDescriptionWithToggle(description, 'event-desc-main');
+    }
+
+    function setupEventLocationToggle() {
+        if (!eventLocation) return;
+
+        const toggle = document.getElementById('event-location-toggle');
+        const panel = document.getElementById('event-location-panel');
+        const label = document.getElementById('event-location-toggle-label');
+        if (!toggle || !panel || !label) return;
+
+        toggle.addEventListener('click', () => {
+            const willExpand = toggle.getAttribute('aria-expanded') !== 'true';
+            toggle.setAttribute('aria-expanded', String(willExpand));
+            panel.hidden = !willExpand;
+            label.textContent = willExpand ? 'Ocultar mapa' : 'Ver mapa';
+
+            if (!willExpand) return;
+
+            initializeEventLocationMap();
+            window.setTimeout(() => {
+                if (eventLocationMap) {
+                    eventLocationMap.invalidateSize();
+                }
+            }, 180);
+        });
+    }
+
+    function initializeEventLocationMap() {
+        if (!eventLocation || eventLocationMapInitialized || typeof L === 'undefined') return;
+
+        const mapElement = document.getElementById('event-location-map');
+        if (!mapElement) return;
+
+        eventLocationMap = L.map(mapElement, {
+            scrollWheelZoom: false,
+        }).setView([eventLocation.latitude, eventLocation.longitude], 15);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(eventLocationMap);
+
+        L.marker([eventLocation.latitude, eventLocation.longitude]).addTo(eventLocationMap);
+        eventLocationMapInitialized = true;
     }
 
     function userRoleCanAccessEvent() {
@@ -410,7 +635,22 @@
         const container = document.getElementById('event-access-alert');
         if (!container) return;
 
-        if (!isAuthenticated || !eventData.motivo_bloqueio_inscricao || eventData.possui_inscricao_evento) {
+        if (!isAuthenticated) {
+            container.innerHTML = '';
+            return;
+        }
+
+        if (eventData.inscricoes_encerradas) {
+            container.innerHTML = `
+                <div class="alert alert-secondary rounded-4 border-0 shadow-sm mb-0">
+                    <div class="fw-bold mb-1"><i class="fa-solid fa-hourglass-end me-2"></i>Evento encerrado</div>
+                    <div class="small mb-0">Novas inscrições não estão mais disponíveis para este evento.</div>
+                </div>
+            `;
+            return;
+        }
+
+        if (!eventData.motivo_bloqueio_inscricao || eventData.possui_inscricao_evento) {
             container.innerHTML = '';
             return;
         }
@@ -559,7 +799,10 @@
         }
 
         eventData.possui_inscricao_evento = stillHasEventRegistration;
-        if (stillHasEventRegistration) {
+        if (eventData.inscricoes_encerradas) {
+            eventData.pode_se_inscrever = false;
+            eventData.motivo_bloqueio_inscricao = 'Inscrições encerradas para este evento.';
+        } else if (stillHasEventRegistration) {
             eventData.pode_se_inscrever = true;
             eventData.motivo_bloqueio_inscricao = null;
         } else {
@@ -596,25 +839,36 @@
 
         for (const a of list) {
             const isFull = a.vagas !== -1 && a.total_inscritos >= a.vagas;
+            const eventClosed = Boolean(eventData.inscricoes_encerradas);
 
             let btnHtml = '';
             if (!isAuthenticated) {
                 btnHtml = `<a href="${pathUrl('{{ url_for('main.index') }}')}" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
-            } else if (eventData.pode_se_inscrever) {
-                const isDisabled = !a.inscrito && isFull;
-                const btnClass = a.inscrito
-                    ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
-                    : (isFull ? 'btn-light disabled' : 'btn-outline-primary');
+            } else {
+                const isDisabled = eventClosed || (!a.inscrito && (isFull || !eventData.pode_se_inscrever));
+                const btnClass = isDisabled
+                    ? 'btn-light disabled border'
+                    : (a.inscrito
+                        ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
+                        : 'btn-outline-primary');
 
-                const btnText = a.inscrito
-                    ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
-                    : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever');
+                const btnText = eventClosed
+                    ? '<i class="fa-solid fa-lock me-1"></i> Encerrado'
+                    : (a.inscrito
+                        ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
+                        : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever'));
 
                 const acao = a.inscrito ? 'sair' : 'inscrever';
+                const blockReason = eventClosed
+                    ? 'Evento encerrado: alterações de inscrição não são permitidas.'
+                    : (isFull
+                        ? 'Atividade lotada.'
+                        : (eventData.motivo_bloqueio_inscricao || 'Inscrição indisponível para este evento.'));
 
                 btnHtml = `
           <button onclick="toggleInscricao(this, ${a.id}, '${acao}')"
                         data-atv-id="${a.id}"
+            title="${isDisabled ? escapeHtml(blockReason) : ''}"
             ${isDisabled ? 'disabled aria-disabled="true"' : ''}
                         class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
             style="font-size: 0.65rem;">

@@ -34,6 +34,8 @@ def toggle_inscricao():
         "Categoria de inscrição inválida.",
         "Categoria de inscrição lotada.",
         "Seu perfil não está habilitado para este evento.",
+        "Inscrições encerradas para este evento.",
+        "Evento encerrado: desinscrição não permitida.",
     ]:
         if message == "Atividade não encontrada":
             return jsonify({"erro": message}), 404

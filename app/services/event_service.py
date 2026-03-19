@@ -17,7 +17,7 @@ from app.models import (
     db,
 )
 import secrets
-from datetime import datetime, date
+from datetime import datetime, date, time
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
@@ -57,6 +57,31 @@ class EventService:
             except (ValueError, TypeError):
                 continue
         return None
+
+    @staticmethod
+    def _event_end_datetime(event):
+        """Build a comparable end datetime for enrollment cutoff rules."""
+        if not event:
+            return None
+
+        end_date = event.data_fim or event.data_inicio
+        if not end_date:
+            return None
+
+        # If end time is missing, treat the event as ending at the end of the day.
+        end_time = event.hora_fim or time(23, 59, 59)
+        try:
+            return datetime.combine(end_date, end_time)
+        except Exception:
+            return None
+
+    def is_event_enrollment_closed(self, event, reference_dt=None):
+        """True when enrollment actions should be blocked because event already ended."""
+        end_dt = self._event_end_datetime(event)
+        if not end_dt:
+            return False
+        now_dt = reference_dt or datetime.now()
+        return now_dt >= end_dt
 
     @staticmethod
     def _parse_fast_event_hours(value):
@@ -1142,6 +1167,20 @@ class EventService:
 
         event = activity.event
         existing = self.get_enrollment(activity_id, user.cpf)
+
+        actor = actor_user or user
+        can_manual_enroll_after_end = (
+            action == 'inscrever'
+            and actor is not None
+            and getattr(actor, 'cpf', None) != getattr(user, 'cpf', None)
+            and self.can_add_event_participants(actor, event)
+        )
+
+        if self.is_event_enrollment_closed(event):
+            if action == 'inscrever' and not can_manual_enroll_after_end:
+                return None, "Inscrições encerradas para este evento."
+            if action == 'sair':
+                return None, "Evento encerrado: desinscrição não permitida."
 
         if action == 'inscrever':
             if existing:
