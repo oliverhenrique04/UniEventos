@@ -833,6 +833,34 @@ def test_listar_usuarios_allows_filtering_users_without_course(client, app, admi
     assert 'api_user_with_course' not in usernames
 
 
+def test_listar_usuarios_allows_filtering_by_cargo(client, app, admin_user):
+    with app.app_context():
+        gestor = User(
+            username='api_user_gestor',
+            role='gestor',
+            nome='Usuario API Gestor',
+            cpf='77788899900',
+        )
+        participante = User(
+            username='api_user_participante',
+            role='participante',
+            nome='Usuario API Participante',
+            cpf='00099988877',
+        )
+        db.session.add_all([gestor, participante])
+        db.session.commit()
+
+    _login_admin(client)
+
+    res = client.get('/api/listar_usuarios?cargo=gestor')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    usernames = {item['username'] for item in payload['items']}
+    assert 'api_user_gestor' in usernames
+    assert 'api_user_participante' not in usernames
+
+
 def test_protected_api_returns_401_json_when_not_authenticated(client):
     res = client.get('/api/eventos')
 
@@ -1515,6 +1543,7 @@ def test_users_admin_page_reuses_rich_csv_import_flow(client, admin_user):
     assert '/api/importar_usuarios_csv/status/${jobId}' in html
     assert 'Criadas' in html
     assert 'Atualizadas' in html
+    assert 'id="filtCargo"' in html
     assert 'Somente usuários sem curso vinculado' in html
 
 

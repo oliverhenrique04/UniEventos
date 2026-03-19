@@ -247,11 +247,23 @@
                 <label class="small fw-bold mb-1">CPF</label>
                 <input type="text" id="filtCpf" class="form-control form-control-sm" placeholder="000.000.000-00">
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-lg-3">
                 <label class="small fw-bold mb-1">Nome / E-mail</label>
                 <input type="text" id="filtBusca" class="form-control form-control-sm" placeholder="Nome ou e-mail...">
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-sm-6 col-lg-2">
+                <label class="small fw-bold mb-1">Cargo</label>
+                <select id="filtCargo" class="form-select form-select-sm">
+                    <option value="">-- Todos os Cargos --</option>
+                    <option value="admin">Admin</option>
+                    <option value="professor">Professor</option>
+                    <option value="coordenador">Coordenador</option>
+                    <option value="gestor">Gestor</option>
+                    <option value="extensao">Extensão</option>
+                    <option value="participante">Participante</option>
+                </select>
+            </div>
+            <div class="col-12 col-lg-3">
                 <label class="small fw-bold mb-1">Curso</label>
                 <select id="filtCurso" class="form-select form-select-sm">
                     <option value="">-- Todos os Cursos --</option>
@@ -776,6 +788,7 @@
             ra: document.getElementById('filtRa').value,
             cpf: document.getElementById('filtCpf').value,
             curso: document.getElementById('filtCurso').value,
+            cargo: document.getElementById('filtCargo').value,
             nome: document.getElementById('filtBusca').value,
             without_course: document.getElementById('filtSemCurso').checked ? '1' : '',
             page: page
