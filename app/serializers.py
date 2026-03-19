@@ -131,8 +131,13 @@ def serialize_event(event, current_user=None):
         elif has_legacy_enrollment:
             current_registration_category = service.resolve_registration_category(event)
         can_self_enroll = service.can_self_enroll(current_user) and service.can_user_access_open_event(current_user, event)
+        if can_self_enroll and service.is_event_enrollment_closed(event):
+            can_self_enroll = False
+            if not has_event_registration:
+                enrollment_block_reason = 'Inscrições encerradas para este evento.'
         if not can_self_enroll and not has_event_registration and service.can_self_enroll(current_user):
-            enrollment_block_reason = 'Seu perfil não está habilitado para este evento.'
+            if not enrollment_block_reason:
+                enrollment_block_reason = 'Seu perfil não está habilitado para este evento.'
     else:
         from app.services.event_service import EventService
 
