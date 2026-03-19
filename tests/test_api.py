@@ -645,6 +645,43 @@ def _seed_open_events_access_data(app):
         }
 
 
+def _seed_event_view_location_data(app, *, token, with_location):
+    with app.app_context():
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento com Mapa' if with_location else 'Evento sem Mapa',
+            descricao='Detalhes publicos do evento.',
+            tipo='PADRAO',
+            status='ABERTO',
+            token_publico=token,
+            data_inicio=date(2030, 10, 5),
+            hora_inicio=time(19, 0),
+            data_fim=date(2030, 10, 5),
+            hora_fim=time(21, 0),
+            latitude=-15.836 if with_location else None,
+            longitude=-48.019 if with_location else None,
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        db.session.add(Activity(
+            event_id=event.id,
+            nome='Atividade Publica',
+            local='Auditorio Central',
+            descricao='Atividade para a pagina publica.',
+            data_atv=date(2030, 10, 5),
+            hora_atv=time(19, 30),
+            carga_horaria=2,
+            vagas=60,
+        ))
+        db.session.commit()
+
+        return {
+            'token': event.token_publico,
+            'event_id': event.id,
+        }
+
+
 def _seed_open_events_filter_data(app):
     with app.app_context():
         course_tech = Course(nome='Tecnologia Aplicada')
@@ -1672,6 +1709,46 @@ def test_dashboard_open_events_are_visible_and_enrollable_for_all_profiles(clien
             user_cpf=seeded['open_extensao_cpf'],
         ).first()
         assert enrollment is not None
+
+
+def test_event_details_page_renders_discrete_map_when_event_has_coordinates(client, app, admin_user):
+    seeded = _seed_event_view_location_data(
+        app,
+        token='evento-publico-com-mapa',
+        with_location=True,
+    )
+
+    res = client.get(f"/inscrever/{seeded['token']}")
+
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert 'id="event-location-section"' in html
+    assert 'id="event-location-toggle"' in html
+    assert 'id="event-location-panel"' in html
+    assert 'id="event-location-map"' in html
+    assert 'Abrir no mapa' in html
+    assert 'leaflet@1.9.4/dist/leaflet.css' in html
+    assert 'leaflet@1.9.4/dist/leaflet.js' in html
+
+
+def test_event_details_page_hides_map_when_event_has_no_coordinates(client, app, admin_user):
+    seeded = _seed_event_view_location_data(
+        app,
+        token='evento-publico-sem-mapa',
+        with_location=False,
+    )
+
+    res = client.get(f"/inscrever/{seeded['token']}")
+
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert 'id="event-location-section"' not in html
+    assert 'id="event-location-toggle"' not in html
+    assert 'id="event-location-panel"' not in html
+    assert 'id="event-location-map"' not in html
+    assert 'Abrir no mapa' not in html
+    assert 'leaflet@1.9.4/dist/leaflet.css' not in html
+    assert 'leaflet@1.9.4/dist/leaflet.js' not in html
 
 def test_create_event_api(client, app, admin_user):
     with app.app_context():
