@@ -22,6 +22,9 @@ from app.models import (
     InstitutionalCertificateCategory,
     User,
     Course,
+    Event,
+    Activity,
+    Enrollment,
 )
 from app.services.institutional_certificate_service import InstitutionalCertificateService
 from app.services.certificate_service import CertificateService
@@ -583,6 +586,168 @@ def _resolve_recipient_user(email=None, cpf=None, username_hint=None, metadata=N
     return None
 
 
+def _get_user_institutional_recipients(user):
+    recipient_filters = []
+    if user.username:
+        recipient_filters.append(InstitutionalCertificateRecipient.user_username == user.username)
+    if user.cpf:
+        recipient_filters.append(InstitutionalCertificateRecipient.cpf == user.cpf)
+    if user.email:
+        recipient_filters.append(
+            func.lower(InstitutionalCertificateRecipient.email) == user.email.lower()
+        )
+
+    if not recipient_filters:
+        return []
+
+    return (
+        InstitutionalCertificateRecipient.query
+        .join(
+            InstitutionalCertificate,
+            InstitutionalCertificate.id == InstitutionalCertificateRecipient.certificate_id,
+        )
+        .filter(or_(*recipient_filters))
+        .all()
+    )
+
+
+def _build_user_history_payload(user):
+    enrollments_with_context = (
+        db.session.query(Enrollment, Activity, Event)
+        .join(Activity, Enrollment.activity_id == Activity.id)
+        .join(Event, Activity.event_id == Event.id)
+        .filter(Enrollment.user_cpf == user.cpf)
+        .order_by(Activity.data_atv.desc(), Activity.hora_atv.desc(), Enrollment.id.desc())
+        .all()
+    )
+
+    activities = []
+    event_aggregates = {}
+    seen_event_hashes = set()
+
+    for enrollment, activity, event in enrollments_with_context:
+        is_present = bool(enrollment.presente)
+        cert_hash = (enrollment.cert_hash or '').strip() or None
+        if cert_hash:
+            seen_event_hashes.add(cert_hash)
+
+        event_key = event.id
+        aggregate = event_aggregates.get(event_key)
+        if not aggregate:
+            aggregate = {
+                'event_id': event.id,
+                'nome': event.nome,
+                'tipo': event.tipo,
+                'data_inicio': event.data_inicio.isoformat() if event.data_inicio else None,
+                'total_activities': 0,
+                'present_activities': 0,
+                'attended_hours': 0,
+                'certificates': 0,
+            }
+            event_aggregates[event_key] = aggregate
+
+        aggregate['total_activities'] += 1
+        if is_present:
+            aggregate['present_activities'] += 1
+            aggregate['attended_hours'] += activity.carga_horaria or 0
+        if cert_hash:
+            aggregate['certificates'] += 1
+
+        activities.append({
+            'enrollment_id': enrollment.id,
+            'event_id': event.id,
+            'event_name': event.nome,
+            'activity_name': activity.nome,
+            'activity_date': activity.data_atv.isoformat() if activity.data_atv else None,
+            'activity_time': activity.hora_atv.isoformat() if activity.hora_atv else None,
+            'hours': activity.carga_horaria or 0,
+            'presente': is_present,
+            'certificate_hash': cert_hash,
+            'certificate_delivered': bool(enrollment.cert_entregue),
+            'certificate_sent_at': enrollment.cert_data_envio.isoformat() if enrollment.cert_data_envio else None,
+        })
+
+    events = sorted(
+        event_aggregates.values(),
+        key=lambda item: (item.get('data_inicio') or '', item.get('event_id') or 0),
+        reverse=True,
+    )
+
+    institutional_recipients = _get_user_institutional_recipients(user)
+    institutional_certificates = []
+    seen_institutional_hashes = set()
+    for recipient in institutional_recipients:
+        cert_hash = (recipient.cert_hash or '').strip() or None
+        if cert_hash:
+            seen_institutional_hashes.add(cert_hash)
+
+        metadata = _extract_recipient_metadata(recipient)
+        cert = recipient.certificate
+        institutional_certificates.append({
+            'recipient_id': recipient.id,
+            'certificate_id': cert.id if cert else None,
+            'title': cert.titulo if cert else None,
+            'category': cert.categoria if cert else None,
+            'issued_at': cert.data_emissao if cert else None,
+            'hours': metadata.get('carga_horaria'),
+            'course': metadata.get('curso_usuario'),
+            'certificate_hash': cert_hash,
+            'certificate_delivered': bool(recipient.cert_entregue),
+            'certificate_sent_at': recipient.cert_data_envio.isoformat() if recipient.cert_data_envio else None,
+        })
+
+    event_certificates = [
+        {
+            'certificate_type': 'evento',
+            'enrollment_id': item['enrollment_id'],
+            'event_id': item['event_id'],
+            'event_name': item['event_name'],
+            'activity_name': item['activity_name'],
+            'issued_at': item['activity_date'],
+            'hours': item['hours'],
+            'certificate_hash': item['certificate_hash'],
+            'certificate_delivered': item['certificate_delivered'],
+            'certificate_sent_at': item['certificate_sent_at'],
+        }
+        for item in activities
+        if item['certificate_hash']
+    ]
+
+    total_event_hours = sum(item.get('hours', 0) for item in activities if item.get('presente'))
+    delivered_event_certificates = sum(1 for item in event_certificates if item.get('certificate_delivered'))
+    delivered_institutional_certificates = sum(
+        1 for item in institutional_certificates if item.get('certificate_delivered')
+    )
+
+    return {
+        'user': {
+            'username': user.username,
+            'nome': user.nome,
+            'email': user.email,
+            'cpf': user.cpf,
+            'ra': user.ra,
+            'curso': user.curso,
+        },
+        'summary': {
+            'total_events': len(events),
+            'total_activities': len(activities),
+            'total_present_activities': sum(1 for item in activities if item.get('presente')),
+            'total_event_hours': int(total_event_hours)
+            if float(total_event_hours).is_integer()
+            else round(total_event_hours, 2),
+            'total_event_certificates': len(seen_event_hashes),
+            'total_institutional_certificates': len(seen_institutional_hashes),
+            'total_certificates': len(seen_event_hashes) + len(seen_institutional_hashes),
+            'delivered_event_certificates': delivered_event_certificates,
+            'delivered_institutional_certificates': delivered_institutional_certificates,
+        },
+        'events': events,
+        'activities': activities,
+        'event_certificates': event_certificates,
+        'institutional_certificates': institutional_certificates,
+    }
+
+
 @bp.route('/<int:certificate_id>/users/search', methods=['GET'])
 @login_required
 def search_users_for_recipients(certificate_id):
@@ -629,6 +794,20 @@ def search_users_for_recipients(certificate_id):
         'current_page': pagination.page,
         'query': query_text,
     })
+
+
+@bp.route('/<int:certificate_id>/users/<username>/history', methods=['GET'])
+@login_required
+def get_user_history_for_recipients(certificate_id, username):
+    cert, error = _get_managed_certificate_or_error(certificate_id)
+    if error:
+        return error
+
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({'erro': 'Usuario nao encontrado'}), 404
+
+    return jsonify(_build_user_history_payload(user))
 
 
 @bp.route('', methods=['GET'])
