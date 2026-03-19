@@ -342,12 +342,16 @@
         const isCollapsed = description.classList.contains('collapsed');
         
         if (isCollapsed) {
+            // Mostrar texto completo
+            description.innerHTML = description.dataset.fullText;
             description.classList.remove('collapsed');
             description.classList.add('expanded');
             toggleBtn.classList.remove('collapsed');
             toggleBtn.classList.add('expanded');
             toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver menos';
         } else {
+            // Voltar para texto truncado
+            description.innerHTML = description.dataset.previewText;
             description.classList.remove('expanded');
             description.classList.add('collapsed');
             toggleBtn.classList.remove('expanded');
@@ -363,17 +367,22 @@
         const totalLines = lines.length;
         const isLong = totalLines > maxLines;
         
-        let displayText = descriptionText;
+        let previewText = descriptionText;
         let showToggle = isLong;
         
         if (isLong) {
+            // Mostrar apenas as primeiras linhas
             const previewLines = lines.slice(0, maxLines).join('\n');
-            displayText = previewLines;
+            previewText = previewLines;
         }
         
         return `
-            <p id="${elementId}" class="event-description ${isLong ? 'collapsed' : ''}" style="white-space: pre-wrap;">
-                ${displayText}
+            <p id="${elementId}" 
+               class="event-description ${isLong ? 'collapsed' : ''}" 
+               style="white-space: pre-wrap;"
+               data-full-text="${escapeHtml(descriptionText).replace(/"/g, '&quot;')}"
+               data-preview-text="${escapeHtml(previewText).replace(/"/g, '&quot;')}">
+                ${previewText}
             </p>
             ${showToggle ? `
                 <button id="${elementId}-toggle" onclick="toggleDescription('${elementId}')" class="event-description-toggle ${isLong ? 'collapsed' : 'expanded'}">
