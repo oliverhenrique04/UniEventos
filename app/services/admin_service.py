@@ -68,14 +68,16 @@ class AdminService:
     def list_users_paginated(self, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of users with optional filtering.
         
-        Filters can include: ra, curso, cpf, email, event_id, activity_id.
+        Filters can include: ra, curso, without_course, cpf, email, event_id, activity_id.
         """
         query = User.query
         
         if filters:
             if filters.get('ra'):
                 query = query.filter(User.ra.ilike(f"%{filters['ra']}%"))
-            if filters.get('curso'):
+            if self._coerce_bool(filters.get('without_course')):
+                query = query.filter(User.course_id.is_(None))
+            elif filters.get('curso'):
                 query = query.join(Course, User.course_id == Course.id, isouter=True)
                 query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
             if filters.get('cpf'):

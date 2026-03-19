@@ -28,6 +28,39 @@ def test_auth_service_duplicate(app, admin_user):
     with pytest.raises(ValueError):
         service.register_user(data)
 
+
+def test_admin_service_list_users_paginated_filters_users_without_course(app):
+    with app.app_context():
+        course = Course(nome='Direito')
+        db.session.add(course)
+        db.session.flush()
+
+        user_with_course = User(
+            username='user_with_course',
+            role='participante',
+            nome='Usuario Com Curso',
+            cpf='12312312312',
+            course_id=course.id,
+        )
+        user_without_course = User(
+            username='user_without_course',
+            role='participante',
+            nome='Usuario Sem Curso',
+            cpf='32132132132',
+        )
+        db.session.add_all([user_with_course, user_without_course])
+        db.session.commit()
+
+        pagination = AdminService().list_users_paginated(
+            page=1,
+            per_page=20,
+            filters={'without_course': '1'},
+        )
+
+        usernames = {user.username for user in pagination.items}
+        assert 'user_without_course' in usernames
+        assert 'user_with_course' not in usernames
+
 def test_event_service_create(app, admin_user):
     service = EventService()
     data = {

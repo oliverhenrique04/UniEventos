@@ -800,6 +800,39 @@ def test_session_ping_keeps_authenticated_session_alive(client, admin_user):
         assert flask_session.permanent is True
 
 
+def test_listar_usuarios_allows_filtering_users_without_course(client, app, admin_user):
+    with app.app_context():
+        course = Course(nome='Engenharia de Software')
+        db.session.add(course)
+        db.session.flush()
+
+        user_with_course = User(
+            username='api_user_with_course',
+            role='participante',
+            nome='Usuario API Com Curso',
+            cpf='11122233399',
+            course_id=course.id,
+        )
+        user_without_course = User(
+            username='api_user_without_course',
+            role='participante',
+            nome='Usuario API Sem Curso',
+            cpf='99933322211',
+        )
+        db.session.add_all([user_with_course, user_without_course])
+        db.session.commit()
+
+    _login_admin(client)
+
+    res = client.get('/api/listar_usuarios?without_course=1')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    usernames = {item['username'] for item in payload['items']}
+    assert 'api_user_without_course' in usernames
+    assert 'api_user_with_course' not in usernames
+
+
 def test_protected_api_returns_401_json_when_not_authenticated(client):
     res = client.get('/api/eventos')
 
@@ -1482,6 +1515,7 @@ def test_users_admin_page_reuses_rich_csv_import_flow(client, admin_user):
     assert '/api/importar_usuarios_csv/status/${jobId}' in html
     assert 'Criadas' in html
     assert 'Atualizadas' in html
+    assert 'Somente usuários sem curso vinculado' in html
 
 
 def test_mobile_first_management_pages_render_new_layout_markers(client, app, admin_user):
