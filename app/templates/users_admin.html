@@ -257,6 +257,12 @@
                     <option value="">-- Todos os Cursos --</option>
                     <!-- Populated via JS -->
                 </select>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="filtSemCurso">
+                    <label class="form-check-label small text-muted" for="filtSemCurso">
+                        Somente usuários sem curso vinculado
+                    </label>
+                </div>
             </div>
             <div class="col-12 col-md-2 d-flex align-items-end">
                 <button onclick="carregarUsuarios(1)" class="btn btn-primary w-100 shadow-sm" style="padding: 0.6rem 1rem; font-weight: 600;">
@@ -639,9 +645,12 @@
         carregarCursosSelect();
         carregarUsuarios(1);
         configurarModalImportacao('xlsx');
+        toggleFiltroSemCurso();
         if (!IS_READ_ONLY) {
             carregarEventosParaInscricao();
         }
+
+        document.getElementById('filtSemCurso')?.addEventListener('change', toggleFiltroSemCurso);
 
         const cpfInput = document.getElementById('uCpf');
         if (cpfInput) {
@@ -748,12 +757,27 @@
         });
     }
 
+    function toggleFiltroSemCurso() {
+        const semCursoCheckbox = document.getElementById('filtSemCurso');
+        const cursoSelect = document.getElementById('filtCurso');
+        if (!semCursoCheckbox || !cursoSelect) return;
+
+        if (semCursoCheckbox.checked) {
+            cursoSelect.value = '';
+            cursoSelect.disabled = true;
+            return;
+        }
+
+        cursoSelect.disabled = false;
+    }
+
     async function carregarUsuarios(page) {
         const filters = {
             ra: document.getElementById('filtRa').value,
             cpf: document.getElementById('filtCpf').value,
             curso: document.getElementById('filtCurso').value,
             nome: document.getElementById('filtBusca').value,
+            without_course: document.getElementById('filtSemCurso').checked ? '1' : '',
             page: page
         };
         
