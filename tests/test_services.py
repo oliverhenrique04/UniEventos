@@ -61,6 +61,34 @@ def test_admin_service_list_users_paginated_filters_users_without_course(app):
         assert 'user_without_course' in usernames
         assert 'user_with_course' not in usernames
 
+
+def test_admin_service_list_users_paginated_filters_by_cargo(app):
+    with app.app_context():
+        gestor = User(
+            username='user_role_gestor',
+            role='gestor',
+            nome='Usuario Gestor',
+            cpf='55544433322',
+        )
+        professor = User(
+            username='user_role_professor',
+            role='professor',
+            nome='Usuario Professor',
+            cpf='22233344455',
+        )
+        db.session.add_all([gestor, professor])
+        db.session.commit()
+
+        pagination = AdminService().list_users_paginated(
+            page=1,
+            per_page=20,
+            filters={'cargo': 'gestor'},
+        )
+
+        usernames = {user.username for user in pagination.items}
+        assert 'user_role_gestor' in usernames
+        assert 'user_role_professor' not in usernames
+
 def test_event_service_create(app, admin_user):
     service = EventService()
     data = {

@@ -279,6 +279,7 @@ def listar_usuarios():
     filters = {
         'ra': request.args.get('ra'),
         'curso': request.args.get('curso'),
+        'cargo': request.args.get('cargo'),
         'without_course': request.args.get('without_course'),
         'cpf': request.args.get('cpf'),
         'email': request.args.get('email'),
