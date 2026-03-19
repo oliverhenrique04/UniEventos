@@ -476,6 +476,7 @@ let recipientsTotal = 0;
 let recipientsDebounceTimer = null;
 let recipientsSortBy = 'id';
 let recipientsSortDir = 'desc';
+const USER_HISTORY_PREVIEW_LIMIT = 8;
 let activeUserHistoryUsername = null;
 let previewDestinatarioModalInstance = null;
 let previewDestinatarioHandlersBound = false;
@@ -776,7 +777,7 @@ function renderUserHistory(payload) {
         </tr>
     `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhum evento encontrado.</td></tr>';
 
-    const activityRows = activities.length ? activities.slice(0, 8).map((activity) => `
+    const activityRows = activities.length ? activities.slice(0, USER_HISTORY_PREVIEW_LIMIT).map((activity) => `
         <tr>
             <td>${escapeHtml(activity.event_name || '-')}</td>
             <td>${escapeHtml(activity.activity_name || '-')}</td>
@@ -786,7 +787,7 @@ function renderUserHistory(payload) {
         </tr>
     `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhuma atividade encontrada.</td></tr>';
 
-    const eventCertificateRows = eventCertificates.length ? eventCertificates.slice(0, 8).map((item) => `
+    const eventCertificateRows = eventCertificates.length ? eventCertificates.slice(0, USER_HISTORY_PREVIEW_LIMIT).map((item) => `
         <tr>
             <td>${escapeHtml(item.event_name || '-')}</td>
             <td>${escapeHtml(item.activity_name || '-')}</td>
@@ -796,7 +797,7 @@ function renderUserHistory(payload) {
         </tr>
     `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhum certificado de evento encontrado.</td></tr>';
 
-    const institutionalRows = institutionalCertificates.length ? institutionalCertificates.slice(0, 8).map((item) => `
+    const institutionalRows = institutionalCertificates.length ? institutionalCertificates.slice(0, USER_HISTORY_PREVIEW_LIMIT).map((item) => `
         <tr>
             <td>${escapeHtml(item.title || '-')}</td>
             <td>${escapeHtml(item.category || '-')}</td>
@@ -1478,7 +1479,7 @@ function renderSearchUsersRows() {
             <td data-label="Nome">
                 <div class="d-flex flex-column gap-1">
                     <span>${user.nome || user.username || '-'}</span>
-                    <button type="button" class="btn btn-link btn-sm p-0 text-start btn-user-history" data-user-index="${index}">
+                    <button type="button" class="btn btn-link btn-sm p-0 text-start btn-user-history" data-user-index="${index}" aria-label="Ver histórico de ${escapeHtml(user.nome || user.username || 'usuário')}">
                         <i class="fa-solid fa-clock-rotate-left me-1"></i>Ver histórico
                     </button>
                 </div>

@@ -805,7 +805,7 @@ def get_user_history_for_recipients(certificate_id, username):
 
     user = User.query.filter_by(username=username).first()
     if not user:
-        return jsonify({'erro': 'Usuario nao encontrado'}), 404
+        return jsonify({'erro': 'Usuário não encontrado'}), 404
 
     return jsonify(_build_user_history_payload(user))
 
