@@ -4367,6 +4367,13 @@
                 </div>
                 ${htmlAtividades}
               </div>
+
+                            <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-3">
+                                <small class="fw-bold text-slate-500"><i class="fa-regular fa-calendar me-1"></i>${escapeHtml(dataBR)}</small>
+                                ${ev.token_publico
+                                        ? `<a href="${pathUrl(`/inscrever/${ev.token_publico}`)}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver Detalhes</a>`
+                                        : ''}
+                            </div>
             </div>
           </div>
         </div>
