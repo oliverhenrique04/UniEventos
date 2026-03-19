@@ -1,5 +1,200 @@
 {% extends 'base.html' %}
 
+{% block head_styles %}
+<style>
+    /* Description collapse/expand */
+    .event-description {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        line-height: 1.6;
+        margin-bottom: 0;
+        color: #495057;
+        font-size: 1.0rem;
+    }
+
+    .event-description.collapsed {
+        max-height: 120px;
+        display: -webkit-box;
+        -webkit-line-clamp: 5;
+        -webkit-box-orient: vertical;
+    }
+
+    .event-description.collapsed::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 40px;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 85%);
+    }
+
+    .event-description.expanded {
+        max-height: none;
+        overflow: visible;
+        display: block;
+        -webkit-line-clamp: unset;
+    }
+
+    .event-description-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+        font-size: 0.85rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid rgba(4, 77, 132, 0.12);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 1rem;
+    }
+
+    .event-description-toggle:hover {
+        background: rgba(4, 77, 132, 0.12);
+        border-color: rgba(4, 77, 132, 0.18);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(4, 77, 132, 0.18);
+    }
+
+    .event-description-toggle i {
+        font-size: 0.95rem;
+        transition: transform 0.3s ease;
+    }
+
+    .event-description-toggle.collapsed i {
+        transform: rotate(0deg);
+    }
+
+    .event-description-toggle.expanded i {
+        transform: rotate(180deg);
+    }
+
+    /* Glass Panel Identity - Dashboard Style */
+    .glass-panel {
+        background: white;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        padding: 1.5rem;
+        transition: all 0.2s ease;
+    }
+
+    .glass-panel:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Activity Card Style */
+    .activity-card {
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.08), transparent 30%),
+            linear-gradient(145deg, #ffffff 0%, #f7fbff 58%, #f8fcf8 100%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-top: 4px solid #044d84;
+        border-radius: 16px;
+        padding: 1.25rem;
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+
+    .activity-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px rgba(4, 77, 132, 0.12);
+        border-color: rgba(4, 77, 132, 0.25);
+    }
+
+    .activity-card .activity-time {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .activity-card .activity-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .activity-status.available {
+        background: rgba(22, 163, 74, 0.1);
+        color: #15803d;
+        border: 1px solid rgba(22, 163, 74, 0.16);
+    }
+
+    .activity-status.enrolled {
+        background: rgba(4, 77, 132, 0.1);
+        color: #044d84;
+        border: 1px solid rgba(4, 77, 132, 0.16);
+    }
+
+    .activity-status.full {
+        background: rgba(220, 38, 38, 0.1);
+        color: #b91c1c;
+        border: 1px solid rgba(220, 38, 38, 0.16);
+    }
+
+    .activity-status.closed {
+        background: rgba(107, 114, 128, 0.1);
+        color: #4b5563;
+        border: 1px solid rgba(107, 114, 128, 0.16);
+    }
+
+    /* Info Cards */
+    .info-card {
+        background:
+            radial-gradient(circle at top right, rgba(14, 116, 144, 0.08), transparent 30%),
+            linear-gradient(145deg, #ffffff 0%, #f7fbff 55%, #f8fcf8 100%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 16px;
+        padding: 1.25rem;
+        transition: all 0.2s ease;
+    }
+
+    .info-card:hover {
+        box-shadow: 0 8px 16px rgba(4, 77, 132, 0.08);
+    }
+
+    /* Breadcrumb Glass Style */
+    .breadcrumb {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 12px;
+        padding: 0.75rem 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .breadcrumb-item a {
+        color: #044d84;
+        transition: all 0.2s ease;
+    }
+
+    .breadcrumb-item a:hover {
+        color: #033e68;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4 fade-in-up">
     {% if event.data_inicio and event.data_inicio.strftime %}
@@ -45,7 +240,9 @@
                         <span
                             class="badge bg-white bg-opacity-20 text-color-primary border-0 small text-uppercase fw-bold"
                             style="letter-spacing: 1px;">
-                            {{ event.tipo }}
+                            {% if event.curso %}
+                            <i class="fa-solid fa-graduation-cap me-1"></i>{{ event.curso }}
+                            {% endif %}
                         </span>
                         <div class="small fw-bold opacity-75">
                             <i class="fa-regular fa-calendar-days me-1"></i>
@@ -55,18 +252,16 @@
 
                     <h2 class="fw-bold m-0">{{ event.nome }}</h2>
 
-                    {% if event.curso %}
+                    {% if event.tipo %}
                     <div class="mt-2 opacity-75 fw-bold small">
-                        <i class="fa-solid fa-graduation-cap me-1"></i>{{ event.curso }}
+                        {{event.tipo}}
                     </div>
                     {% endif %}
                 </div>
 
                 <div class="p-4">
-                    <h6 class="fw-bold text-slate-400 text-uppercase letter-spacing-1 mb-3">Sobre o Evento</h6>
-                    <p class="text-slate-700 fs-5" style="line-height: 1.6; white-space: pre-wrap;">
-                        {{ event.descricao or 'Nenhuma descrição disponível para este evento.' }}
-                    </p>
+                    <h6 class="fw-bold text-slate-400 text-uppercase text-primary letter-spacing-1 mb-3">Sobre o Evento</h6>
+                    <div id="event-description-container"></div>
 
                     <div id="event-access-alert" class="mt-4">
                         {% if user.is_authenticated and event_payload.motivo_bloqueio_inscricao and not event_payload.possui_inscricao_evento %}
@@ -81,8 +276,8 @@
 
                     <div class="row g-3 mt-4">
                         <div class="col-sm-6">
-                            <div class="p-3 bg-slate-50 rounded-4 border">
-                                <small class="text-muted d-block mb-1 fw-bold text-uppercase">Início</small>
+                            <div class="info-card">
+                                <small class="text-muted d-block mb-1 fw-bold text-uppercase" style="letter-spacing: 0.06em;">Início</small>
                                 <div class="fw-bold text-dark">
                                     <i class="fa-regular fa-clock me-2 text-primary"></i>
                                     {{ data_inicio_fmt }} às {{ hora_inicio_fmt }}
@@ -90,8 +285,8 @@
                             </div>
                         </div>
                         <div class="col-sm-6">
-                            <div class="p-3 bg-slate-50 rounded-4 border">
-                                <small class="text-muted d-block mb-1 fw-bold text-uppercase">Término</small>
+                            <div class="info-card">
+                                <small class="text-muted d-block mb-1 fw-bold text-uppercase" style="letter-spacing: 0.06em;">Término</small>
                                 <div class="fw-bold text-dark">
                                     <i class="fa-regular fa-calendar-check me-2 text-primary"></i>
                                     {{ data_fim_fmt }} às {{ hora_fim_fmt }}
@@ -114,11 +309,13 @@
                 <div id="lista-atividades-desktop" class="d-none d-lg-grid gap-3"></div>
 
                 {% if not user.is_authenticated %}
-                <div class="glass-panel p-4 bg-indigo-50 border-0 mt-4 text-center">
-                    <h6 class="fw-bold text-indigo-700">Quer participar?</h6>
-                    <p class="small text-indigo-600 mb-3">Faça login ou crie sua conta para se inscrever nas atividades.
-                    </p>
-                    <a href="{{ url_for('main.index') }}" class="btn btn-primary w-100 rounded-pill shadow">Acessar Sistema</a>
+                <div class="glass-panel p-4 border-0 mt-4 text-center" style="background: radial-gradient(circle at top right, rgba(14, 116, 144, 0.08), transparent 30%), linear-gradient(145deg, #ffffff 0%, #f7fbff 55%, #f8fcf8 100%);">
+                    <div class="mb-3">
+                        <i class="fa-solid fa-users-rectangle" style="font-size: 2.5rem; color: #044d84; opacity: 0.8;"></i>
+                    </div>
+                    <h6 class="fw-bold text-primary mb-2" style="letter-spacing: 0.02em;">Quer participar?</h6>
+                    <p class="small text-muted mb-3">Faça login ou crie sua conta para se inscrever nas atividades.</p>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary w-100 rounded-pill shadow" style="font-weight: 700; padding: 0.75rem 1.5rem;">Acessar Sistema</a>
                 </div>
                 {% endif %}
             </div>
@@ -135,12 +332,72 @@
     const currentUserRole = {{ (user.role if user.is_authenticated else none)|tojson }};
     const pendingEnrollmentActions = new Set();
     const activitiesData = (eventData.atividades || []).map((activity) => ({ ...activity }));
+    const eventDescription = {{ event.descricao|tojson if event.descricao else 'null' }};
+
+    function toggleDescription(elementId) {
+        const description = document.getElementById(elementId);
+        const toggleBtn = document.getElementById(`${elementId}-toggle`);
+        if (!description || !toggleBtn) return;
+
+        const isCollapsed = description.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            description.classList.remove('collapsed');
+            description.classList.add('expanded');
+            toggleBtn.classList.remove('collapsed');
+            toggleBtn.classList.add('expanded');
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver menos';
+        } else {
+            description.classList.remove('expanded');
+            description.classList.add('collapsed');
+            toggleBtn.classList.remove('expanded');
+            toggleBtn.classList.add('collapsed');
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver mais';
+        }
+    }
+
+    function renderDescriptionWithToggle(descriptionText, elementId, maxLines = 5) {
+        if (!descriptionText) return '';
+        
+        const lines = descriptionText.split('\n').filter(line => line.trim());
+        const totalLines = lines.length;
+        const isLong = totalLines > maxLines;
+        
+        let displayText = descriptionText;
+        let showToggle = isLong;
+        
+        if (isLong) {
+            const previewLines = lines.slice(0, maxLines).join('\n');
+            displayText = previewLines;
+        }
+        
+        return `
+            <p id="${elementId}" class="event-description ${isLong ? 'collapsed' : ''}" style="white-space: pre-wrap;">
+                ${displayText}
+            </p>
+            ${showToggle ? `
+                <button id="${elementId}-toggle" onclick="toggleDescription('${elementId}')" class="event-description-toggle ${isLong ? 'collapsed' : 'expanded'}">
+                    <i class="fa-solid fa-chevron-down"></i>
+                    ${isLong ? 'Ver mais' : 'Ver menos'}
+                </button>
+            ` : ''}
+        `;
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
+        renderEventDescription();
         renderAccessAlert();
         renderCategorySummary();
         renderAtividades(activitiesData);
     });
+
+    function renderEventDescription() {
+        const container = document.getElementById('event-description-container');
+        if (!container) return;
+        
+        const description = eventDescription || 'Nenhuma descrição disponível para este evento.';
+        container.innerHTML = renderDescriptionWithToggle(description, 'event-desc-main');
+    }
 
     function userRoleCanAccessEvent() {
         if (!isAuthenticated || !currentUserRole) return false;
@@ -205,17 +462,17 @@
                 ? 'Ilimitada'
                 : `${category.ocupacao}/${category.vagas}`;
             return `
-                <span class="badge ${badgeClass} rounded-pill px-3 py-2">
+                <span class="badge ${badgeClass} rounded-pill px-3 py-2" style="font-size: 0.75rem; font-weight: 600;">
                     ${escapeHtml(category.nome)} · ${escapeHtml(subtitle)}
                 </span>
             `;
         }).join('');
 
         container.innerHTML = `
-            <div class="p-3 bg-slate-50 rounded-4 border">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                    <div class="small fw-bold text-uppercase text-slate-500">Categorias de inscrição</div>
-                    ${currentCategory ? `<span class="small text-primary fw-semibold">Sua categoria: ${escapeHtml(currentCategory.nome)}</span>` : ''}
+            <div class="info-card">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div class="small fw-bold text-uppercase text-muted" style="letter-spacing: 0.06em;">Categorias de inscrição</div>
+                    ${currentCategory ? `<span class="small text-primary fw-semibold">Sua categoria: <strong>${escapeHtml(currentCategory.nome)}</strong></span>` : ''}
                 </div>
                 <div class="d-flex flex-wrap gap-2">${badges}</div>
             </div>
@@ -329,6 +586,7 @@
         if (!Array.isArray(list) || list.length === 0) {
             return `
         <div class="glass-panel p-4 text-center text-muted">
+          <i class="fa-regular fa-calendar-xmark fs-1 mb-3 text-slate-300"></i>
           <p class="mb-0">Nenhuma atividade cadastrada para este evento.</p>
         </div>
       `;
@@ -367,28 +625,45 @@
 
             let vagasStatus = '';
             if (a.vagas === -1) {
-                vagasStatus = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 small"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>`;
+                vagasStatus = `<span class="activity-status available"><i class="fa-solid fa-infinity me-1"></i> LIVRE</span>`;
             } else {
-                const perc = a.vagas > 0 ? Math.round((a.total_inscritos / a.vagas) * 100) : 100;
-                const color = perc > 90 ? 'danger' : (perc > 70 ? 'warning' : 'primary');
                 const restantes = Math.max(0, a.vagas - a.total_inscritos);
-                vagasStatus = `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle rounded-pill px-2 small">${restantes} vagas</span>`;
+                const statusClass = restantes === 0 ? 'full' : 'available';
+                vagasStatus = `<span class="activity-status ${statusClass}"><i class="fa-solid fa-chair me-1"></i> ${restantes} vagas</span>`;
             }
 
+            const enrolledStatus = a.inscrito ? '<span class="activity-status enrolled"><i class="fa-solid fa-check me-1"></i> INSCRITO</span>' : '';
+            
+            const timeBadge = a.hora_atv 
+                ? `<span class="activity-time"><i class="fa-regular fa-clock me-1"></i>${a.hora_atv}</span>`
+                : '';
+
             out += `
-        <div class="p-3 bg-white rounded-4 mb-3 border shadow-sm transition-fast ${a.inscrito ? 'border-primary' : ''}">
+        <div class="activity-card">
           <div class="d-flex justify-content-between align-items-start mb-2">
-            <div class="pe-2">
-              <h6 class="fw-bold mb-1 ${a.inscrito ? 'text-primary' : 'text-slate-800'}">${escapeHtml(a.nome)}</h6>
-              <div class="text-muted d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
-                <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1 text-primary-300"></i>${a.horas}h</span>
-                <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1 text-primary-300"></i>${escapeHtml(a.local || 'Auditório')}</span>
-                ${(a.palestrantes_label || a.palestrante) ? `<span class="d-flex align-items-center"><i class="fa-solid fa-user-tie me-1 text-primary-300"></i>${escapeHtml(a.palestrantes_label || a.palestrante)}</span>` : ''}
+            <div class="pe-2 flex-grow-1">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="fw-bold mb-0 ${a.inscrito ? 'text-primary' : 'text-slate-800'}" style="font-size: 1.05rem;">${escapeHtml(a.nome)}</h6>
+                <div class="d-flex gap-2">
+                  ${timeBadge}
+                  ${enrolledStatus}
+                </div>
+              </div>
+              <div class="text-muted small" style="font-size: 0.85rem; line-height: 1.6;">
+                <div class="d-flex flex-wrap gap-3 mb-2">
+                  <span class="d-flex align-items-center"><i class="fa-regular fa-clock me-1" style="color: #044d84;"></i>${a.carga_horaria}h</span>
+                  <span class="d-flex align-items-center"><i class="fa-solid fa-location-dot me-1" style="color: #044d84;"></i>${escapeHtml(a.local || 'Auditório')}</span>
+                </div>
+                ${(a.palestrantes_label || a.palestrante) ? `<div class="d-flex align-items-center pt-2 border-top"><i class="fa-solid fa-user-tie me-2" style="color: #044d84;"></i><span>${escapeHtml(a.palestrantes_label || a.palestrante)}</span></div>` : ''}
               </div>
             </div>
-            ${vagasStatus}
           </div>
-          ${btnHtml}
+          <div class="mt-3">
+            ${vagasStatus}
+            <div class="mt-2">
+              ${btnHtml}
+            </div>
+          </div>
         </div>
       `;
         }

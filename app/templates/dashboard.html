@@ -1510,6 +1510,81 @@
         line-height: 1.4;
         text-align: left;
     }
+
+    /* Description collapse/expand */
+    .event-description {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        line-height: 1.6;
+        margin-bottom: 0;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+
+    .event-description.collapsed {
+        max-height: 48px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+    }
+
+    .event-description.collapsed::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 20px;
+        background: linear-gradient(to bottom, rgba(248, 249, 250, 0) 0%, rgba(248, 249, 250, 1) 85%);
+    }
+
+    .event-description.expanded {
+        max-height: none;
+        overflow: visible;
+        display: block;
+        -webkit-line-clamp: unset;
+    }
+
+    .event-description-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        background: rgba(4, 77, 132, 0.08);
+        color: #044d84;
+        font-size: 0.55rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid rgba(4, 77, 132, 0.12);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 0.5rem;
+        max-width: fit-content;
+        margin-bottom: 0.5rem;
+    }
+
+    .event-description-toggle:hover {
+        background: rgba(4, 77, 132, 0.12);
+        border-color: rgba(4, 77, 132, 0.18);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(4, 77, 132, 0.15);
+    }
+
+    .event-description-toggle i {
+        font-size: 0.85rem;
+        transition: transform 0.3s ease;
+    }
+
+    .event-description-toggle.collapsed i {
+        transform: rotate(0deg);
+    }
+
+    .event-description-toggle.expanded i {
+        transform: rotate(180deg);
+    }
 </style>
 {% endblock %}
 
@@ -2997,6 +3072,57 @@
         return `${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
     }
 
+    function toggleDescription(elementId) {
+        const description = document.getElementById(elementId);
+        const toggleBtn = document.getElementById(`${elementId}-toggle`);
+        if (!description || !toggleBtn) return;
+
+        const isCollapsed = description.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            description.classList.remove('collapsed');
+            description.classList.add('expanded');
+            toggleBtn.classList.remove('collapsed');
+            toggleBtn.classList.add('expanded');
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver menos';
+        } else {
+            description.classList.remove('expanded');
+            description.classList.add('collapsed');
+            toggleBtn.classList.remove('expanded');
+            toggleBtn.classList.add('collapsed');
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>Ver mais';
+        }
+    }
+
+    function renderDescriptionWithToggle(descriptionText, elementId, maxLines = 3) {
+        if (!descriptionText) return '';
+        
+        const lines = descriptionText.split('\n').filter(line => line.trim());
+        const totalLines = lines.length;
+        const isLong = totalLines > maxLines;
+        
+        let displayText = descriptionText;
+        let showToggle = isLong;
+        
+        if (isLong) {
+            // Show first N lines initially
+            const previewLines = lines.slice(0, maxLines).join('\n');
+            displayText = previewLines;
+        }
+        
+        return `
+            <p id="${elementId}" class="event-description ${isLong ? 'collapsed' : ''}">
+                ${displayText}
+            </p>
+            ${showToggle ? `
+                <button id="${elementId}-toggle" onclick="toggleDescription('${elementId}')" class="event-description-toggle ${isLong ? 'collapsed' : 'expanded'}">
+                    <i class="fa-solid fa-chevron-down"></i>
+                    ${isLong ? 'Ver mais' : 'Ver menos'}
+                </button>
+            ` : ''}
+        `;
+    }
+
     const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
 
     function parseApiDate(value) {
@@ -3995,9 +4121,7 @@
               <div class="p-4 flex-grow-1">
                 <h5 class="fw-bold text-slate-900 mb-1">${ev.nome}</h5>
                 ${ev.curso ? `<div class="text-primary small fw-bold mb-2"><i class="fa-solid fa-graduation-cap me-1"></i>${ev.curso}</div>` : ''}
-                <p class="text-muted small mb-0" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                  ${ev.descricao || 'Nenhuma descrição fornecida.'}
-                </p>
+                ${renderDescriptionWithToggle(ev.descricao || 'Nenhuma descrição fornecida.', `desc-gestor-${ev.id}`)}
               </div>
 
               <div class="p-3 bg-white border-top d-flex gap-2">
@@ -4224,9 +4348,7 @@
               <h5 class="fw-bold m-0 fs-5">${escapeHtml(ev.nome)}</h5>
             </div>
             <div class="p-4 flex-grow-1 bg-slate-50">
-              <p class="text-muted small mb-4" style="line-height: 1.6;">
-                ${escapeHtml(ev.descricao || 'Participe deste evento acadêmico e emita seu certificado de horas complementares.')}
-              </p>
+              ${renderDescriptionWithToggle(ev.descricao || 'Participe deste evento acadêmico e emita seu certificado de horas complementares.', `desc-evento-${ev.id}`)}
 
               ${blockedAlert}
               ${categorySummaryHtml}
