@@ -329,6 +329,13 @@
                     </div>
                 </div>
 
+                <div class="clean-section d-none" id="secHistoricoUsuarioBusca">
+                    <div class="clean-section-title"><i class="fa-solid fa-timeline me-1"></i>Histórico completo do usuário</div>
+                    <div id="historicoUsuarioBuscaContainer" class="small text-muted">
+                        Selecione um usuário na busca para analisar participações em eventos, atividades e certificados.
+                    </div>
+                </div>
+
                 <div class="clean-section" id="secInclusaoLoteDestinatarios">
                     <div class="clean-section-title"><i class="fa-solid fa-upload me-1"></i>Inclusao por lote</div>
                     <div class="alert alert-light border small mb-3">
@@ -469,6 +476,8 @@ let recipientsTotal = 0;
 let recipientsDebounceTimer = null;
 let recipientsSortBy = 'id';
 let recipientsSortDir = 'desc';
+const USER_HISTORY_PREVIEW_LIMIT = 8;
+let activeUserHistoryUsername = null;
 let previewDestinatarioModalInstance = null;
 let previewDestinatarioHandlersBound = false;
 let previewDestinatarioCurrentUrl = '';
@@ -511,6 +520,8 @@ function resetUserSearchState() {
     if (resumo) resumo.textContent = 'Nenhuma busca executada.';
     document.getElementById('btnBuscaUsuariosAnterior').disabled = true;
     document.getElementById('btnBuscaUsuariosProxima').disabled = true;
+    activeUserHistoryUsername = null;
+    renderUserHistoryState('Selecione um usuário na busca para analisar participações em eventos, atividades e certificados.');
 }
 
 function updateUserSearchPaginationInfo() {
@@ -729,6 +740,139 @@ function formatDateDisplay(value) {
     const parts = String(value).split('-');
     if (parts.length !== 3) return value;
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function renderUserHistoryState(message, loading = false) {
+    const section = document.getElementById('secHistoricoUsuarioBusca');
+    const container = document.getElementById('historicoUsuarioBuscaContainer');
+    if (!section || !container) return;
+    section.classList.remove('d-none');
+    if (loading) {
+        container.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando histórico do usuário...';
+        return;
+    }
+    container.innerHTML = `<span class="text-muted">${escapeHtml(message || 'Sem histórico disponível.')}</span>`;
+}
+
+function renderUserHistory(payload) {
+    const section = document.getElementById('secHistoricoUsuarioBusca');
+    const container = document.getElementById('historicoUsuarioBuscaContainer');
+    if (!section || !container) return;
+    section.classList.remove('d-none');
+
+    const user = payload?.user || {};
+    const summary = payload?.summary || {};
+    const events = payload?.events || [];
+    const activities = payload?.activities || [];
+    const eventCertificates = payload?.event_certificates || [];
+    const institutionalCertificates = payload?.institutional_certificates || [];
+
+    const eventRows = events.length ? events.map((event) => `
+        <tr>
+            <td>${escapeHtml(event.nome || '-')}</td>
+            <td>${formatDateDisplay(event.data_inicio)}</td>
+            <td>${event.present_activities || 0}/${event.total_activities || 0}</td>
+            <td>${event.attended_hours ?? 0}h</td>
+            <td>${event.certificates || 0}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhum evento encontrado.</td></tr>';
+
+    const activityRows = activities.length ? activities.slice(0, USER_HISTORY_PREVIEW_LIMIT).map((activity) => `
+        <tr>
+            <td>${escapeHtml(activity.event_name || '-')}</td>
+            <td>${escapeHtml(activity.activity_name || '-')}</td>
+            <td>${formatDateDisplay(activity.activity_date)}</td>
+            <td>${activity.presente ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Presente</span>' : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Ausente</span>'}</td>
+            <td>${activity.hours ?? 0}h</td>
+        </tr>
+    `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhuma atividade encontrada.</td></tr>';
+
+    const eventCertificateRows = eventCertificates.length ? eventCertificates.slice(0, USER_HISTORY_PREVIEW_LIMIT).map((item) => `
+        <tr>
+            <td>${escapeHtml(item.event_name || '-')}</td>
+            <td>${escapeHtml(item.activity_name || '-')}</td>
+            <td>${formatDateDisplay(item.issued_at)}</td>
+            <td>${item.certificate_hash ? escapeHtml(item.certificate_hash) : '-'}</td>
+            <td>${item.certificate_delivered ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Entregue</span>' : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pendente</span>'}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhum certificado de evento encontrado.</td></tr>';
+
+    const institutionalRows = institutionalCertificates.length ? institutionalCertificates.slice(0, USER_HISTORY_PREVIEW_LIMIT).map((item) => `
+        <tr>
+            <td>${escapeHtml(item.title || '-')}</td>
+            <td>${escapeHtml(item.category || '-')}</td>
+            <td>${formatDateDisplay(item.issued_at)}</td>
+            <td>${item.certificate_hash ? escapeHtml(item.certificate_hash) : '-'}</td>
+            <td>${item.certificate_delivered ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Entregue</span>' : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pendente</span>'}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="5" class="text-center text-muted py-2">Nenhum certificado institucional encontrado.</td></tr>';
+
+    container.innerHTML = `
+        <div class="mb-3">
+            <div class="fw-semibold text-dark">${escapeHtml(user.nome || user.username || '-')}</div>
+            <div class="text-muted small">
+                <span class="me-2"><strong>Usuário:</strong> ${escapeHtml(user.username || '-')}</span>
+                <span class="me-2"><strong>CPF:</strong> ${escapeHtml(user.cpf || '-')}</span>
+                <span><strong>Curso:</strong> ${escapeHtml(user.curso || '-')}</span>
+            </div>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-3"><div class="border rounded-3 p-2 bg-light"><small class="text-muted d-block">Eventos</small><strong>${summary.total_events || 0}</strong></div></div>
+            <div class="col-md-3"><div class="border rounded-3 p-2 bg-light"><small class="text-muted d-block">Atividades</small><strong>${summary.total_present_activities || 0}/${summary.total_activities || 0}</strong></div></div>
+            <div class="col-md-3"><div class="border rounded-3 p-2 bg-light"><small class="text-muted d-block">Horas (presenças)</small><strong>${summary.total_event_hours ?? 0}h</strong></div></div>
+            <div class="col-md-3"><div class="border rounded-3 p-2 bg-light"><small class="text-muted d-block">Certificados</small><strong>${summary.total_certificates || 0}</strong></div></div>
+        </div>
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Evento</th><th>Data início</th><th>Presenças</th><th>Horas</th><th>Certificados</th></tr></thead>
+                        <tbody>${eventRows}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-12 col-xl-6">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Evento</th><th>Atividade</th><th>Data</th><th>Presença</th><th>Horas</th></tr></thead>
+                        <tbody>${activityRows}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-12 col-xl-6">
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Evento</th><th>Atividade</th><th>Emissão</th><th>Hash</th><th>Status</th></tr></thead>
+                        <tbody>${eventCertificateRows}</tbody>
+                    </table>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Título</th><th>Categoria</th><th>Emissão</th><th>Hash</th><th>Status</th></tr></thead>
+                        <tbody>${institutionalRows}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function carregarHistoricoUsuarioBusca(username) {
+    if (!certificateIdAtivo || !username) return;
+    activeUserHistoryUsername = username;
+    renderUserHistoryState('Carregando histórico do usuário...', true);
+    try {
+        const resp = await fetch(apiUrl(`/api/institutional_certificates/${certificateIdAtivo}/users/${encodeURIComponent(username)}/history`));
+        const data = await resp.json();
+        if (!resp.ok) {
+            renderUserHistoryState(data.erro || 'Falha ao carregar histórico do usuário.');
+            return;
+        }
+        if (activeUserHistoryUsername !== username) return;
+        renderUserHistory(data);
+    } catch (error) {
+        renderUserHistoryState('Falha ao carregar histórico do usuário.');
+    }
 }
 
 async function carregarCertificadosInstitucionais(page = 1) {
@@ -1332,7 +1476,14 @@ function renderSearchUsersRows() {
     tbody.innerHTML = searchUsersResults.map((user, index) => `
         <tr>
             <td data-label="Selecionar" data-cell="select"><input type="checkbox" class="form-check-input check-usuario-selecao" value="${index}" ${selectedUsersMap.has(userSelectionKey(user)) ? 'checked' : ''}></td>
-            <td data-label="Nome">${user.nome || user.username || '-'}</td>
+            <td data-label="Nome">
+                <div class="d-flex flex-column gap-1">
+                    <span>${user.nome || user.username || '-'}</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-start btn-user-history" data-user-index="${index}" aria-label="Ver histórico de ${escapeHtml(user.nome || user.username || 'usuário')}">
+                        <i class="fa-solid fa-clock-rotate-left me-1"></i>Ver histórico
+                    </button>
+                </div>
+            </td>
             <td data-label="Email">${user.email || '-'}</td>
             <td data-label="CPF">${user.cpf || '-'}</td>
             <td data-label="RA">${user.ra || '-'}</td>
@@ -1352,6 +1503,19 @@ function renderSearchUsersRows() {
                 selectedUsersMap.delete(key);
             }
             updateUserSearchPaginationInfo();
+        });
+    });
+
+    document.querySelectorAll('.btn-user-history').forEach((button) => {
+        button.addEventListener('click', () => {
+            const userIndex = Number(button.dataset.userIndex);
+            const user = searchUsersResults[userIndex];
+            const username = (user?.username || '').trim();
+            if (!username) {
+                renderUserHistoryState('Usuário sem identificação para consulta de histórico.');
+                return;
+            }
+            carregarHistoricoUsuarioBusca(username);
         });
     });
 
@@ -1568,5 +1732,3 @@ updateRecipientsSortIndicators();
 carregarCertificadosInstitucionais(1);
 </script>
 {% endblock %}
-
-

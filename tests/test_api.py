@@ -3071,6 +3071,39 @@ def test_profile_certificates_return_public_download_and_preview_urls(client, ap
     assert inst_item['preview_url'].startswith('/api/institutional_certificates/preview_public/')
 
 
+def test_institutional_user_history_endpoint_returns_full_history(client, app, admin_user):
+    _seed_profile_history_data(app)
+
+    with app.app_context():
+        cert = InstitutionalCertificate.query.filter_by(titulo='Certificado Institucional Perfil').first()
+        participant = User.query.filter_by(username='participant_test').first()
+        assert cert is not None
+        assert participant is not None
+        cert_id = cert.id
+        participant_username = participant.username
+
+    _login_admin(client)
+    res = client.get(f'/api/institutional_certificates/{cert_id}/users/{participant_username}/history')
+    assert res.status_code == 200
+
+    payload = res.get_json()
+    assert payload['user']['username'] == participant_username
+    assert payload['summary']['total_events'] == 1
+    assert payload['summary']['total_activities'] == 1
+    assert payload['summary']['total_present_activities'] == 1
+    assert payload['summary']['total_event_hours'] == 4
+    assert payload['summary']['total_event_certificates'] == 1
+    assert payload['summary']['total_institutional_certificates'] == 1
+    assert payload['summary']['total_certificates'] == 2
+    assert len(payload['events']) == 1
+    assert len(payload['activities']) == 1
+    assert len(payload['event_certificates']) == 1
+    assert len(payload['institutional_certificates']) == 1
+    assert payload['activities'][0]['event_name'] == 'Evento Perfil'
+    assert payload['event_certificates'][0]['certificate_type'] == 'evento'
+    assert payload['institutional_certificates'][0]['title'] == 'Certificado Institucional Perfil'
+
+
 def test_importar_alunos_xlsx_requires_admin(client, app, admin_user):
     with app.app_context():
         participant = User(
