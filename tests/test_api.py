@@ -1727,6 +1727,7 @@ def test_event_details_page_renders_discrete_map_when_event_has_coordinates(clie
     assert 'id="event-location-panel"' in html
     assert 'id="event-location-map"' in html
     assert 'Abrir no mapa' in html
+    assert 'https://www.google.com/maps/search/?api=1&query=-15.836,-48.019' in html
     assert 'leaflet@1.9.4/dist/leaflet.css' in html
     assert 'leaflet@1.9.4/dist/leaflet.js' in html
 
