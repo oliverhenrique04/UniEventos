@@ -419,7 +419,22 @@
         const container = document.getElementById('event-access-alert');
         if (!container) return;
 
-        if (!isAuthenticated || !eventData.motivo_bloqueio_inscricao || eventData.possui_inscricao_evento) {
+        if (!isAuthenticated) {
+            container.innerHTML = '';
+            return;
+        }
+
+        if (eventData.inscricoes_encerradas) {
+            container.innerHTML = `
+                <div class="alert alert-secondary rounded-4 border-0 shadow-sm mb-0">
+                    <div class="fw-bold mb-1"><i class="fa-solid fa-hourglass-end me-2"></i>Evento encerrado</div>
+                    <div class="small mb-0">Novas inscrições não estão mais disponíveis para este evento.</div>
+                </div>
+            `;
+            return;
+        }
+
+        if (!eventData.motivo_bloqueio_inscricao || eventData.possui_inscricao_evento) {
             container.innerHTML = '';
             return;
         }
@@ -568,7 +583,10 @@
         }
 
         eventData.possui_inscricao_evento = stillHasEventRegistration;
-        if (stillHasEventRegistration) {
+        if (eventData.inscricoes_encerradas) {
+            eventData.pode_se_inscrever = false;
+            eventData.motivo_bloqueio_inscricao = 'Inscrições encerradas para este evento.';
+        } else if (stillHasEventRegistration) {
             eventData.pode_se_inscrever = true;
             eventData.motivo_bloqueio_inscricao = null;
         } else {
@@ -605,25 +623,36 @@
 
         for (const a of list) {
             const isFull = a.vagas !== -1 && a.total_inscritos >= a.vagas;
+            const eventClosed = Boolean(eventData.inscricoes_encerradas);
 
             let btnHtml = '';
             if (!isAuthenticated) {
                 btnHtml = `<a href="${pathUrl('{{ url_for('main.index') }}')}" class="btn btn-sm btn-outline-primary w-100 mt-2 rounded-pill fw-bold">Entrar para Inscrever</a>`;
-            } else if (eventData.pode_se_inscrever) {
-                const isDisabled = !a.inscrito && isFull;
-                const btnClass = a.inscrito
-                    ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
-                    : (isFull ? 'btn-light disabled' : 'btn-outline-primary');
+            } else {
+                const isDisabled = eventClosed || (!a.inscrito && (isFull || !eventData.pode_se_inscrever));
+                const btnClass = isDisabled
+                    ? 'btn-light disabled border'
+                    : (a.inscrito
+                        ? 'btn-danger bg-danger bg-opacity-10 text-danger border-danger'
+                        : 'btn-outline-primary');
 
-                const btnText = a.inscrito
-                    ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
-                    : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever');
+                const btnText = eventClosed
+                    ? '<i class="fa-solid fa-lock me-1"></i> Encerrado'
+                    : (a.inscrito
+                        ? '<i class="fa-solid fa-user-minus me-1"></i> Sair'
+                        : (isFull ? '<i class="fa-solid fa-ban me-1"></i> Esgotado' : '<i class="fa-solid fa-user-plus me-1"></i> Inscrever'));
 
                 const acao = a.inscrito ? 'sair' : 'inscrever';
+                const blockReason = eventClosed
+                    ? 'Evento encerrado: alterações de inscrição não são permitidas.'
+                    : (isFull
+                        ? 'Atividade lotada.'
+                        : (eventData.motivo_bloqueio_inscricao || 'Inscrição indisponível para este evento.'));
 
                 btnHtml = `
           <button onclick="toggleInscricao(this, ${a.id}, '${acao}')"
                         data-atv-id="${a.id}"
+            title="${isDisabled ? escapeHtml(blockReason) : ''}"
             ${isDisabled ? 'disabled aria-disabled="true"' : ''}
                         class="btn btn-sm ${btnClass} w-100 mt-2 py-2 fw-bold text-uppercase rounded-pill"
             style="font-size: 0.65rem;">

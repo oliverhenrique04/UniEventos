@@ -91,6 +91,7 @@ def serialize_event(event, current_user=None):
     current_registration = None
     current_registration_category = None
     can_self_enroll = False
+    enrollment_closed = False
     has_event_registration = False
     enrollment_block_reason = None
     delete_block_reason = None
@@ -112,6 +113,7 @@ def serialize_event(event, current_user=None):
         can_view_certificates = EventService.can_view_event_certificates(current_user, event)
         can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
         service = EventService()
+        enrollment_closed = service.is_event_enrollment_closed(event)
         delete_block_status = service.get_event_delete_block_status(event)
         can_delete = can_delete_permission and not delete_block_status['has_linked_records']
         if not can_delete_permission:
@@ -131,7 +133,7 @@ def serialize_event(event, current_user=None):
         elif has_legacy_enrollment:
             current_registration_category = service.resolve_registration_category(event)
         can_self_enroll = service.can_self_enroll(current_user) and service.can_user_access_open_event(current_user, event)
-        if can_self_enroll and service.is_event_enrollment_closed(event):
+        if can_self_enroll and enrollment_closed:
             can_self_enroll = False
             if not has_event_registration:
                 enrollment_block_reason = 'Inscrições encerradas para este evento.'
@@ -208,6 +210,7 @@ def serialize_event(event, current_user=None):
         ),
         'possui_inscricao_evento': has_event_registration,
         'pode_se_inscrever': can_self_enroll,
+        'inscricoes_encerradas': enrollment_closed,
         'motivo_bloqueio_inscricao': enrollment_block_reason,
         'can_edit': can_edit,
         'can_delete': can_delete,

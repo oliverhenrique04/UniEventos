@@ -421,9 +421,6 @@ def remover_inscricao(enrollment_id):
     if not event or not _user_can_manage_event_participants(event):
         return jsonify({"erro": "Acesso negado"}), 403
 
-    if event_service.is_event_enrollment_closed(event):
-        return jsonify({"erro": "Evento encerrado: desinscrição não permitida."}), 400
-
     user_ref = SimpleNamespace(cpf=enrollment.user_cpf)
     db.session.delete(enrollment)
     db.session.commit()
