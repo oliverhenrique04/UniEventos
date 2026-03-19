@@ -1478,7 +1478,7 @@ function renderSearchUsersRows() {
             <td data-label="Nome">
                 <div class="d-flex flex-column gap-1">
                     <span>${user.nome || user.username || '-'}</span>
-                    <button type="button" class="btn btn-link btn-sm p-0 text-start btn-user-history" data-username="${escapeHtml(user.username || '')}">
+                    <button type="button" class="btn btn-link btn-sm p-0 text-start btn-user-history" data-user-index="${index}">
                         <i class="fa-solid fa-clock-rotate-left me-1"></i>Ver histórico
                     </button>
                 </div>
@@ -1507,7 +1507,9 @@ function renderSearchUsersRows() {
 
     document.querySelectorAll('.btn-user-history').forEach((button) => {
         button.addEventListener('click', () => {
-            const username = (button.dataset.username || '').trim();
+            const userIndex = Number(button.dataset.userIndex);
+            const user = searchUsersResults[userIndex];
+            const username = (user?.username || '').trim();
             if (!username) {
                 renderUserHistoryState('Usuário sem identificação para consulta de histórico.');
                 return;
@@ -1729,4 +1731,3 @@ updateRecipientsSortIndicators();
 carregarCertificadosInstitucionais(1);
 </script>
 {% endblock %}
-
