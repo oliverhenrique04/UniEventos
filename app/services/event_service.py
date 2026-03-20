@@ -21,7 +21,13 @@ from datetime import datetime, date, time
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
-from app.utils import normalize_cpf
+from app.utils import (
+    brasilia_now,
+    brasilia_today,
+    build_brasilia_datetime,
+    normalize_brasilia_datetime,
+    normalize_cpf,
+)
 
 class EventService:
     """
@@ -71,7 +77,7 @@ class EventService:
         # If end time is missing, treat the event as ending at the end of the day.
         end_time = event.hora_fim or time(23, 59, 59)
         try:
-            return datetime.combine(end_date, end_time)
+            return build_brasilia_datetime(end_date, end_time)
         except Exception:
             return None
 
@@ -80,7 +86,7 @@ class EventService:
         end_dt = self._event_end_datetime(event)
         if not end_dt:
             return False
-        now_dt = reference_dt or datetime.now()
+        now_dt = normalize_brasilia_datetime(reference_dt) if reference_dt is not None else brasilia_now()
         return now_dt >= end_dt
 
     @staticmethod
@@ -647,7 +653,7 @@ class EventService:
 
         # Fast events must always have at least the creation date.
         if is_rapido and not data_inicio:
-            data_inicio = date.today()
+            data_inicio = brasilia_today()
         if is_rapido and not data_fim:
             data_fim = data_inicio
         

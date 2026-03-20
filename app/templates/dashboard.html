@@ -2520,7 +2520,7 @@
         // Datas mínimas no formulário de evento
         const dIni = document.getElementById('evDataIni');
         if (dIni) {
-            dIni.min = new Date().toISOString().split('T')[0];
+            dIni.min = getCurrentDateInTimeZone();
             dIni.addEventListener('change', () => {
                 const dFim = document.getElementById('evDataFim');
                 if (dFim) dFim.min = dIni.value;
@@ -3131,6 +3131,23 @@
     }
 
     const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+
+    function getCurrentDateInTimeZone(timeZone = BRASILIA_TIMEZONE) {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(new Date());
+
+        const mapped = Object.fromEntries(
+            parts
+                .filter((part) => part.type !== 'literal')
+                .map((part) => [part.type, part.value])
+        );
+
+        return `${mapped.year}-${mapped.month}-${mapped.day}`;
+    }
 
     function parseApiDate(value) {
         if (!value) return null;

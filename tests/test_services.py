@@ -2,7 +2,7 @@ import pytest
 import json
 import os
 from io import BytesIO
-from datetime import date, time
+from datetime import date, datetime, time, timezone
 from types import SimpleNamespace
 from app.services.auth_service import AuthService
 from app.services.event_service import EventService
@@ -108,7 +108,10 @@ def test_event_service_create(app, admin_user):
     assert event.activities[0].nome == 'Check-in Presença'
 
 
-def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin_user):
+def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin_user, monkeypatch):
+    expected_today = date(2030, 1, 15)
+    monkeypatch.setattr('app.services.event_service.brasilia_today', lambda: expected_today)
+
     service = EventService()
     data = {
         'nome': 'Fast Event Sem Data',
@@ -123,8 +126,39 @@ def test_event_service_create_fast_event_defaults_start_date_to_today(app, admin
     event = service.create_event(admin_user.username, data)
 
     assert event.tipo == 'RAPIDO'
-    assert event.data_inicio == date.today()
-    assert event.data_fim == date.today()
+    assert event.data_inicio == expected_today
+    assert event.data_fim == expected_today
+
+
+def test_event_service_enrollment_closed_respects_brasilia_boundaries_for_naive_and_utc_reference(app, admin_user):
+    service = EventService()
+    event = service.create_event(admin_user.username, {
+        'nome': 'Evento Limite Brasilia',
+        'descricao': 'Desc',
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-07-10',
+        'hora_inicio': '18:00',
+        'data_fim': '2030-07-10',
+        'hora_fim': '20:00',
+    })
+
+    assert service.is_event_enrollment_closed(
+        event,
+        reference_dt=datetime(2030, 7, 10, 19, 59),
+    ) is False
+    assert service.is_event_enrollment_closed(
+        event,
+        reference_dt=datetime(2030, 7, 10, 20, 0),
+    ) is True
+    assert service.is_event_enrollment_closed(
+        event,
+        reference_dt=datetime(2030, 7, 10, 22, 59, tzinfo=timezone.utc),
+    ) is False
+    assert service.is_event_enrollment_closed(
+        event,
+        reference_dt=datetime(2030, 7, 10, 23, 0, tzinfo=timezone.utc),
+    ) is True
 
 
 def test_event_service_create_persists_allowed_roles_and_registration_categories(app, admin_user):

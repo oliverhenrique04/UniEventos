@@ -279,8 +279,26 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     let currentType = 'PADRAO';
+    const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
     const CHECKIN_RADIUS_METERS = Number("{{ config.CHECKIN_RADIUS_METERS|default(500) }}") || 500;
     let map, marker, checkinCircle;
+
+    function getCurrentDateInTimeZone(timeZone = BRASILIA_TIMEZONE) {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(new Date());
+
+        const mapped = Object.fromEntries(
+            parts
+                .filter((part) => part.type !== 'literal')
+                .map((part) => [part.type, part.value])
+        );
+
+        return `${mapped.year}-${mapped.month}-${mapped.day}`;
+    }
 
     function refreshRadiusBadge() {
         const badge = document.getElementById('checkinRadiusBadge');
@@ -374,7 +392,7 @@
         });
 
         // Set min dates
-        const today = new Date().toISOString().split('T')[0];
+        const today = getCurrentDateInTimeZone();
         document.getElementById('evDataIni').min = today;
         document.getElementById('evDataFim').min = today;
         
