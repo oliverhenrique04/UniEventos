@@ -21,7 +21,9 @@ def login():
     
     if user:
         _start_authenticated_session(user)
-        return jsonify({"status": "success"})
+        # Verifica se há uma URL de redirecionamento salva na sessão
+        next_url = session.pop('next_url', None)
+        return jsonify({"status": "success", "redirect_url": next_url})
     
     return jsonify({"status": "error", "message": "Dados inválidos"}), 401
 
@@ -156,6 +158,10 @@ def ava_launch_login():
         return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
 
     _start_authenticated_session(user)
+    # Verifica se há uma URL de redirecionamento salva na sessão
+    next_url = session.pop('next_url', None)
+    if next_url:
+        return redirect(next_url)
     return redirect(url_for('main.index'))
 
 
@@ -200,6 +206,10 @@ def ava_direct_login():
         return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
 
     _start_authenticated_session(user)
+    # Verifica se há uma URL de redirecionamento salva na sessão
+    next_url = session.pop('next_url', None)
+    if next_url:
+        return redirect(next_url)
     return redirect(url_for('main.index'))
 
 

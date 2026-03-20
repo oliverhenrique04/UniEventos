@@ -239,8 +239,16 @@
                     })
                 });
                 if(res.ok) {
+                    const json = await res.json();
                     Toast.fire({ icon: 'success', title: 'Bem-vindo de volta!' });
-                    setTimeout(() => window.location.reload(), 1000);
+                    // Redireciona para a URL salva ou recarrega a página atual
+                    setTimeout(() => {
+                        if (json.redirect_url) {
+                            window.location.href = json.redirect_url;
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 500);
                 } else {
                     const json = await res.json();
                     Swal.fire({

@@ -51,6 +51,8 @@ def create_app(config_class=Config):
             response.status_code = 401
             response.headers['X-Session-Expired'] = '1'
             return response
+        # Salva a URL original para redirecionar após o login
+        session['next_url'] = request.url
         return redirect(url_for('main.index'))
 
     return app
