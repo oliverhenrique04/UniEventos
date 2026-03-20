@@ -1835,6 +1835,50 @@ def test_create_event_api(client, app, admin_user):
     assert 'link' in res.json
 
 
+def test_create_event_api_accepts_brasilia_today(client, app, admin_user, monkeypatch):
+    with app.app_context():
+        admin = db.session.get(User, 'admin_test')
+        admin.can_create_events = True
+        db.session.commit()
+
+    monkeypatch.setattr('app.api.events.brasilia_today', lambda: date(2030, 1, 1))
+    _login_admin(client)
+
+    res = client.post('/api/criar_evento', json={
+        'nome': 'API Event Today',
+        'descricao': 'Via API',
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-01-01',
+        'hora_inicio': '10:00',
+    })
+
+    assert res.status_code == 200
+    assert 'link' in res.get_json()
+
+
+def test_create_event_api_rejects_date_before_brasilia_today(client, app, admin_user, monkeypatch):
+    with app.app_context():
+        admin = db.session.get(User, 'admin_test')
+        admin.can_create_events = True
+        db.session.commit()
+
+    monkeypatch.setattr('app.api.events.brasilia_today', lambda: date(2030, 1, 2))
+    _login_admin(client)
+
+    res = client.post('/api/criar_evento', json={
+        'nome': 'API Event Past',
+        'descricao': 'Via API',
+        'is_rapido': True,
+        'carga_horaria_rapida': 2,
+        'data_inicio': '2030-01-01',
+        'hora_inicio': '10:00',
+    })
+
+    assert res.status_code == 400
+    assert res.get_json()['erro'] == 'Data de início no passado!'
+
+
 def test_create_standard_event_api_returns_multiple_speakers_and_legacy_fields(client, app, admin_user):
     with app.app_context():
         admin = db.session.get(User, 'admin_test')

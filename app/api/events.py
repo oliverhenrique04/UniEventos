@@ -17,6 +17,7 @@ from app.models import (
 from app.services.event_service import EventService
 from app.serializers import serialize_event
 from datetime import datetime, timedelta, timezone
+from app.utils import brasilia_today
 
 bp = Blueprint('events', __name__, url_prefix='/api')
 event_service = EventService()
@@ -213,7 +214,7 @@ def criar_evento():
     # Simple validation for start date
     try:
         data_ini_obj = datetime.strptime(data.get('data_inicio'), '%Y-%m-%d').date()
-        if data_ini_obj < datetime.now().date():
+        if data_ini_obj < brasilia_today():
             return jsonify({"erro": "Data de início no passado!"}), 400
     except (ValueError, TypeError):
         pass

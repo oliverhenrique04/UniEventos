@@ -10,6 +10,12 @@ from zoneinfo import ZoneInfo
 import unicodedata
 import re
 
+BRASILIA_TIMEZONE_NAME = 'America/Sao_Paulo'
+try:
+    BRASILIA_TIMEZONE = ZoneInfo(BRASILIA_TIMEZONE_NAME)
+except Exception:
+    BRASILIA_TIMEZONE = None
+
 
 def _join_url_paths(*parts):
     """Joins URL path chunks preserving a single leading slash."""
@@ -40,12 +46,44 @@ def build_absolute_app_url(path):
     return urlunparse((parsed.scheme, parsed.netloc, final_path, '', '', ''))
 
 
+def brasilia_now():
+    """Returns the current datetime in Brasilia timezone."""
+    return datetime.now(BRASILIA_TIMEZONE) if BRASILIA_TIMEZONE else datetime.now()
+
+
+def brasilia_today():
+    """Returns the current civil date in Brasilia timezone."""
+    return brasilia_now().date()
+
+
+def normalize_brasilia_datetime(value):
+    """Normalizes datetimes to Brasilia timezone.
+
+    Naive datetimes are treated as local civil time in Brasilia.
+    """
+    if value is None:
+        return None
+
+    is_aware = value.tzinfo is not None and value.tzinfo.utcoffset(value) is not None
+    if not BRASILIA_TIMEZONE:
+        return value.replace(tzinfo=None) if is_aware else value
+
+    if not is_aware:
+        return value.replace(tzinfo=BRASILIA_TIMEZONE)
+
+    return value.astimezone(BRASILIA_TIMEZONE)
+
+
+def build_brasilia_datetime(date_value, time_value):
+    """Builds a datetime interpreted as local civil time in Brasilia."""
+    if not date_value or not time_value:
+        return None
+    return normalize_brasilia_datetime(datetime.combine(date_value, time_value))
+
+
 def current_certificate_issue_date_label():
     """Returns the certificate issue date label in dd/mm/yyyy using Brasilia timezone."""
-    try:
-        return datetime.now(ZoneInfo('America/Sao_Paulo')).strftime('%d/%m/%Y')
-    except Exception:
-        return datetime.now().strftime('%d/%m/%Y')
+    return brasilia_now().strftime('%d/%m/%Y')
 
 
 def normalize_cpf(value):
