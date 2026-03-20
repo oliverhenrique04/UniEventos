@@ -223,46 +223,102 @@
             }
         }
 
+        /**
+         * Realiza o login do usuário com validação, sanitização e tratamento de erros.
+         * @param {SubmitEvent} e - Evento de submit do formulário
+         */
         async function fazerLogin(e) {
             e.preventDefault();
+
             const btn = e.target.querySelector('button[type="submit"]');
+            const cpfInput = document.getElementById('loginCpf');
+            const passInput = document.getElementById('loginPass');
+
+            // Validação de campos obrigatórios
+            const cpf = cpfInput?.value?.trim();
+            const password = passInput?.value;
+
+            if (!cpf || !password) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campos obrigatórios',
+                    text: 'Por favor, preencha o CPF e a senha.',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+
+            // Sanitização do CPF (remove caracteres não numéricos)
+            const cpfLimpo = cpf.replace(/\D/g, '');
+
+            // Estado de loading
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Autenticando...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Autenticando...';
             btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+
+            // AbortController para permitir cancelamento se necessário
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
             try {
                 const res = await fetch(API_LOGIN_URL, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        cpf: document.getElementById('loginCpf').value,
-                        password: document.getElementById('loginPass').value
-                    })
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cpf: cpfLimpo, password }),
+                    signal: controller.signal
                 });
-                if(res.ok) {
-                    const json = await res.json();
-                    Toast.fire({ icon: 'success', title: 'Bem-vindo de volta!' });
-                    // Redireciona para a URL salva ou recarrega a página atual
-                    setTimeout(() => {
-                        if (json.redirect_url) {
-                            window.location.href = json.redirect_url;
-                        } else {
-                            window.location.reload();
-                        }
-                    }, 500);
+
+                clearTimeout(timeoutId);
+
+                const json = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    const mensagemErro = json.message || json.erro || 'Usuário ou senha inválidos';
+                    throw new Error(mensagemErro);
+                }
+
+                // Login bem-sucedido
+                Toast.fire({ icon: 'success', title: 'Bem-vindo de volta!' });
+
+                // Redireciona para a URL salva ou recarrega a página atual
+                const redirectUrl = json.redirect_url;
+                setTimeout(() => {
+                    window.location.href = redirectUrl || window.location.href;
+                }, 500);
+
+            } catch (err) {
+                clearTimeout(timeoutId);
+
+                if (err.name === 'AbortError') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Tempo esgotado',
+                        text: 'A conexão demorou muito. Tente novamente.',
+                        confirmButtonColor: '#4f46e5'
+                    });
+                } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro de Conexão',
+                        text: 'Não foi possível conectar ao servidor. Verifique sua internet.',
+                        confirmButtonColor: '#4f46e5'
+                    });
                 } else {
-                    const json = await res.json();
                     Swal.fire({
                         icon: 'error',
                         title: 'Falha na Autenticação',
-                        text: json.message || "Usuário ou senha inválidos",
+                        text: err.message || 'Ocorreu um erro inesperado.',
                         confirmButtonColor: '#4f46e5'
                     });
                 }
-            } catch (err) {
-                Swal.fire({ icon: 'error', title: 'Erro de Conexão', text: 'Não foi possível conectar ao servidor.' });
+
+                console.error('[Login] Erro:', err);
             } finally {
+                // Restaura estado do botão
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+                btn.removeAttribute('aria-busy');
             }
         }
 
