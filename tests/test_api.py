@@ -2014,6 +2014,63 @@ def test_open_events_api_supports_extended_filters_and_keeps_course_name_compati
     assert [item['nome'] for item in by_period.get_json()['items']] == [seeded['python_event_name']]
 
 
+def test_open_events_api_handles_activities_without_schedule_data(client, app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='open_events_missing_schedule',
+            role='participante',
+            nome='Participante Sem Agenda',
+            cpf='90100000006',
+            email='open_events_missing_schedule@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento com Atividade Sem Agenda',
+            descricao='Evento para validar serializacao de atividades incompletas.',
+            tipo='PADRAO',
+            status='ABERTO',
+            token_publico='evento-atividade-sem-agenda',
+            data_inicio=date(2030, 5, 4),
+            hora_inicio=time(18, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        db.session.add_all([
+            Activity(
+                event_id=event.id,
+                nome='Abertura Programada',
+                descricao='Atividade com horario definido.',
+                data_atv=date(2030, 5, 4),
+                hora_atv=time(18, 0),
+                carga_horaria=2,
+                vagas=40,
+            ),
+            Activity(
+                event_id=event.id,
+                nome='Espaco Livre',
+                descricao='Atividade ainda sem data e hora.',
+                data_atv=None,
+                hora_atv=None,
+                carga_horaria=1,
+                vagas=40,
+            ),
+        ])
+        db.session.commit()
+
+    _login_user(client, 'open_events_missing_schedule')
+
+    res = client.get('/api/eventos_abertos?data_inicio=2030-05-04')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert [item['nome'] for item in payload['items']] == ['Evento com Atividade Sem Agenda']
+    assert [item['nome'] for item in payload['items'][0]['atividades']] == ['Abertura Programada', 'Espaco Livre']
+
+
 def test_open_events_api_can_filter_by_current_user_enrollment_status(client, app, admin_user):
     seeded = _seed_open_events_filter_data(app)
 

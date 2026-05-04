@@ -2823,6 +2823,10 @@
     }
 
     function inicializarFiltrosEventosAbertos() {
+        const inputInicio = document.getElementById('filtPartDataInicio');
+        if (inputInicio && !inputInicio.value) {
+            inputInicio.value = getCurrentDateInTimeZone();
+        }
         sincronizarPeriodoEventosAbertos();
         atualizarResumoFiltrosEventosAbertos();
     }
@@ -2916,10 +2920,12 @@
     }
 
     function limparFiltrosEventosAbertos() {
-        ['filtPartNome', 'filtPartProgramacao', 'filtPartDataInicio', 'filtPartDataFim'].forEach((id) => {
+        ['filtPartNome', 'filtPartProgramacao', 'filtPartDataFim'].forEach((id) => {
             const input = document.getElementById(id);
             if (input) input.value = '';
         });
+        const inputInicio = document.getElementById('filtPartDataInicio');
+        if (inputInicio) inputInicio.value = getCurrentDateInTimeZone();
         ['filtPartCurso', 'filtPartTipo', 'filtPartSituacao'].forEach((id) => {
             const select = document.getElementById(id);
             if (select) select.value = '';
