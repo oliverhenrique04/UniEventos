@@ -12,6 +12,14 @@ def _fmt_time(value):
     return str(value)
 
 
+def _activity_sort_key(activity):
+    return (
+        _fmt_date(getattr(activity, 'data_atv', None)) or '9999-12-31',
+        _fmt_time(getattr(activity, 'hora_atv', None)) or '23:59',
+        getattr(activity, 'id', 0) or 0,
+    )
+
+
 def serialize_user(user):
     """Serializes a User object to a dictionary."""
     if not user:
@@ -72,7 +80,7 @@ def serialize_event(event, current_user=None):
         total_presentes += len([e for e in a.enrollments if e.presente])
 
     # Sort activities chronologically
-    sorted_activities = sorted(event.activities, key=lambda a: (a.data_atv or '', a.hora_atv or ''))
+    sorted_activities = sorted(event.activities, key=_activity_sort_key)
     
     from app.models import User
     owner_user = User.query.filter_by(username=event.owner_username).first() if event.owner_username else None
