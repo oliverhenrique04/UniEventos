@@ -214,19 +214,40 @@ def criar_evento_page():
     """Dedicated page for creating new events with multiple activities."""
     if not EventService.can_create_events(current_user):
         return "Acesso negado", 403
-    return render_template('event_create.html', user=current_user)
+    from app.serializers import serialize_user
+
+    initial_event_responsibles = [
+        {
+            **(serialize_user(current_user) or {}),
+            'is_primary': True,
+        }
+    ]
+    return render_template(
+        'event_create.html',
+        user=current_user,
+        initial_event_responsibles=initial_event_responsibles,
+    )
 
 @bp.route('/editar_evento/<int:event_id>')
 @login_required
 def editar_evento_page(event_id):
     """Page for editing an existing event."""
     from app.models import Event
+    from app.serializers import serialize_event
+
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
     if not EventService.can_manage_event(current_user, event):
         return "Acesso negado", 403
-    return render_template('event_edit.html', user=current_user, event=event)
+    event_payload = serialize_event(event, current_user)
+    return render_template(
+        'event_edit.html',
+        user=current_user,
+        event=event,
+        event_payload=event_payload,
+        initial_event_responsibles=list(event_payload.get('responsaveis') or []),
+    )
 
 @bp.route('/validar')
 def validar_busca():

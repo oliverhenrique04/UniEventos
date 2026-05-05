@@ -1,0 +1,395 @@
+<div class="mb-4" id="eventResponsiblesEditor" data-search-url="{{ url_for('events.event_responsibles_options') }}">
+    <div class="rounded-4 border bg-slate-50 p-3 p-md-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                <label class="form-label fw-bold text-slate-700 mb-1">Responsáveis do Evento</label>
+                <div class="small text-muted">Busque usuários elegíveis, adicione co-responsáveis e defina quem será o responsável principal.</div>
+            </div>
+            <span class="badge bg-light text-dark border" id="eventResponsiblesCounter">0 selecionado(s)</span>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <label for="eventResponsiblesSearchInput" class="small fw-bold text-muted mb-2">Buscar responsáveis elegíveis</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fa-solid fa-user-plus"></i></span>
+                    <input
+                        type="search"
+                        class="form-control"
+                        id="eventResponsiblesSearchInput"
+                        placeholder="Digite nome, usuário, e-mail, CPF ou RA"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="form-text">Perfis elegíveis: admin, gestor, usuários com permissão de criar eventos e coordenadores do curso selecionado.</div>
+                <div id="eventResponsiblesSearchStatus" class="small text-muted mt-2">Digite ao menos 2 caracteres para buscar.</div>
+                <div id="eventResponsiblesSearchResults" class="list-group mt-2"></div>
+            </div>
+
+            <div class="col-lg-6">
+                <label class="small fw-bold text-muted mb-2">Responsáveis selecionados</label>
+                <div id="eventResponsiblesSelectedList" class="d-grid gap-2"></div>
+                <div id="eventResponsiblesValidationHint" class="form-text">Selecione ao menos um responsável e marque exatamente um como principal.</div>
+            </div>
+        </div>
+
+        <input type="hidden" id="eventResponsiblesPayload" name="responsaveis_json">
+    </div>
+</div>
+
+<script>
+    (() => {
+        const root = document.getElementById('eventResponsiblesEditor');
+        if (!root) return;
+
+        const searchUrl = root.dataset.searchUrl;
+        const initialResponsibles = {{ initial_event_responsibles|default([], true)|tojson }};
+        const searchInput = document.getElementById('eventResponsiblesSearchInput');
+        const searchStatus = document.getElementById('eventResponsiblesSearchStatus');
+        const searchResults = document.getElementById('eventResponsiblesSearchResults');
+        const selectedList = document.getElementById('eventResponsiblesSelectedList');
+        const counter = document.getElementById('eventResponsiblesCounter');
+        const hiddenInput = document.getElementById('eventResponsiblesPayload');
+        const validationHint = document.getElementById('eventResponsiblesValidationHint');
+        const courseInput = document.getElementById('evCurso');
+
+        const roleLabels = {
+            admin: 'Admin',
+            coordenador: 'Coordenador',
+            gestor: 'Gestor',
+            extensao: 'Extensão',
+            professor: 'Professor',
+            participante: 'Participante',
+        };
+
+        const state = {
+            selected: [],
+            results: [],
+            debounceId: null,
+            requestId: 0,
+        };
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeResponsible(item) {
+            const username = String(item?.username || '').trim();
+            if (!username) return null;
+            return {
+                username,
+                nome: String(item?.nome || username).trim() || username,
+                email: String(item?.email || '').trim(),
+                role: String(item?.role || '').trim(),
+                is_primary: Boolean(item?.is_primary),
+            };
+        }
+
+        function formatRole(role) {
+            return roleLabels[role] || role || 'Perfil não informado';
+        }
+
+        function buildMetaLine(user) {
+            const parts = [`@${user.username}`];
+            if (user.role) parts.push(formatRole(user.role));
+            if (user.email) parts.push(user.email);
+            return parts.join(' • ');
+        }
+
+        function ensureSinglePrimary() {
+            if (!state.selected.length) return;
+
+            let primaryIndex = state.selected.findIndex((item) => item.is_primary);
+            if (primaryIndex === -1) {
+                primaryIndex = 0;
+            }
+
+            state.selected = state.selected.map((item, index) => ({
+                ...item,
+                is_primary: index === primaryIndex,
+            }));
+        }
+
+        function getResponsiblesPayload() {
+            return state.selected.map((item) => ({
+                username: item.username,
+                is_primary: Boolean(item.is_primary),
+            }));
+        }
+
+        function updateValidationHint() {
+            const payload = getResponsiblesPayload();
+            const primaryCount = payload.filter((item) => item.is_primary).length;
+            const isValid = payload.length > 0 && primaryCount === 1;
+
+            validationHint.classList.toggle('text-danger', !isValid);
+            validationHint.classList.toggle('fw-semibold', !isValid);
+            validationHint.textContent = isValid
+                ? 'Selecione ao menos um responsável e marque exatamente um como principal.'
+                : 'A seleção atual precisa conter pelo menos um responsável e um único principal.';
+        }
+
+        function syncHiddenInput() {
+            const payload = getResponsiblesPayload();
+            hiddenInput.value = JSON.stringify(payload);
+            counter.textContent = `${payload.length} selecionado(s)`;
+            updateValidationHint();
+        }
+
+        function renderSelected() {
+            selectedList.innerHTML = '';
+
+            if (!state.selected.length) {
+                selectedList.innerHTML = '<div class="border rounded-4 bg-white px-3 py-4 text-center text-muted small">Nenhum responsável selecionado.</div>';
+                syncHiddenInput();
+                return;
+            }
+
+            state.selected.forEach((user) => {
+                const item = document.createElement('div');
+                item.className = 'border rounded-4 bg-white p-3 shadow-sm';
+                item.innerHTML = `
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div class="min-w-0 flex-grow-1">
+                            <div class="fw-bold text-dark">${escapeHtml(user.nome)}</div>
+                            <div class="small text-muted">${escapeHtml(buildMetaLine(user))}</div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-remove-username="${escapeHtml(user.username)}">
+                            <i class="fa-solid fa-user-minus me-1"></i>Remover
+                        </button>
+                    </div>
+                    <div class="form-check mt-3 mb-0">
+                        <input
+                            class="form-check-input"
+                            type="radio"
+                            name="eventResponsiblePrimary"
+                            id="eventResponsiblePrimary_${escapeHtml(user.username)}"
+                            data-primary-username="${escapeHtml(user.username)}"
+                            ${user.is_primary ? 'checked' : ''}
+                        >
+                        <label class="form-check-label small fw-semibold" for="eventResponsiblePrimary_${escapeHtml(user.username)}">
+                            Responsável principal
+                        </label>
+                    </div>
+                `;
+                selectedList.appendChild(item);
+            });
+
+            syncHiddenInput();
+        }
+
+        function renderResults() {
+            searchResults.innerHTML = '';
+
+            if (!state.results.length) {
+                return;
+            }
+
+            state.results.forEach((user) => {
+                const alreadySelected = state.selected.some((item) => item.username === user.username);
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex flex-wrap justify-content-between align-items-start gap-3';
+                item.innerHTML = `
+                    <div class="min-w-0 flex-grow-1">
+                        <div class="fw-bold text-dark small">${escapeHtml(user.nome)}</div>
+                        <div class="small text-muted">${escapeHtml(buildMetaLine(user))}</div>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn btn-sm ${alreadySelected ? 'btn-light border text-muted' : 'btn-outline-primary'}"
+                        data-add-username="${escapeHtml(user.username)}"
+                        ${alreadySelected ? 'disabled' : ''}
+                    >
+                        <i class="fa-solid ${alreadySelected ? 'fa-check' : 'fa-plus'} me-1"></i>${alreadySelected ? 'Selecionado' : 'Adicionar'}
+                    </button>
+                `;
+                searchResults.appendChild(item);
+            });
+        }
+
+        function setSelected(users) {
+            const normalized = [];
+            const seen = new Set();
+
+            (users || []).forEach((user) => {
+                const item = normalizeResponsible(user);
+                if (!item || seen.has(item.username)) return;
+                seen.add(item.username);
+                normalized.push(item);
+            });
+
+            state.selected = normalized;
+            ensureSinglePrimary();
+            renderSelected();
+            renderResults();
+        }
+
+        function addResponsible(username) {
+            const user = state.results.find((item) => item.username === username);
+            if (!user || state.selected.some((item) => item.username === username)) {
+                return;
+            }
+
+            state.selected = [
+                ...state.selected,
+                {
+                    ...user,
+                    is_primary: state.selected.length === 0,
+                }
+            ];
+            ensureSinglePrimary();
+            renderSelected();
+            renderResults();
+        }
+
+        function removeResponsible(username) {
+            state.selected = state.selected.filter((item) => item.username !== username);
+            ensureSinglePrimary();
+            renderSelected();
+            renderResults();
+        }
+
+        function setPrimary(username) {
+            state.selected = state.selected.map((item) => ({
+                ...item,
+                is_primary: item.username === username,
+            }));
+            renderSelected();
+        }
+
+        async function searchResponsibleOptions(term) {
+            const currentRequestId = ++state.requestId;
+            searchStatus.textContent = 'Buscando responsáveis elegíveis...';
+
+            try {
+                const params = new URLSearchParams({ q: term });
+                const selectedCourse = String(courseInput?.value || '').trim();
+                if (selectedCourse) {
+                    params.set('curso', selectedCourse);
+                }
+
+                const response = await fetch(`${searchUrl}?${params.toString()}`);
+                if (!response.ok) {
+                    throw new Error('Falha ao buscar responsáveis.');
+                }
+
+                const payload = await response.json();
+                if (currentRequestId !== state.requestId) {
+                    return;
+                }
+
+                state.results = Array.isArray(payload)
+                    ? payload.map((item) => normalizeResponsible(item)).filter(Boolean)
+                    : [];
+
+                renderResults();
+                searchStatus.textContent = state.results.length
+                    ? `${state.results.length} responsável(is) elegível(is) encontrado(s).`
+                    : 'Nenhum responsável elegível encontrado para este termo.';
+            } catch (error) {
+                if (currentRequestId !== state.requestId) {
+                    return;
+                }
+
+                state.results = [];
+                renderResults();
+                searchStatus.textContent = 'Não foi possível consultar os responsáveis elegíveis agora.';
+            }
+        }
+
+        searchInput.addEventListener('input', (event) => {
+            const term = event.target.value.trim();
+            clearTimeout(state.debounceId);
+
+            if (term.length < 2) {
+                state.requestId += 1;
+                state.results = [];
+                renderResults();
+                searchStatus.textContent = term
+                    ? 'Digite ao menos 2 caracteres para buscar.'
+                    : 'Digite ao menos 2 caracteres para buscar.';
+                return;
+            }
+
+            state.debounceId = window.setTimeout(() => {
+                searchResponsibleOptions(term);
+            }, 250);
+        });
+
+        if (courseInput) {
+            courseInput.addEventListener('change', () => {
+                state.requestId += 1;
+                const removedCoordinators = state.selected.some((item) => item.role === 'coordenador');
+                if (removedCoordinators) {
+                    state.selected = state.selected.filter((item) => item.role !== 'coordenador');
+                    ensureSinglePrimary();
+                    renderSelected();
+                }
+                state.results = [];
+                renderResults();
+                if (removedCoordinators) {
+                    searchStatus.textContent = 'Curso alterado. Coordenadores selecionados foram removidos; busque novamente os elegíveis para este curso.';
+                    return;
+                }
+
+                searchStatus.textContent = searchInput.value.trim().length >= 2
+                    ? 'Curso alterado. Refine a busca para atualizar os coordenadores elegíveis.'
+                    : 'Digite ao menos 2 caracteres para buscar.';
+            });
+        }
+
+        searchResults.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-add-username]');
+            if (!button) return;
+            addResponsible(button.dataset.addUsername);
+        });
+
+        selectedList.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-remove-username]');
+            if (!button) return;
+            removeResponsible(button.dataset.removeUsername);
+        });
+
+        selectedList.addEventListener('change', (event) => {
+            const radio = event.target.closest('[data-primary-username]');
+            if (!radio) return;
+            setPrimary(radio.dataset.primaryUsername);
+        });
+
+        window.getEventResponsiblesPayload = function getEventResponsiblesPayload() {
+            return getResponsiblesPayload();
+        };
+
+        window.validateEventResponsiblesSelection = function validateEventResponsiblesSelection() {
+            const responsibles = getResponsiblesPayload();
+            if (!responsibles.length) {
+                return {
+                    valid: false,
+                    message: 'Selecione ao menos um responsável pelo evento.',
+                    responsibles,
+                };
+            }
+
+            const primaryCount = responsibles.filter((item) => item.is_primary).length;
+            if (primaryCount !== 1) {
+                return {
+                    valid: false,
+                    message: 'Selecione exatamente um responsável principal.',
+                    responsibles,
+                };
+            }
+
+            return {
+                valid: true,
+                responsibles,
+            };
+        };
+
+        setSelected(initialResponsibles);
+    })();
+</script>

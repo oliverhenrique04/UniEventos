@@ -1,6 +1,7 @@
-from app.models import Event
+from app.models import Event, EventResponsible
 from .base_repository import BaseRepository
 from typing import List, Optional
+from sqlalchemy import or_
 
 class EventRepository(BaseRepository[Event]):
     """
@@ -19,7 +20,16 @@ class EventRepository(BaseRepository[Event]):
         Returns:
             List[Event]: List of events.
         """
-        return self.find_by(owner_username=owner_username)
+        return (
+            self.model.query
+            .filter(
+                or_(
+                    Event.owner_username == owner_username,
+                    Event.responsibles.any(EventResponsible.user_username == owner_username),
+                )
+            )
+            .all()
+        )
 
     def get_by_token(self, token: str) -> Optional[Event]:
         """

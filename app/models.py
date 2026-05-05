@@ -77,6 +77,12 @@ class User(UserMixin, db.Model):
         back_populates='user',
         foreign_keys='EventRegistration.user_cpf',
     )
+    event_responsibilities = db.relationship(
+        'EventResponsible',
+        back_populates='user',
+        cascade='all, delete-orphan',
+        foreign_keys='EventResponsible.user_username',
+    )
 
     @property
     def curso(self):
@@ -212,6 +218,16 @@ class Event(db.Model):
         cascade='all, delete-orphan',
         order_by='EventRegistration.id',
     )
+    responsibles = db.relationship(
+        'EventResponsible',
+        back_populates='event',
+        cascade='all, delete-orphan',
+        order_by=lambda: (
+            db.desc(EventResponsible.is_primary),
+            EventResponsible.created_at,
+            EventResponsible.user_username,
+        ),
+    )
 
     @property
     def curso(self):
@@ -240,6 +256,34 @@ class Event(db.Model):
     @property
     def registration_categories_list(self):
         return list(self.registration_categories or [])
+
+
+class EventResponsible(db.Model):
+    __tablename__ = 'event_responsibles'
+
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), primary_key=True)
+    user_username = db.Column(db.String(50), db.ForeignKey('users.username'), primary_key=True)
+    is_primary = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    event = db.relationship('Event', back_populates='responsibles')
+    user = db.relationship(
+        'User',
+        back_populates='event_responsibilities',
+        foreign_keys=[user_username],
+    )
+
+    __table_args__ = (
+        db.Index('ix_event_responsibles_event_id', 'event_id'),
+        db.Index('ix_event_responsibles_user_username', 'user_username'),
+        db.Index(
+            'uq_event_responsibles_single_primary',
+            'event_id',
+            unique=True,
+            sqlite_where=db.text('is_primary = 1'),
+            postgresql_where=db.text('is_primary = true'),
+        ),
+    )
 
 
 class EventAllowedRole(db.Model):

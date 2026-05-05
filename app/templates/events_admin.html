@@ -1372,6 +1372,45 @@
             .replace(/'/g, '&#39;');
     }
 
+    function buildEventResponsiblesSummary(ev) {
+        const fallbackPrimary = {
+            username: ev.owner || '',
+            nome: ev.owner_name || ev.owner || 'Sistema',
+            is_primary: true,
+        };
+        const responsibles = Array.isArray(ev?.responsaveis) && ev.responsaveis.length
+            ? ev.responsaveis
+            : [fallbackPrimary];
+        const primary = responsibles.find((item) => item?.is_primary) || responsibles[0] || fallbackPrimary;
+        const coResponsibles = responsibles.filter((item) => item && item.username !== primary.username);
+        const primaryLabel = primary?.nome || primary?.username || ev.owner_name || ev.owner || 'Sistema';
+
+        const tooltipLines = [`Principal: ${primaryLabel}`];
+        if (coResponsibles.length) {
+            tooltipLines.push(`Co-responsáveis: ${coResponsibles.map((item) => item.nome || item.username || 'Sistema').join(', ')}`);
+        }
+
+        return {
+            primaryLabel,
+            coResponsibleCount: coResponsibles.length,
+            tooltip: tooltipLines.join(' | '),
+        };
+    }
+
+    function renderEventResponsiblesCell(ev) {
+        const summary = buildEventResponsiblesSummary(ev);
+        const coResponsibleBadge = summary.coResponsibleCount > 0
+            ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle">+${summary.coResponsibleCount}</span>`
+            : '';
+
+        return `
+            <div class="d-inline-flex align-items-center gap-2 flex-wrap" title="${escapeHtml(summary.tooltip)}">
+                <span class="badge bg-light text-dark border">${escapeHtml(summary.primaryLabel)}</span>
+                ${coResponsibleBadge}
+            </div>
+        `;
+    }
+
     function renderManualEnrollmentCategoryOptions(eventPayload) {
         const wrapper = document.getElementById('addPartCategoriaWrapper');
         const select = document.getElementById('addPartCategoria');
@@ -1456,7 +1495,7 @@
                     </td>
                     <td data-label="Data Início"><small class="fw-bold text-slate-600">${formatDateOrDash(ev.data_inicio)}</small></td>
                     <td data-label="Participação">${partInfo}</td>
-                    <td data-label="Responsável"><span class="badge bg-light text-dark border">${ev.owner_name || ev.owner || 'Sistema'}</span></td>
+                    <td data-label="Responsável">${renderEventResponsiblesCell(ev)}</td>
                     <td class="text-end pe-3 pe-md-4 event-row-actions-cell" data-label="Ações">
                         <div class="event-actions-grid">
                             ${ev.can_edit ? `

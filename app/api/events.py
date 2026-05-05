@@ -2,12 +2,13 @@ import json
 from types import SimpleNamespace
 from flask import Blueprint, request, jsonify, abort, url_for
 from flask_login import login_required, current_user
-from sqlalchemy import or_, func, case
+from sqlalchemy import and_, false, or_, func, case
 from app.models import (
     Event,
     Activity,
     Enrollment,
     Course,
+    EventResponsible,
     User,
     InstitutionalCertificate,
     InstitutionalCertificateRecipient,
@@ -45,6 +46,46 @@ def _user_can_create_events():
 
 def _user_can_access_event_management():
     return event_service.can_access_event_management(current_user)
+
+
+def _resolve_event_responsibles_course_id(course_name):
+    normalized_name = str(course_name or '').strip()
+    if not normalized_name:
+        return None
+
+    return (
+        db.session.query(Course.id)
+        .filter(func.lower(Course.nome) == normalized_name.lower())
+        .scalar()
+    )
+
+
+def _event_responsibles_options_query(course_name=None):
+    course_id = _resolve_event_responsibles_course_id(course_name)
+    coordinator_filter = false()
+    if course_id is not None:
+        coordinator_filter = and_(
+            User.role == 'coordenador',
+            User.course_id == course_id,
+        )
+
+    return User.query.filter(
+        or_(
+            User.role.in_(['admin', 'gestor']),
+            User.can_create_events.is_(True),
+            coordinator_filter,
+        )
+    )
+
+
+def _serialize_event_responsible_option(user):
+    return {
+        'username': user.username,
+        'nome': user.nome,
+        'email': user.email,
+        'role': user.role,
+        'can_create_events': bool(user.can_create_events),
+    }
 
 
 def _enforce_role_course_for_creation(data):
@@ -95,11 +136,18 @@ def _safe_workload_hours(value):
         return 0
 
 
+def _event_responsible_or_owner_filter(username):
+    return or_(
+        Event.responsibles.any(EventResponsible.user_username == username),
+        Event.owner_username == username,
+    )
+
+
 def _apply_event_visibility_scope(base_query):
     """Apply role-based event visibility to analytics/reporting queries."""
     query = base_query
     if current_user.role == 'professor':
-        query = query.filter(Event.owner_username == current_user.username)
+        query = query.filter(_event_responsible_or_owner_filter(current_user.username))
     elif current_user.role == 'coordenador':
         if current_user.course_id:
             query = query.filter(Event.course_id == current_user.course_id)
@@ -194,6 +242,41 @@ def _get_user_institutional_recipients(user):
         .filter(or_(*recipient_filters))
         .all()
     )
+
+
+@bp.route('/event_responsibles/options', methods=['GET'])
+@login_required
+def event_responsibles_options():
+    if not _user_can_access_event_management():
+        return jsonify([]), 403
+
+    query_text = (request.args.get('q') or '').strip()
+    include_username = (request.args.get('include_username') or '').strip()
+    course_name = (request.args.get('curso') or '').strip()
+
+    users = []
+    if len(query_text) >= 2:
+        users_query = _event_responsibles_options_query(course_name)
+        like_term = f'%{query_text}%'
+        users_query = users_query.filter(or_(
+            User.username.ilike(like_term),
+            User.nome.ilike(like_term),
+            User.email.ilike(like_term),
+            User.cpf.ilike(like_term),
+            User.ra.ilike(like_term),
+        ))
+
+        users = users_query.order_by(
+            func.lower(func.coalesce(User.nome, User.username)),
+            func.lower(User.username),
+        ).limit(20).all()
+
+    if include_username:
+        included_user = _event_responsibles_options_query(course_name).filter_by(username=include_username).first()
+        if included_user and all(user.username != include_username for user in users):
+            users.append(included_user)
+
+    return jsonify([_serialize_event_responsible_option(user) for user in users])
 
 @bp.route('/criar_evento', methods=['POST'])
 @login_required
@@ -757,7 +840,9 @@ def dashboard_analytics():
     if event_type:
         scoped_events_query = scoped_events_query.filter(Event.tipo == event_type)
     if owner_username:
-        scoped_events_query = scoped_events_query.filter(Event.owner_username == owner_username)
+        scoped_events_query = scoped_events_query.filter(
+            _event_responsible_or_owner_filter(owner_username)
+        )
 
     event_ids = [event_id for (event_id,) in scoped_events_query.with_entities(Event.id).all()]
 
@@ -772,20 +857,41 @@ def dashboard_analytics():
 
     owner_rows = (
         owner_options_query
+        .join(EventResponsible, EventResponsible.event_id == Event.id)
+        .outerjoin(User, User.username == EventResponsible.user_username)
+        .with_entities(EventResponsible.user_username, User.nome)
+        .filter(EventResponsible.user_username.isnot(None))
+        .distinct()
+        .order_by(func.lower(func.coalesce(User.nome, EventResponsible.user_username)).asc())
+        .all()
+    )
+
+    legacy_owner_rows = (
+        owner_options_query
         .outerjoin(User, User.username == Event.owner_username)
         .with_entities(Event.owner_username, User.nome)
         .filter(Event.owner_username.isnot(None))
-        .group_by(Event.owner_username, User.nome)
+        .filter(~Event.responsibles.any())
+        .distinct()
         .order_by(func.lower(func.coalesce(User.nome, Event.owner_username)).asc())
         .all()
     )
+
+    owner_labels = {}
+    for username, name in [*owner_rows, *legacy_owner_rows]:
+        if not username:
+            continue
+        display_name = (name or username or '').strip() or 'Sem responsável'
+        existing_name = owner_labels.get(username)
+        if existing_name is None or existing_name == username:
+            owner_labels[username] = display_name
+
     owner_options = [
         {
             'username': username,
-            'name': (name or username or '').strip() or 'Sem responsável',
+            'name': owner_labels[username],
         }
-        for username, name in owner_rows
-        if username
+        for username in sorted(owner_labels, key=lambda item: owner_labels[item].lower())
     ]
 
     if not event_ids:

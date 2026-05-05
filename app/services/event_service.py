@@ -13,6 +13,7 @@ from app.models import (
     EventAllowedRole,
     EventRegistration,
     EventRegistrationCategory,
+    EventResponsible,
     User,
     db,
 )
@@ -159,6 +160,150 @@ class EventService:
             ))
 
         activity.sync_legacy_speaker_fields()
+
+    @staticmethod
+    def _is_user_eligible_as_event_responsible(user, event=None):
+        if not user:
+            return False
+        if user.role in ['admin', 'gestor']:
+            return True
+        if EventService.can_create_events(user):
+            return True
+        if user.role == 'coordenador' and event is not None:
+            return EventService.is_same_course_event(user, event)
+        return False
+
+    def _normalize_event_responsibles_payload(self, raw_responsibles, default_primary_username=None, event=None):
+        if raw_responsibles is None:
+            raw_responsibles = []
+        elif not isinstance(raw_responsibles, list):
+            raise ValueError('Informe a lista de responsáveis do evento.')
+
+        normalized = []
+        seen = set()
+        has_primary = False
+
+        for item in raw_responsibles:
+            if isinstance(item, dict):
+                username = str(item.get('username') or '').strip()
+                raw_is_primary = item.get('is_primary')
+                if isinstance(raw_is_primary, bool):
+                    is_primary = raw_is_primary
+                else:
+                    is_primary = str(raw_is_primary or '').strip().lower() in {'1', 'true', 'sim', 'yes'}
+            else:
+                username = str(item or '').strip()
+                is_primary = False
+
+            if not username:
+                continue
+
+            if username in seen:
+                raise ValueError(f'Responsável duplicado: {username}.')
+
+            seen.add(username)
+            normalized.append({
+                'username': username,
+                'is_primary': is_primary,
+            })
+            if is_primary:
+                has_primary = True
+
+        default_username = str(default_primary_username or '').strip()
+        if default_username and default_username not in seen:
+            normalized.append({
+                'username': default_username,
+                'is_primary': not has_primary,
+            })
+            has_primary = True or has_primary
+
+        if not normalized:
+            raise ValueError('Informe ao menos um responsável pelo evento.')
+
+        primary_count = sum(1 for responsible in normalized if responsible.get('is_primary'))
+        if primary_count != 1:
+            raise ValueError('Selecione exatamente um responsável principal.')
+
+        primary_username = next(
+            responsible['username']
+            for responsible in normalized
+            if responsible.get('is_primary')
+        )
+
+        usernames = [responsible['username'] for responsible in normalized]
+        users_by_username = {
+            user.username: user
+            for user in User.query.filter(User.username.in_(usernames)).all()
+        }
+
+        original_owner_username = getattr(event, 'owner_username', None) if event is not None else None
+        if event is not None:
+            event.owner_username = primary_username
+
+        try:
+            for username in usernames:
+                user = users_by_username.get(username)
+                if not user:
+                    raise ValueError(f'Usuário responsável não encontrado: {username}.')
+                if not self._is_user_eligible_as_event_responsible(user, event=event):
+                    raise ValueError(
+                        f'Usuário sem permissão para ser responsável pelo evento: {username}.'
+                    )
+        finally:
+            if event is not None:
+                event.owner_username = original_owner_username
+
+        return normalized
+
+    def _sync_event_responsibles(self, event, responsibles_data):
+        event.responsibles.clear()
+        db.session.flush()
+
+        primary_username = None
+        for responsible_data in responsibles_data:
+            username = responsible_data.get('username')
+            is_primary = bool(responsible_data.get('is_primary'))
+            event.responsibles.append(EventResponsible(
+                user_username=username,
+                is_primary=is_primary,
+            ))
+            if is_primary:
+                primary_username = username
+
+        event.owner_username = primary_username
+        db.session.flush()
+
+    @staticmethod
+    def _get_event_responsible_users(event):
+        responsible_users = []
+        seen_usernames = set()
+
+        related_responsibles = sorted(
+            list(getattr(event, 'responsibles', None) or []),
+            key=lambda responsible: (
+                not bool(getattr(responsible, 'is_primary', False)),
+                getattr(responsible, 'created_at', None) is None,
+                getattr(responsible, 'created_at', None) or '',
+                getattr(responsible, 'user_username', '') or '',
+            ),
+        )
+        for responsible in related_responsibles:
+            user = getattr(responsible, 'user', None)
+            username = getattr(responsible, 'user_username', None) or getattr(user, 'username', None)
+            if not user or not username or username in seen_usernames:
+                continue
+            responsible_users.append(user)
+            seen_usernames.add(username)
+
+        if responsible_users:
+            return responsible_users
+
+        owner_username = getattr(event, 'owner_username', None)
+        if not owner_username:
+            return []
+
+        owner = User.query.filter_by(username=owner_username).first()
+        return [owner] if owner else []
 
     @staticmethod
     def _normalize_allowed_roles_payload(raw_roles, default_if_missing=False):
@@ -554,8 +699,17 @@ class EventService:
 
     @staticmethod
     def is_event_owner(user, event):
+        return EventService.is_event_responsible(user, event)
+
+    @staticmethod
+    def is_event_responsible(user, event):
         if not user or not event:
             return False
+
+        for responsible in getattr(event, 'responsibles', []) or []:
+            if responsible.user_username == user.username:
+                return True
+
         return bool(event.owner_username and event.owner_username == user.username)
 
     @staticmethod
@@ -575,7 +729,7 @@ class EventService:
         if user.role == 'coordenador':
             return EventService.is_same_course_event(user, event)
         if EventService.can_create_events(user):
-            return event.owner_username == user.username
+            return EventService.is_event_responsible(user, event)
         return False
 
     @staticmethod
@@ -586,7 +740,7 @@ class EventService:
             return True
         if user.role == 'coordenador':
             return EventService.is_same_course_event(user, event)
-        return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
+        return EventService.is_event_responsible(user, event) and EventService._can_manage_own_events(user)
 
     @staticmethod
     def can_delete_event(user, event):
@@ -596,7 +750,7 @@ class EventService:
             return True
         if user.role == 'coordenador':
             return EventService.is_event_owner(user, event)
-        return EventService.is_event_owner(user, event) and EventService._can_manage_own_events(user)
+        return EventService.is_event_responsible(user, event) and EventService._can_manage_own_events(user)
 
     @staticmethod
     def get_event_delete_block_status(event):
@@ -680,7 +834,15 @@ class EventService:
             token_publico=token,
             status='ABERTO'
         )
-        self.event_repo.save(event)
+        default_primary_username = owner_username if 'responsaveis' not in data else None
+        responsibles_data = self._normalize_event_responsibles_payload(
+            data.get('responsaveis'),
+            default_primary_username=default_primary_username,
+            event=event,
+        )
+        db.session.add(event)
+        db.session.flush()
+        self._sync_event_responsibles(event, responsibles_data)
         self._sync_event_allowed_roles(event, allowed_roles)
         self._sync_event_registration_categories(event, registration_categories)
         db.session.flush()
@@ -690,93 +852,95 @@ class EventService:
         else:
             self._create_activities(event, data.get('atividades', []))
 
+        self.event_repo.save(event)
+
         self._notify_owner_event_created(event)
             
         return event
 
     def _notify_owner_event_created(self, event):
-        """Sends an email confirmation to the event owner when an event is created."""
-        owner = User.query.filter_by(username=event.owner_username).first()
-        if not owner or not owner.email:
-            return
-
+        """Sends an email confirmation to all event responsibles when an event is created."""
         app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
         event_link = f"{app_url}/inscrever/{event.token_publico}" if app_url else f"/inscrever/{event.token_publico}"
         manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
         event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
         event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
 
-        self.notification_service.send_email_task(
-            to_email=owner.email,
-            subject=f"Evento criado: {event.nome}",
-            template_name='event_created_owner.html',
-            template_data={
-                'user_name': owner.nome or owner.username,
-                'event_name': event.nome,
-                'event_type': event.tipo,
-                'event_date': event_date,
-                'event_time': event_time,
-                'event_status': event.status,
-                'event_link': event_link,
-                'manage_link': manage_link,
-                'year': datetime.now().year,
-            },
-        )
+        for owner in self._get_event_responsible_users(event):
+            if not owner.email:
+                continue
+
+            self.notification_service.send_email_task(
+                to_email=owner.email,
+                subject=f"Evento criado: {event.nome}",
+                template_name='event_created_owner.html',
+                template_data={
+                    'user_name': owner.nome or owner.username,
+                    'event_name': event.nome,
+                    'event_type': event.tipo,
+                    'event_date': event_date,
+                    'event_time': event_time,
+                    'event_status': event.status,
+                    'event_link': event_link,
+                    'manage_link': manage_link,
+                    'year': datetime.now().year,
+                },
+            )
 
     def _notify_owner_event_updated(self, event):
-        """Sends an email confirmation to the event owner when an event is updated."""
-        owner = User.query.filter_by(username=event.owner_username).first()
-        if not owner or not owner.email:
-            return
-
+        """Sends an email confirmation to all event responsibles when an event is updated."""
         app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
         event_link = f"{app_url}/editar_evento/{event.id}" if app_url else f"/editar_evento/{event.id}"
         manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
         event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
         event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
 
-        self.notification_service.send_email_task(
-            to_email=owner.email,
-            subject=f"Evento atualizado: {event.nome}",
-            template_name='event_updated_owner.html',
-            template_data={
-                'user_name': owner.nome or owner.username,
-                'event_name': event.nome,
-                'event_type': event.tipo,
-                'event_date': event_date,
-                'event_time': event_time,
-                'event_status': event.status,
-                'event_link': event_link,
-                'manage_link': manage_link,
-                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
-                'year': datetime.now().year,
-            },
-        )
+        for owner in self._get_event_responsible_users(event):
+            if not owner.email:
+                continue
 
-    def _notify_owner_event_deleted(self, owner_username, event_name, event_type, event_date, event_time):
-        """Sends an email confirmation to the event owner when an event is deleted."""
-        owner = User.query.filter_by(username=owner_username).first()
-        if not owner or not owner.email:
-            return
+            self.notification_service.send_email_task(
+                to_email=owner.email,
+                subject=f"Evento atualizado: {event.nome}",
+                template_name='event_updated_owner.html',
+                template_data={
+                    'user_name': owner.nome or owner.username,
+                    'event_name': event.nome,
+                    'event_type': event.tipo,
+                    'event_date': event_date,
+                    'event_time': event_time,
+                    'event_status': event.status,
+                    'event_link': event_link,
+                    'manage_link': manage_link,
+                    'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                    'year': datetime.now().year,
+                },
+            )
 
+    def _notify_owner_event_deleted(self, responsible_users, event_name, event_type, event_date, event_time):
+        """Sends an email confirmation to all event responsibles when an event is deleted."""
         app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
         manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
 
-        self.notification_service.send_email_task(
-            to_email=owner.email,
-            subject=f"Evento excluído: {event_name}",
-            template_name='event_deleted_owner.html',
-            template_data={
-                'user_name': owner.nome or owner.username,
-                'event_name': event_name,
-                'event_type': event_type,
-                'event_date': event_date,
-                'event_time': event_time,
-                'manage_link': manage_link,
-                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
-                'year': datetime.now().year,
-            },
-        )
+        for owner in responsible_users:
+            if not owner or not owner.email:
+                continue
+
+            self.notification_service.send_email_task(
+                to_email=owner.email,
+                subject=f"Evento excluído: {event_name}",
+                template_name='event_deleted_owner.html',
+                template_data={
+                    'user_name': owner.nome or owner.username,
+                    'event_name': event_name,
+                    'event_type': event_type,
+                    'event_date': event_date,
+                    'event_time': event_time,
+                    'manage_link': manage_link,
+                    'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                    'year': datetime.now().year,
+                },
+            )
 
     def update_event(self, event_id, user, data):
         """Updates an existing event's information and its associated activities.
@@ -801,6 +965,16 @@ class EventService:
         fast_event_hours = self._parse_fast_event_hours(data.get('carga_horaria_rapida')) if is_rapido else None
         allowed_roles = self._normalize_allowed_roles_payload(data.get('perfis_habilitados'))
         registration_categories = self._normalize_registration_categories_payload(data.get('categorias_inscricao'))
+        responsibles_data = None
+        if 'responsaveis' in data:
+            validation_event = Event(owner_username=event.owner_username)
+            validation_event.course_id = event.course_id
+            if 'curso' in data:
+                validation_event.curso = data.get('curso')
+            responsibles_data = self._normalize_event_responsibles_payload(
+                data.get('responsaveis'),
+                event=validation_event,
+            )
             
         # Safe coordinate parsing to prevent crashes on invalid input
         try:
@@ -841,6 +1015,15 @@ class EventService:
 
         self._sync_event_allowed_roles(event, allowed_roles)
         self._sync_event_registration_categories(event, registration_categories)
+        if responsibles_data is not None:
+            self._sync_event_responsibles(event, responsibles_data)
+        elif not event.responsibles:
+            fallback_responsibles = self._normalize_event_responsibles_payload(
+                None,
+                default_primary_username=event.owner_username,
+                event=event,
+            )
+            self._sync_event_responsibles(event, fallback_responsibles)
         db.session.flush()
         
         # Non-destructive activity synchronization
@@ -942,7 +1125,12 @@ class EventService:
             else:
                 query = query.filter(Event.id == -1)
         elif self.can_create_events(user):
-            query = query.filter_by(owner_username=user.username)
+            query = query.filter(
+                or_(
+                    Event.responsibles.any(EventResponsible.user_username == user.username),
+                    Event.owner_username == user.username,
+                )
+            )
         elif user.role != 'admin':
             query = query.filter(Event.id == -1)
         
@@ -976,7 +1164,12 @@ class EventService:
             # Gestor can consult all events; edition constraints are enforced elsewhere.
             pass
         elif self.can_create_events(user):
-            query = query.filter(Event.owner_username == user.username)
+            query = query.filter(
+                or_(
+                    Event.responsibles.any(EventResponsible.user_username == user.username),
+                    Event.owner_username == user.username,
+                )
+            )
         elif user.role != 'admin':
             query = query.filter(Event.id == -1)
 
@@ -988,7 +1181,20 @@ class EventService:
             if filters.get('status'):
                 query = query.filter(Event.status == filters['status'])
             if filters.get('owner'):
-                query = query.filter(Event.owner_username.ilike(f"%{filters['owner']}%"))
+                owner_filter = f"%{filters['owner']}%"
+                query = (
+                    query
+                    .outerjoin(EventResponsible, EventResponsible.event_id == Event.id)
+                    .outerjoin(User, User.username == EventResponsible.user_username)
+                    .filter(
+                        or_(
+                            Event.owner_username.ilike(owner_filter),
+                            EventResponsible.user_username.ilike(owner_filter),
+                            User.nome.ilike(owner_filter),
+                        )
+                    )
+                    .distinct()
+                )
             if filters.get('curso'):
                 query = query.join(Course, Event.course_id == Course.id, isouter=True)
                 query = query.filter(Course.nome.ilike(f"%{filters['curso']}%"))
@@ -1153,10 +1359,10 @@ class EventService:
         event_type = event.tipo
         event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
         event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
-        event_owner = event.owner_username
+        responsible_users = self._get_event_responsible_users(event)
 
         self.event_repo.delete(event)
-        self._notify_owner_event_deleted(event_owner, event_name, event_type, event_date, event_time)
+        self._notify_owner_event_deleted(responsible_users, event_name, event_type, event_date, event_time)
         return True, "Evento removido com sucesso."
 
     def get_activity(self, activity_id):

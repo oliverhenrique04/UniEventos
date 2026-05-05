@@ -35,6 +35,58 @@ def serialize_user(user):
         'can_create_events': user.can_create_events,
     }
 
+
+def serialize_event_responsibles(event):
+    """Serializes event responsibles, keeping the primary responsible first."""
+    if not event:
+        return []
+
+    responsibles = []
+    seen_usernames = set()
+
+    related_responsibles = sorted(
+        list(getattr(event, 'responsibles', None) or []),
+        key=lambda responsible: (
+            not bool(getattr(responsible, 'is_primary', False)),
+            getattr(responsible, 'created_at', None) is None,
+            getattr(responsible, 'created_at', None) or '',
+            getattr(responsible, 'user_username', '') or '',
+        ),
+    )
+
+    for responsible in related_responsibles:
+        user = getattr(responsible, 'user', None)
+        username = getattr(responsible, 'user_username', None) or getattr(user, 'username', None)
+        if not username or username in seen_usernames:
+            continue
+
+        seen_usernames.add(username)
+        responsibles.append({
+            'username': username,
+            'nome': getattr(user, 'nome', None) or username,
+            'email': getattr(user, 'email', None),
+            'role': getattr(user, 'role', None),
+            'is_primary': bool(getattr(responsible, 'is_primary', False)),
+        })
+
+    if responsibles:
+        return responsibles
+
+    from app.models import User
+
+    owner_username = getattr(event, 'owner_username', None)
+    if not owner_username:
+        return []
+
+    owner_user = User.query.filter_by(username=owner_username).first()
+    return [{
+        'username': owner_username,
+        'nome': getattr(owner_user, 'nome', None) or owner_username,
+        'email': getattr(owner_user, 'email', None),
+        'role': getattr(owner_user, 'role', None),
+        'is_primary': True,
+    }]
+
 def serialize_activity(activity, current_user=None, include_private=False):
     """Serializes an Activity object to a dictionary, optionally checking enrollment."""
     total_inscritos = len(activity.enrollments)
@@ -82,9 +134,17 @@ def serialize_event(event, current_user=None):
     # Sort activities chronologically
     sorted_activities = sorted(event.activities, key=_activity_sort_key)
     
-    from app.models import User
-    owner_user = User.query.filter_by(username=event.owner_username).first() if event.owner_username else None
-    owner_name = owner_user.nome if owner_user else (event.owner_username or 'Sistema')
+    serialized_responsibles = serialize_event_responsibles(event)
+    primary_responsible = next(
+        (responsible for responsible in serialized_responsibles if responsible.get('is_primary')),
+        serialized_responsibles[0] if serialized_responsibles else None,
+    )
+    owner_username = primary_responsible.get('username') if primary_responsible else event.owner_username
+    owner_name = (
+        primary_responsible.get('nome')
+        if primary_responsible and primary_responsible.get('nome')
+        else (event.owner_username or 'Sistema')
+    )
 
     can_edit = False
     can_delete = False
@@ -191,8 +251,10 @@ def serialize_event(event, current_user=None):
 
     return {
         'id': event.id,
-        'owner': event.owner_username,
+        'owner': owner_username,
         'owner_name': owner_name,
+        'responsavel_principal': primary_responsible,
+        'responsaveis': serialized_responsibles,
         'nome': event.nome,
         'descricao': event.descricao,
         'curso': event.curso, # Derived from normalized course relation

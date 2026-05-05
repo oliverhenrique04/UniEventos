@@ -5,6 +5,7 @@ from app.models import (
     Event,
     Activity,
     Enrollment,
+    EventResponsible,
     EventRegistration,
     Course,
     User,
@@ -303,6 +304,24 @@ def _seed_dashboard_analytics_data(app):
         )
         db.session.add_all([event_eng_a, event_eng_b, event_dir])
         db.session.flush()
+
+        db.session.add_all([
+            EventResponsible(
+                event_id=event_eng_a.id,
+                user_username='prof_eng_a',
+                is_primary=True,
+            ),
+            EventResponsible(
+                event_id=event_eng_b.id,
+                user_username='prof_eng_b',
+                is_primary=True,
+            ),
+            EventResponsible(
+                event_id=event_dir.id,
+                user_username='prof_dir',
+                is_primary=True,
+            ),
+        ])
 
         activity_eng_a = Activity(
             event_id=event_eng_a.id,
@@ -1087,6 +1106,145 @@ def test_dashboard_analytics_gestor_behavior_remains_unchanged(client, app):
     assert payload['institutional_summary']['total_certificates'] == 3
 
 
+def test_event_responsibles_options_returns_only_eligible_users(client, app, admin_user):
+    with app.app_context():
+        eligible_course = Course(nome='Curso Elegivel')
+        other_course = Course(nome='Curso Outro')
+        db.session.add_all([eligible_course, other_course])
+        db.session.flush()
+
+        eligible_admin = User(
+            username='resp_option_admin',
+            role='admin',
+            nome='Elegivel Admin',
+            cpf='30140050070',
+            email='resp_option_admin@test.local',
+        )
+        eligible_admin.set_password('1234')
+
+        eligible_coord = User(
+            username='resp_option_coord',
+            role='coordenador',
+            nome='Elegivel Coordenador',
+            cpf='30140050071',
+            email='resp_option_coord@test.local',
+            course_id=eligible_course.id,
+        )
+        eligible_coord.set_password('1234')
+
+        ineligible_other_course_coord = User(
+            username='resp_option_coord_other_course',
+            role='coordenador',
+            nome='Elegivel Coordenador Outro Curso',
+            cpf='30140050077',
+            email='resp_option_coord_other_course@test.local',
+            course_id=other_course.id,
+        )
+        ineligible_other_course_coord.set_password('1234')
+
+        eligible_manager = User(
+            username='resp_option_manager',
+            role='gestor',
+            nome='Elegivel Gestor',
+            cpf='30140050072',
+            email='resp_option_manager@test.local',
+        )
+        eligible_manager.set_password('1234')
+
+        ineligible_extension = User(
+            username='resp_option_extension',
+            role='extensao',
+            nome='Elegivel Extensao',
+            cpf='30140050073',
+            email='resp_option_extension@test.local',
+        )
+        ineligible_extension.set_password('1234')
+
+        eligible_flagged = User(
+            username='resp_option_flagged',
+            role='participante',
+            nome='Criador Especial',
+            cpf='30140050074',
+            email='resp_option_flagged@test.local',
+            can_create_events=True,
+        )
+        eligible_flagged.set_password('1234')
+
+        ineligible_professor = User(
+            username='resp_option_professor',
+            role='professor',
+            nome='Elegivel Professor',
+            cpf='30140050075',
+            email='resp_option_professor@test.local',
+        )
+        ineligible_professor.set_password('1234')
+
+        ineligible_participant = User(
+            username='resp_option_participant',
+            role='participante',
+            nome='Elegivel Participante',
+            cpf='30140050076',
+            email='resp_option_participant@test.local',
+        )
+        ineligible_participant.set_password('1234')
+
+        db.session.add_all([
+            eligible_course,
+            other_course,
+            eligible_admin,
+            eligible_coord,
+            ineligible_other_course_coord,
+            eligible_manager,
+            ineligible_extension,
+            eligible_flagged,
+            ineligible_professor,
+            ineligible_participant,
+        ])
+        db.session.commit()
+
+    _login_admin(client)
+
+    res = client.get('/api/event_responsibles/options')
+    assert res.status_code == 200
+    assert res.get_json() == []
+
+    res = client.get('/api/event_responsibles/options?include_username=resp_option_flagged')
+    assert res.status_code == 200
+    assert res.get_json() == [{
+        'username': 'resp_option_flagged',
+        'nome': 'Criador Especial',
+        'email': 'resp_option_flagged@test.local',
+        'role': 'participante',
+        'can_create_events': True,
+    }]
+
+    res = client.get('/api/event_responsibles/options?q=Elegivel&curso=Curso%20Elegivel&include_username=resp_option_flagged')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert {item['username'] for item in payload} == {
+        'resp_option_admin',
+        'resp_option_coord',
+        'resp_option_manager',
+        'resp_option_flagged',
+    }
+    assert all(item['username'] != 'resp_option_coord_other_course' for item in payload)
+    assert all(item['username'] != 'resp_option_extension' for item in payload)
+    assert all(set(item.keys()) == {'username', 'nome', 'email', 'role', 'can_create_events'} for item in payload)
+    assert all(
+        item['role'] in {'admin', 'coordenador', 'gestor'} or item['can_create_events']
+        for item in payload
+    )
+    flagged_user = next(item for item in payload if item['username'] == 'resp_option_flagged')
+    assert flagged_user == {
+        'username': 'resp_option_flagged',
+        'nome': 'Criador Especial',
+        'email': 'resp_option_flagged@test.local',
+        'role': 'participante',
+        'can_create_events': True,
+    }
+
+
 def test_events_api_keeps_gestor_read_only_for_foreign_events(client, app):
     seeded = _seed_dashboard_analytics_data(app)
 
@@ -1342,6 +1500,92 @@ def test_dashboard_analytics_professor_owner_filter_remains_disabled(client, app
     payload = res.get_json()
     assert payload['applied_filters']['owner_username'] is None
     assert payload['summary']['total_events'] == 1
+
+
+def test_dashboard_analytics_owner_filter_matches_co_responsible(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    with app.app_context():
+        shared_responsible = User(
+            username='prof_shared_analytics',
+            role='professor',
+            nome='Prof Shared Analytics',
+            cpf='20030040061',
+            course_id=seeded['course_eng_id'],
+            can_create_events=True,
+        )
+        shared_responsible.set_password('1234')
+        db.session.add(shared_responsible)
+        db.session.flush()
+
+        event = Event.query.filter_by(owner_username=seeded['prof_eng_a_username']).first()
+        assert event is not None
+        db.session.add(EventResponsible(
+            event_id=event.id,
+            user_username=shared_responsible.username,
+            is_primary=False,
+        ))
+        db.session.commit()
+
+    _login_user(client, seeded['coord_username'])
+    res = client.get('/api/dashboard/analytics?owner_username=prof_shared_analytics')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['applied_filters']['course_id'] == seeded['course_eng_id']
+    assert payload['applied_filters']['owner_username'] == 'prof_shared_analytics'
+    assert payload['summary']['total_events'] == 1
+    assert payload['events_by_course'] == [{'course': 'Engenharia', 'count': 1}]
+    assert 'prof_shared_analytics' in {
+        item['username'] for item in payload['filter_options']['owners']
+    }
+
+
+def test_dashboard_analytics_owner_filter_matches_legacy_owner_without_responsibles(client, app):
+    seeded = _seed_dashboard_analytics_data(app)
+
+    with app.app_context():
+        legacy_owner = User(
+            username='prof_legacy_analytics',
+            role='professor',
+            nome='Prof Legacy Analytics',
+            cpf='20030040062',
+            course_id=seeded['course_eng_id'],
+            can_create_events=True,
+        )
+        legacy_owner.set_password('1234')
+        db.session.add(legacy_owner)
+        db.session.flush()
+
+        legacy_event = Event(
+            owner_username=legacy_owner.username,
+            nome='Evento Legado Analytics',
+            descricao='Evento legado sem responsaveis vinculados',
+            tipo='PADRAO',
+            status='ABERTO',
+            data_inicio=date.today(),
+            hora_inicio=time(18, 0),
+            course_id=seeded['course_eng_id'],
+        )
+        db.session.add(legacy_event)
+        db.session.commit()
+
+        saved_legacy_event = Event.query.filter_by(owner_username=legacy_owner.username).first()
+        assert saved_legacy_event is not None
+        assert saved_legacy_event.responsibles == []
+
+    _login_user(client, seeded['coord_username'])
+    res = client.get('/api/dashboard/analytics?owner_username=prof_legacy_analytics')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['applied_filters']['course_id'] == seeded['course_eng_id']
+    assert payload['applied_filters']['owner_username'] == 'prof_legacy_analytics'
+    assert payload['summary']['total_events'] == 1
+    assert payload['events_by_course'] == [{'course': 'Engenharia', 'count': 1}]
+    assert 'prof_legacy_analytics' in {
+        item['username'] for item in payload['filter_options']['owners']
+    }
 
 
 def test_dashboard_analytics_participant_still_has_no_access(client, app):

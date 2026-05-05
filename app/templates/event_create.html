@@ -120,6 +120,8 @@
                             <textarea class="form-control" id="evDesc" rows="4" placeholder="Descreva os objetivos, público-alvo e informações relevantes..."></textarea>
                         </div>
 
+                        {% include 'partials/event_responsibles_editor.html' %}
+
                         <div class="row g-4 mb-4">
                             <div class="col-lg-6">
                                 <label class="form-label fw-bold text-slate-700">Público Habilitado</label>
@@ -666,6 +668,19 @@
     document.getElementById('mainEventForm').onsubmit = async (e) => {
         e.preventDefault();
 
+        if (typeof window.validateEventResponsiblesSelection !== 'function') {
+            Swal.fire('Erro', 'O editor de responsáveis não foi carregado corretamente.', 'error');
+            return;
+        }
+
+        const responsiblesValidation = window.validateEventResponsiblesSelection();
+        if (!responsiblesValidation.valid) {
+            Swal.fire('Validação', responsiblesValidation.message, 'warning');
+            return;
+        }
+
+        const eventResponsibles = responsiblesValidation.responsibles;
+
         if (currentType === 'RAPIDO') {
             const horasRapido = document.getElementById('evRapidoHoras').value;
             if (!horasRapido || Number(horasRapido) <= 0) {
@@ -720,6 +735,7 @@
             atividades: activities,
             perfis_habilitados: registrationSettings.perfis_habilitados,
             categorias_inscricao: registrationSettings.categorias_inscricao,
+            responsaveis: eventResponsibles,
         };
 
         try {
