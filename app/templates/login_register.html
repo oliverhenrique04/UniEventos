@@ -223,6 +223,29 @@
             }
         }
 
+        const AUTH_REQUEST_TIMEOUT_MS = 10000;
+
+        async function fetchWithTimeout(url, init = {}, timeoutMs = AUTH_REQUEST_TIMEOUT_MS) {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+            try {
+                return await fetch(url, {
+                    ...init,
+                    signal: controller.signal,
+                });
+            } catch (error) {
+                if (error?.name === 'AbortError') {
+                    const timeoutError = new Error('A solicitação demorou demais para responder.');
+                    timeoutError.isTimeout = true;
+                    throw timeoutError;
+                }
+                throw error;
+            } finally {
+                window.clearTimeout(timeoutId);
+            }
+        }
+
         async function fazerLogin(e) {
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
@@ -231,12 +254,13 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch(API_LOGIN_URL, {
+                const res = await fetchWithTimeout(API_LOGIN_URL, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         cpf: document.getElementById('loginCpf').value,
                         password: document.getElementById('loginPass').value
-                    })
+                    }),
+                    credentials: 'same-origin'
                 });
                 if(res.ok) {
                     Toast.fire({ icon: 'success', title: 'Bem-vindo de volta!' });
@@ -251,7 +275,11 @@
                     });
                 }
             } catch (err) {
-                Swal.fire({ icon: 'error', title: 'Erro de Conexão', text: 'Não foi possível conectar ao servidor.' });
+                Swal.fire({
+                    icon: 'error',
+                    title: err?.isTimeout ? 'Tempo esgotado' : 'Erro de Conexão',
+                    text: err?.isTimeout ? err.message : 'Não foi possível conectar ao servidor.'
+                });
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -276,14 +304,15 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch(API_REGISTRAR_URL, {
+                const res = await fetchWithTimeout(API_REGISTRAR_URL, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         nome: document.getElementById('regNome').value,
                         email: document.getElementById('regEmail').value,
                         cpf: document.getElementById('regCpf').value,
                         password: document.getElementById('regPass').value
-                    })
+                    }),
+                    credentials: 'same-origin'
                 });
                 const json = await res.json();
                 
@@ -305,7 +334,11 @@
                     });
                 }
             } catch (err) {
-                Swal.fire({ icon: 'error', title: 'Erro de Conexão', text: 'Não foi possível realizar o cadastro.' });
+                Swal.fire({
+                    icon: 'error',
+                    title: err?.isTimeout ? 'Tempo esgotado' : 'Erro de Conexão',
+                    text: err?.isTimeout ? err.message : 'Não foi possível realizar o cadastro.'
+                });
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -328,10 +361,11 @@
             if (!result.isConfirmed || !result.value) return;
 
             try {
-                const res = await fetch(API_PASSWORD_FORGOT_URL, {
+                const res = await fetchWithTimeout(API_PASSWORD_FORGOT_URL, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email: result.value })
+                    body: JSON.stringify({ email: result.value }),
+                    credentials: 'same-origin'
                 });
                 const json = await res.json();
                 if (res.ok) {
@@ -339,8 +373,12 @@
                 } else {
                     Swal.fire('Erro', json.erro || 'Não foi possível processar a solicitação.', 'error');
                 }
-            } catch (_) {
-                Swal.fire('Erro', 'Falha de conexão ao solicitar recuperação.', 'error');
+            } catch (err) {
+                Swal.fire(
+                    err?.isTimeout ? 'Tempo esgotado' : 'Erro',
+                    err?.isTimeout ? err.message : 'Falha de conexão ao solicitar recuperação.',
+                    'error'
+                );
             }
         }
     </script>

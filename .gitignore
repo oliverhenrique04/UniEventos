@@ -10,5 +10,6 @@ logs/
 *.log
 dist/
 build/
+/.worktrees/
 app/static/certificates/
 gunicorn.pid

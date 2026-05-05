@@ -210,6 +210,18 @@ Garanta que as migrations foram aplicadas:
 flask --app run.py db upgrade
 ```
 
+### 2.1. Migração executada com `postgres` e a aplicação perdeu acesso a tabelas novas
+
+Se uma migration PostgreSQL for aplicada com um superusuário, os objetos novos podem ficar sem grants compatíveis com o usuário da aplicação `euroeventos`. Isso afeta especialmente a tabela `event_responsibles`, introduzida pela migration `a5b7c9d2e4f6`.
+
+Reaplique ownership e privilégios com o script versionado abaixo:
+
+```bash
+psql -h nuted.unieuro.edu.br -p 5432 -U postgres -d euro_eventos_dev -f scripts/grant_event_responsibles_privileges.sql
+```
+
+Depois disso, o usuário `euroeventos` volta a conseguir consultar e atualizar `public.event_responsibles`.
+
 ### 3. Migração de dados falhando por legado inconsistente
 
 O script `scripts/migrate_sqlite_to_postgres.py` cria placeholders para referências órfãs em usuários e responsáveis por eventos, o que permite concluir a migração mesmo quando o SQLite contém dados inconsistentes.
