@@ -1210,6 +1210,47 @@ def test_certificate_service_generates_pdf_with_unsupported_font_family_fallback
         assert os.path.getsize(pdf_path) > 0
 
 
+def test_certificate_service_generate_pdf_overwrites_read_only_existing_file_atomically(app, admin_user):
+    with app.app_context():
+        output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')
+        os.makedirs(output_dir, exist_ok=True)
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Regravacao Atomica',
+            descricao='Teste de sobrescrita segura',
+            tipo='RAPIDO',
+            data_inicio=date(2030, 7, 2),
+            hora_inicio=time(9, 30),
+        )
+
+        user = User(
+            username='cert_user_atomic_replace',
+            role='student',
+            nome='Aluno Regravacao',
+            cpf='10000000005',
+            email='atomic@example.com'
+        )
+        user.set_password('1234')
+
+        db.session.add(event)
+        db.session.add(user)
+        db.session.commit()
+
+        existing_pdf_path = os.path.join(output_dir, f'cert_{event.id}_{user.cpf}.pdf')
+        with open(existing_pdf_path, 'wb') as existing_file:
+            existing_file.write(b'old-content')
+        os.chmod(existing_pdf_path, 0o444)
+
+        service = CertificateService()
+        pdf_path = service.generate_pdf(event, user, activities=[], total_hours=4)
+
+        assert pdf_path == existing_pdf_path
+        assert os.path.exists(pdf_path)
+        with open(pdf_path, 'rb') as generated_file:
+            assert generated_file.read(4) == b'%PDF'
+
+
 def test_certificate_service_normalize_template_payload_restores_fixed_validation_elements():
     normalized = CertificateService.normalize_template_payload({
         'version': 2,

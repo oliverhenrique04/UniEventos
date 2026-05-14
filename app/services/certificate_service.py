@@ -858,10 +858,11 @@ class CertificateService:
         safe_identifier = str(getattr(user, 'cpf', '') or f"USER-{getattr(user, 'id', 'NA')}")
         filename = f"cert_{event.id}_{safe_identifier}.pdf"
         filepath = os.path.join(output_dir, filename)
+        temp_filepath = os.path.join(output_dir, f".tmp_{secrets.token_hex(8)}_{filename}")
         
         page_width, page_height = landscape(A4)
 
-        c = canvas.Canvas(filepath, pagesize=(page_width, page_height))
+        c = canvas.Canvas(temp_filepath, pagesize=(page_width, page_height))
         
         # 1. Draw Background
         elements, background_path = self._parse_template_elements(event, template_override=template_override)
@@ -894,8 +895,14 @@ class CertificateService:
             c.save()
         except FileNotFoundError:
             # Defensive retry for environments where generated folder may be missing at runtime.
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            os.makedirs(os.path.dirname(temp_filepath), exist_ok=True)
             c.save()
+        try:
+            # Replace atomically so an older read-only file does not block regeneration.
+            os.replace(temp_filepath, filepath)
+        finally:
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
         return filepath
 
     def queue_event_certificates(self, event_id):
