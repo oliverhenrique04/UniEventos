@@ -19,12 +19,12 @@ from app.models import (
 )
 import secrets
 from datetime import datetime, date, time
+from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from app.utils import (
     brasilia_now,
     brasilia_today,
-    build_absolute_app_url,
     build_brasilia_datetime,
     normalize_brasilia_datetime,
     normalize_cpf,
@@ -304,26 +304,6 @@ class EventService:
 
         owner = User.query.filter_by(username=owner_username).first()
         return [owner] if owner else []
-
-    @staticmethod
-    def _event_schedule_labels(date_value, time_value):
-        event_date = date_value.strftime('%d/%m/%Y') if date_value else '-'
-        event_time = time_value.strftime('%H:%M') if time_value else '-'
-        return event_date, event_time
-
-    def _send_owner_event_notification(self, owners, subject, template_name, template_data):
-        for owner in owners:
-            if not owner or not owner.email:
-                continue
-            self.notification_service.send_email_task(
-                to_email=owner.email,
-                subject=subject,
-                template_name=template_name,
-                template_data={
-                    'user_name': owner.nome or owner.username,
-                    **template_data,
-                },
-            )
 
     @staticmethod
     def _normalize_allowed_roles_payload(raw_roles, default_if_missing=False):
@@ -880,59 +860,87 @@ class EventService:
 
     def _notify_owner_event_created(self, event):
         """Sends an email confirmation to all event responsibles when an event is created."""
-        event_date, event_time = self._event_schedule_labels(event.data_inicio, event.hora_inicio)
-        self._send_owner_event_notification(
-            self._get_event_responsible_users(event),
-            subject=f"Evento criado: {event.nome}",
-            template_name='event_created_owner.html',
-            template_data={
-                'event_name': event.nome,
-                'event_type': event.tipo,
-                'event_date': event_date,
-                'event_time': event_time,
-                'event_status': event.status,
-                'event_link': build_absolute_app_url(f'/inscrever/{event.token_publico}'),
-                'manage_link': build_absolute_app_url('/eventos_admin'),
-                'year': datetime.now().year,
-            },
-        )
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        event_link = f"{app_url}/inscrever/{event.token_publico}" if app_url else f"/inscrever/{event.token_publico}"
+        manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
+        event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
+        event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
+
+        for owner in self._get_event_responsible_users(event):
+            if not owner.email:
+                continue
+
+            self.notification_service.send_email_task(
+                to_email=owner.email,
+                subject=f"Evento criado: {event.nome}",
+                template_name='event_created_owner.html',
+                template_data={
+                    'user_name': owner.nome or owner.username,
+                    'event_name': event.nome,
+                    'event_type': event.tipo,
+                    'event_date': event_date,
+                    'event_time': event_time,
+                    'event_status': event.status,
+                    'event_link': event_link,
+                    'manage_link': manage_link,
+                    'year': datetime.now().year,
+                },
+            )
 
     def _notify_owner_event_updated(self, event):
         """Sends an email confirmation to all event responsibles when an event is updated."""
-        event_date, event_time = self._event_schedule_labels(event.data_inicio, event.hora_inicio)
-        self._send_owner_event_notification(
-            self._get_event_responsible_users(event),
-            subject=f"Evento atualizado: {event.nome}",
-            template_name='event_updated_owner.html',
-            template_data={
-                'event_name': event.nome,
-                'event_type': event.tipo,
-                'event_date': event_date,
-                'event_time': event_time,
-                'event_status': event.status,
-                'event_link': build_absolute_app_url(f'/editar_evento/{event.id}'),
-                'manage_link': build_absolute_app_url('/eventos_admin'),
-                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
-                'year': datetime.now().year,
-            },
-        )
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        event_link = f"{app_url}/editar_evento/{event.id}" if app_url else f"/editar_evento/{event.id}"
+        manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
+        event_date = event.data_inicio.strftime('%d/%m/%Y') if event.data_inicio else '-'
+        event_time = event.hora_inicio.strftime('%H:%M') if event.hora_inicio else '-'
+
+        for owner in self._get_event_responsible_users(event):
+            if not owner.email:
+                continue
+
+            self.notification_service.send_email_task(
+                to_email=owner.email,
+                subject=f"Evento atualizado: {event.nome}",
+                template_name='event_updated_owner.html',
+                template_data={
+                    'user_name': owner.nome or owner.username,
+                    'event_name': event.nome,
+                    'event_type': event.tipo,
+                    'event_date': event_date,
+                    'event_time': event_time,
+                    'event_status': event.status,
+                    'event_link': event_link,
+                    'manage_link': manage_link,
+                    'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                    'year': datetime.now().year,
+                },
+            )
 
     def _notify_owner_event_deleted(self, responsible_users, event_name, event_type, event_date, event_time):
         """Sends an email confirmation to all event responsibles when an event is deleted."""
-        self._send_owner_event_notification(
-            responsible_users,
-            subject=f"Evento excluído: {event_name}",
-            template_name='event_deleted_owner.html',
-            template_data={
-                'event_name': event_name,
-                'event_type': event_type,
-                'event_date': event_date,
-                'event_time': event_time,
-                'manage_link': build_absolute_app_url('/eventos_admin'),
-                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
-                'year': datetime.now().year,
-            },
-        )
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        manage_link = f"{app_url}/eventos_admin" if app_url else '/eventos_admin'
+
+        for owner in responsible_users:
+            if not owner or not owner.email:
+                continue
+
+            self.notification_service.send_email_task(
+                to_email=owner.email,
+                subject=f"Evento excluído: {event_name}",
+                template_name='event_deleted_owner.html',
+                template_data={
+                    'user_name': owner.nome or owner.username,
+                    'event_name': event_name,
+                    'event_type': event_type,
+                    'event_date': event_date,
+                    'event_time': event_time,
+                    'manage_link': manage_link,
+                    'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                    'year': datetime.now().year,
+                },
+            )
 
     def update_event(self, event_id, user, data):
         """Updates an existing event's information and its associated activities.
@@ -1315,6 +1323,7 @@ class EventService:
         count = 0
         event = self.event_repo.get_by_id(event_id)
         event_name = event.nome if event else 'Evento'
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
         for cpf in cpfs:
             user = User.query.filter_by(cpf=cpf).first()
             if user and user.email:
@@ -1327,7 +1336,7 @@ class EventService:
                         'event_name': event_name,
                         'user_name': user.nome,
                         'message_text': body,
-                        'app_url': build_absolute_app_url('/'),
+                        'app_url': app_url,
                     },
                 )
                 count += 1
@@ -1428,12 +1437,9 @@ class EventService:
                     return existing, "Já inscrito"
                 raise
             if user.email:
-                event_date_value = activity.event.data_inicio if activity.event else None
-                event_time_value = activity.hora_atv
-                event_link = (
-                    build_absolute_app_url(f'/inscrever/{event.token_publico}')
-                    if event and event.token_publico else build_absolute_app_url('/meus_eventos')
-                )
+                app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+                event_date = activity.event.data_inicio.strftime('%d/%m/%Y') if activity.event and activity.event.data_inicio else ''
+                event_time = activity.hora_atv.strftime('%H:%M') if activity.hora_atv else ''
                 self.notification_service.send_email_task(
                     to_email=user.email,
                     subject=f"Inscrição Confirmada: {activity.nome}",
@@ -1441,13 +1447,13 @@ class EventService:
                     template_data={
                         'user_name': user.nome,
                         'event_name': activity.event.nome if activity.event else activity.nome,
-                        'event_date': event_date_value.strftime('%d/%m/%Y') if event_date_value else '',
-                        'event_time': event_time_value.strftime('%H:%M') if event_time_value else '',
+                        'event_date': event_date,
+                        'event_time': event_time,
                         'event_location': activity.local or '-',
                         'event_type': 'Atividade',
                         'event_description': activity.descricao or '',
-                        'event_details_url': event_link,
-                        'my_events_url': build_absolute_app_url('/meus_eventos'),
+                        'event_details_url': app_url,
+                        'my_events_url': f"{app_url}/meus_eventos" if app_url else '',
                         'cancel_url': '',
                     },
                 )
@@ -1530,6 +1536,7 @@ class EventService:
             self.enrollment_repo.save(enrollment)
 
         if user.email:
+            app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
             self.notification_service.send_email_task(
                 to_email=user.email,
                 subject=f"Presença Confirmada: {activity.nome}",
@@ -1538,7 +1545,7 @@ class EventService:
                     'user_name': user.nome,
                     'event_name': activity.event.nome if activity.event else '-',
                     'activity_name': activity.nome,
-                    'app_url': build_absolute_app_url('/meus_eventos'),
+                    'app_url': f"{app_url}/meus_eventos" if app_url else '',
                 },
             )
         return True, "Presença confirmada!", enrollment

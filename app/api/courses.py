@@ -1,6 +1,5 @@
-from flask import Blueprint, jsonify
-from flask_login import login_required
-from app.api.helpers import admin_required, json_error, parse_json_body, json_success
+from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
 from app.services.course_service import CourseService
 
 bp = Blueprint('courses_api', __name__, url_prefix='/api/courses')
@@ -14,35 +13,33 @@ def list_courses():
 
 @bp.route('/', methods=['POST'])
 @login_required
-@admin_required
 def create_course():
-    data, error = parse_json_body(required=True)
-    if error:
-        return error
-
-    course, msg = course_service.create_course(data)
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+    
+    course, msg = course_service.create_course(request.json)
     if course:
-        return json_success(msg, id=course.id, nome=course.nome)
-    return json_error(msg, 400)
+        return jsonify({"id": course.id, "nome": course.nome, "mensagem": msg})
+    return jsonify({"erro": msg}), 400
 
 @bp.route('/<int:course_id>', methods=['PUT'])
 @login_required
-@admin_required
 def update_course(course_id):
-    data, error = parse_json_body(required=True)
-    if error:
-        return error
-
-    course, msg = course_service.update_course(course_id, data)
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+        
+    course, msg = course_service.update_course(course_id, request.json)
     if course:
-        return json_success(msg, id=course.id, nome=course.nome)
-    return json_error(msg, 400)
+        return jsonify({"id": course.id, "nome": course.nome, "mensagem": msg})
+    return jsonify({"erro": msg}), 400
 
 @bp.route('/<int:course_id>', methods=['DELETE'])
 @login_required
-@admin_required
 def delete_course(course_id):
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+        
     success, msg = course_service.delete_course(course_id)
     if success:
-        return json_success(msg)
-    return json_error(msg, 400)
+        return jsonify({"mensagem": msg})
+    return jsonify({"erro": msg}), 400

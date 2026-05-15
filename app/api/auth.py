@@ -11,86 +11,6 @@ def _start_authenticated_session(user):
     login_user(user)
     session.permanent = True
 
-
-def _moodle_payload():
-    return request.form or request.get_json(silent=True) or {}
-
-
-def _moodle_login_disabled_response():
-    return jsonify({'status': 'error', 'message': 'Login AVA desativado.'}), 404
-
-
-def _extract_moodle_identity(payload):
-    cpf_field = (current_app.config.get('MOODLE_CPF_FIELD') or 'custom_cpf').strip()
-    cpf_raw = (
-        payload.get(cpf_field)
-        or payload.get('username')
-        or payload.get('ext_user_username')
-        or payload.get('custom_cpf')
-        or payload.get('cpf')
-        or payload.get('lis_person_sourcedid')
-        or payload.get('user_id')
-    )
-    nome = (
-        payload.get('lis_person_name_full')
-        or payload.get('name')
-        or f"{payload.get('lis_person_name_given', '').strip()} {payload.get('lis_person_name_family', '').strip()}".strip()
-    )
-    email = (payload.get('lis_person_contact_email_primary') or payload.get('email') or '').strip().lower()
-    return {
-        'cpf': normalize_cpf(cpf_raw),
-        'nome': nome,
-        'email': email,
-    }
-
-
-def _validate_moodle_consumer(payload):
-    expected_consumer_key = (current_app.config.get('MOODLE_TOOL_CONSUMER_KEY') or '').strip()
-    received_consumer_key = (
-        payload.get('oauth_consumer_key')
-        or payload.get('custom_oauth_consumer_key')
-        or ''
-    ).strip()
-
-    if expected_consumer_key:
-        if not received_consumer_key:
-            return jsonify({'status': 'error', 'message': 'oauth_consumer_key ausente no launch LTI.'}), 403
-        if received_consumer_key != expected_consumer_key:
-            return jsonify({'status': 'error', 'message': 'Consumer key da ferramenta externa inválido.'}), 403
-
-    shared_secret = (current_app.config.get('MOODLE_TOOL_SHARED_SECRET') or '').strip()
-    if shared_secret and not expected_consumer_key:
-        received_secret = (
-            payload.get('custom_ava_secret')
-            or payload.get('ava_secret')
-            or received_consumer_key
-            or ''
-        ).strip()
-        if not received_secret:
-            return jsonify({'status': 'error', 'message': 'Credencial da ferramenta externa ausente no launch (custom_ava_secret/oauth_consumer_key).'}), 403
-        if received_secret != shared_secret:
-            return jsonify({'status': 'error', 'message': 'Assinatura da ferramenta externa inválida.'}), 403
-
-    return None
-
-
-def _validate_moodle_allowed_domain(email):
-    allowed_domain = (current_app.config.get('MOODLE_ALLOWED_EMAIL_DOMAIN') or '').strip().lower()
-    if allowed_domain and (not email or not email.endswith(f'@{allowed_domain}')):
-        return jsonify({'status': 'error', 'message': 'Acesso restrito à comunidade acadêmica Unieuro.'}), 403
-    return None
-
-
-def _authenticate_moodle_identity(identity):
-    user = auth_service.authenticate_or_provision_from_moodle(
-        cpf=identity['cpf'],
-        nome=identity['nome'],
-        email=identity['email'],
-    )
-    if not user:
-        return None, jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
-    return user, None
-
 @bp.route('/login', methods=['POST'])
 def login():
     data = request.json
@@ -139,7 +59,7 @@ def session_ping():
 def ava_login_redirect():
     """Redirects users to Moodle AVA login/launch URL."""
     if not current_app.config.get('MOODLE_LOGIN_ENABLED'):
-        return _moodle_login_disabled_response()
+        return jsonify({'status': 'error', 'message': 'Login AVA desativado.'}), 404
 
     moodle_url = (current_app.config.get('MOODLE_LOGIN_URL') or '').strip()
     if not moodle_url:
@@ -152,7 +72,7 @@ def ava_login_redirect():
 def ava_launch_login():
     """Receives Moodle external tool launch and authenticates user by CPF."""
     if not current_app.config.get('MOODLE_LOGIN_ENABLED'):
-        return _moodle_login_disabled_response()
+        return jsonify({'status': 'error', 'message': 'Login AVA desativado.'}), 404
 
     if request.method == 'GET':
         query = request.args or {}
@@ -172,19 +92,68 @@ def ava_launch_login():
 
         return redirect(url_for('main.index'))
 
-    payload = _moodle_payload()
-    identity = _extract_moodle_identity(payload)
+    payload = request.form or request.json or {}
+    cpf_field = (current_app.config.get('MOODLE_CPF_FIELD') or 'custom_cpf').strip()
 
-    if not identity['cpf']:
+    cpf_raw = (
+        payload.get(cpf_field)
+        or payload.get('username')
+        or payload.get('ext_user_username')
+        or payload.get('custom_cpf')
+        or payload.get('cpf')
+        or payload.get('lis_person_sourcedid')
+        or payload.get('user_id')
+    )
+    cpf = normalize_cpf(cpf_raw)
+
+    if not cpf:
         return jsonify({'status': 'error', 'message': 'CPF não recebido do AVA.'}), 400
 
-    consumer_error = _validate_moodle_consumer(payload)
-    if consumer_error:
-        return consumer_error
+    email = (payload.get('lis_person_contact_email_primary') or payload.get('email') or '').strip().lower()
+    allowed_domain = (current_app.config.get('MOODLE_ALLOWED_EMAIL_DOMAIN') or '').strip().lower()
 
-    user, auth_error = _authenticate_moodle_identity(identity)
-    if auth_error:
-        return auth_error
+    expected_consumer_key = (current_app.config.get('MOODLE_TOOL_CONSUMER_KEY') or '').strip()
+    received_consumer_key = (
+        payload.get('oauth_consumer_key')
+        or payload.get('custom_oauth_consumer_key')
+        or ''
+    ).strip()
+
+    if expected_consumer_key:
+        if not received_consumer_key:
+            return jsonify({
+                'status': 'error',
+                'message': 'oauth_consumer_key ausente no launch LTI.'
+            }), 403
+        if received_consumer_key != expected_consumer_key:
+            return jsonify({'status': 'error', 'message': 'Consumer key da ferramenta externa inválido.'}), 403
+
+    # Legacy/fallback validation for custom shared secret mode.
+    shared_secret = (current_app.config.get('MOODLE_TOOL_SHARED_SECRET') or '').strip()
+    if shared_secret and not expected_consumer_key:
+        received_secret = (
+            payload.get('custom_ava_secret')
+            or payload.get('ava_secret')
+            or received_consumer_key
+            or ''
+        ).strip()
+        if not received_secret:
+            return jsonify({
+                'status': 'error',
+                'message': 'Credencial da ferramenta externa ausente no launch (custom_ava_secret/oauth_consumer_key).'
+            }), 403
+        if received_secret != shared_secret:
+            return jsonify({'status': 'error', 'message': 'Assinatura da ferramenta externa inválida.'}), 403
+
+    nome = (
+        payload.get('lis_person_name_full')
+        or payload.get('name')
+        or f"{payload.get('lis_person_name_given', '').strip()} {payload.get('lis_person_name_family', '').strip()}".strip()
+    )
+
+    user = auth_service.authenticate_or_provision_from_moodle(cpf=cpf, nome=nome, email=email)
+    if not user:
+        return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
 
     _start_authenticated_session(user)
     return redirect(url_for('main.index'))
@@ -194,21 +163,41 @@ def ava_launch_login():
 def ava_direct_login():
     """Direct login for community members when LTI activity is hidden/unavailable."""
     if not current_app.config.get('MOODLE_LOGIN_ENABLED'):
-        return _moodle_login_disabled_response()
+        return jsonify({'status': 'error', 'message': 'Login AVA desativado.'}), 404
 
-    payload = _moodle_payload()
-    identity = _extract_moodle_identity(payload)
+    payload = request.form or request.json or {}
+    cpf_field = (current_app.config.get('MOODLE_CPF_FIELD') or 'custom_cpf').strip()
 
-    if not identity['cpf']:
+    cpf_raw = (
+        payload.get(cpf_field)
+        or payload.get('username')
+        or payload.get('ext_user_username')
+        or payload.get('custom_cpf')
+        or payload.get('cpf')
+        or payload.get('lis_person_sourcedid')
+        or payload.get('user_id')
+    )
+    cpf = normalize_cpf(cpf_raw)
+
+    if not cpf:
         return jsonify({'status': 'error', 'message': 'CPF não recebido.'}), 400
 
-    allowed_domain_error = _validate_moodle_allowed_domain(identity['email'])
-    if allowed_domain_error:
-        return allowed_domain_error
+    email = (payload.get('lis_person_contact_email_primary') or payload.get('email') or '').strip().lower()
+    allowed_domain = (current_app.config.get('MOODLE_ALLOWED_EMAIL_DOMAIN') or '').strip().lower()
 
-    user, auth_error = _authenticate_moodle_identity(identity)
-    if auth_error:
-        return auth_error
+    if allowed_domain:
+        if not email or not email.endswith(f'@{allowed_domain}'):
+            return jsonify({'status': 'error', 'message': 'Acesso restrito à comunidade acadêmica Unieuro.'}), 403
+
+    nome = (
+        payload.get('lis_person_name_full')
+        or payload.get('name')
+        or f"{payload.get('lis_person_name_given', '').strip()} {payload.get('lis_person_name_family', '').strip()}".strip()
+    )
+
+    user = auth_service.authenticate_or_provision_from_moodle(cpf=cpf, nome=nome, email=email)
+    if not user:
+        return jsonify({'status': 'error', 'message': 'Não foi possível autenticar via AVA.'}), 401
 
     _start_authenticated_session(user)
     return redirect(url_for('main.index'))

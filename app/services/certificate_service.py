@@ -3,7 +3,6 @@ import json
 import secrets
 import html
 import re
-import stat
 from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, A4
@@ -899,12 +898,7 @@ class CertificateService:
             os.makedirs(os.path.dirname(temp_filepath), exist_ok=True)
             c.save()
         try:
-            # On Windows, replacing a read-only file fails unless the write bit is restored first.
-            if os.path.exists(filepath):
-                try:
-                    os.chmod(filepath, os.stat(filepath).st_mode | stat.S_IWUSR)
-                except OSError:
-                    pass
+            # Replace atomically so an older read-only file does not block regeneration.
             os.replace(temp_filepath, filepath)
         finally:
             if os.path.exists(temp_filepath):

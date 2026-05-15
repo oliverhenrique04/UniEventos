@@ -3,7 +3,6 @@ from datetime import date, time
 from pathlib import Path
 
 import pytest
-from flask import current_app
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
@@ -782,27 +781,3 @@ def test_list_events_paginated_owner_filter_finds_primary_and_co_responsible(app
     assert [event.id for event in primary_page.items] == [shared_event.id]
     assert [event.id for event in co_username_page.items] == [shared_event.id]
     assert [event.id for event in co_name_page.items] == [shared_event.id]
-
-
-def test_event_service_create_notification_uses_base_path_links(app):
-    with app.app_context():
-        current_app.config['BASE_URL'] = 'https://portal.unieuro.br'
-        current_app.config['BASE_PATH'] = '/unieventos'
-
-        owner = _persist_user(
-            'notify_base_path_owner',
-            role='professor',
-            cpf='90000000043',
-            can_create_events=True,
-            email='notify_base_path_owner@test.local',
-        )
-        service = EventService()
-        sent_payloads = []
-        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
-
-        service.create_event(owner.username, _event_payload(nome='Evento Base Path Notificacao'))
-
-        assert len(sent_payloads) == 1
-        template_data = sent_payloads[0]['template_data']
-        assert template_data['event_link'].startswith('https://portal.unieuro.br/unieventos/inscrever/')
-        assert template_data['manage_link'] == 'https://portal.unieuro.br/unieventos/eventos_admin'

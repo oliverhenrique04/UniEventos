@@ -8,7 +8,7 @@ from datetime import datetime
 import csv
 import io
 from openpyxl import load_workbook
-from app.utils import build_absolute_app_url, normalize_cpf
+from app.utils import normalize_cpf
 
 class AdminService:
     """Service layer for administrative user management tasks.
@@ -218,9 +218,16 @@ class AdminService:
             return
 
         event = activity.event
-        event_path = f"/inscrever/{event.token_publico}" if event and event.token_publico else '/meus_eventos'
-        event_details_url = build_absolute_app_url(event_path)
-        my_events_url = build_absolute_app_url('/meus_eventos')
+        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
+        event_path = f"/inscrever/{event.token_publico}" if event and event.token_publico else ''
+        my_events_path = '/meus_eventos'
+
+        event_details_url = (
+            f"{app_url}{event_path}" if app_url and event_path else
+            event_path or
+            (f"{app_url}{my_events_path}" if app_url else my_events_path)
+        )
+        my_events_url = f"{app_url}{my_events_path}" if app_url else my_events_path
 
         event_date_value = activity.data_atv or (event.data_inicio if event else None)
         event_time_value = activity.hora_atv or (event.hora_inicio if event else None)

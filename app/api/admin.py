@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
-from app.api.helpers import admin_required, json_error, json_success, parse_json_body
 from app.services.admin_service import AdminService
 from app.services.event_service import EventService
 from app.serializers import serialize_user
@@ -261,94 +260,6 @@ def _build_import_job_payload(job_id, page, per_page, filter_field, filter_query
         }
 
 
-def _uploaded_file_or_error(field_name='file'):
-    if field_name not in request.files:
-        return None, (jsonify({'erro': 'Nenhum arquivo enviado'}), 400)
-
-    uploaded_file = request.files[field_name]
-    if not uploaded_file or uploaded_file.filename == '':
-        return None, (jsonify({'erro': 'Nenhum arquivo selecionado'}), 400)
-
-    return uploaded_file, None
-
-
-def _new_import_job(import_type, created_by):
-    return {
-        'job_id': uuid4().hex,
-        'import_type': import_type,
-        'status': 'queued',
-        'completed': False,
-        'message': 'Importação iniciada.',
-        'created_by': created_by,
-        'updated_at': time.time(),
-        'total_rows': 0,
-        'processed_rows': 0,
-        'created': 0,
-        'updated': 0,
-        'unchanged': 0,
-        'errors_count': 0,
-        'ignored_columns': [],
-        'rows': [],
-    }
-
-
-def _start_async_import(import_type, worker_target):
-    uploaded_file, error_response = _uploaded_file_or_error()
-    if error_response:
-        return error_response
-
-    with _IMPORT_JOBS_LOCK:
-        active_job = _get_active_job_for_user(current_user.username)
-        if active_job:
-            return jsonify({
-                'job_id': active_job['job_id'],
-                'import_type': active_job.get('import_type'),
-                'message': 'Já existe uma importação em andamento para este usuário.',
-                'reused': True,
-            }), 202
-
-    file_content = uploaded_file.read()
-
-    with _IMPORT_JOBS_LOCK:
-        active_job = _get_active_job_for_user(current_user.username)
-        if active_job:
-            return jsonify({
-                'job_id': active_job['job_id'],
-                'import_type': active_job.get('import_type'),
-                'message': 'Já existe uma importação em andamento para este usuário.',
-                'reused': True,
-            }), 202
-
-        job = _new_import_job(import_type, current_user.username)
-        _IMPORT_JOBS[job['job_id']] = job
-        _persist_job(job)
-
-    app_obj = current_app._get_current_object()
-    try:
-        Thread(target=worker_target, args=(job['job_id'], file_content, app_obj), daemon=True).start()
-    except Exception:
-        with _IMPORT_JOBS_LOCK:
-            _IMPORT_JOBS.pop(job['job_id'], None)
-        try:
-            _job_file_path(job['job_id']).unlink()
-        except FileNotFoundError:
-            pass
-        raise
-
-    return jsonify({'job_id': job['job_id'], 'import_type': import_type, 'message': 'Importação em processamento.'})
-
-
-def _import_status_response(job_id):
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-    filter_field = request.args.get('field', 'all', type=str)
-    filter_query = request.args.get('q', '', type=str)
-    payload = _build_import_job_payload(job_id, page, per_page, filter_field, filter_query)
-    if not payload:
-        return jsonify({'erro': 'Job não encontrado.'}), 404
-    return jsonify(payload)
-
-
 def _cert_generated_dir() -> Path:
     return Path(current_app.root_path) / 'static' / 'certificates' / 'generated'
 
@@ -521,7 +432,51 @@ def importar_alunos_xlsx_start():
     if current_user.role != 'admin':
         return jsonify({"erro": "Negado"}), 403
 
-    return _start_async_import('xlsx', _run_xlsx_import_job)
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+
+    with _IMPORT_JOBS_LOCK:
+        active_job = _get_active_job_for_user(current_user.username)
+        if active_job:
+            return jsonify({
+                'job_id': active_job['job_id'],
+                'import_type': active_job.get('import_type'),
+                'message': 'Já existe uma importação em andamento para este usuário.',
+                'reused': True,
+            }), 202
+
+    job_id = uuid4().hex
+    file_content = file.read()
+
+    with _IMPORT_JOBS_LOCK:
+        _IMPORT_JOBS[job_id] = {
+            'job_id': job_id,
+            'import_type': 'xlsx',
+            'status': 'queued',
+            'completed': False,
+            'message': 'Importação iniciada.',
+            'created_by': current_user.username,
+            'updated_at': time.time(),
+            'total_rows': 0,
+            'processed_rows': 0,
+            'created': 0,
+            'updated': 0,
+            'unchanged': 0,
+            'errors_count': 0,
+            'ignored_columns': [],
+            'rows': [],
+        }
+        _persist_job(_IMPORT_JOBS[job_id])
+
+    app_obj = current_app._get_current_object()
+    worker = Thread(target=_run_xlsx_import_job, args=(job_id, file_content, app_obj), daemon=True)
+    worker.start()
+
+    return jsonify({'job_id': job_id, 'import_type': 'xlsx', 'message': 'Importação em processamento.'})
 
 
 @bp.route('/importar_usuarios_csv/start', methods=['POST'])
@@ -530,7 +485,51 @@ def importar_usuarios_csv_start():
     if current_user.role != 'admin':
         return jsonify({"erro": "Negado"}), 403
 
-    return _start_async_import('csv', _run_users_csv_import_job)
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+
+    with _IMPORT_JOBS_LOCK:
+        active_job = _get_active_job_for_user(current_user.username)
+        if active_job:
+            return jsonify({
+                'job_id': active_job['job_id'],
+                'import_type': active_job.get('import_type'),
+                'message': 'Já existe uma importação em andamento para este usuário.',
+                'reused': True,
+            }), 202
+
+    job_id = uuid4().hex
+    file_content = file.read()
+
+    with _IMPORT_JOBS_LOCK:
+        _IMPORT_JOBS[job_id] = {
+            'job_id': job_id,
+            'import_type': 'csv',
+            'status': 'queued',
+            'completed': False,
+            'message': 'Importação iniciada.',
+            'created_by': current_user.username,
+            'updated_at': time.time(),
+            'total_rows': 0,
+            'processed_rows': 0,
+            'created': 0,
+            'updated': 0,
+            'unchanged': 0,
+            'errors_count': 0,
+            'ignored_columns': [],
+            'rows': [],
+        }
+        _persist_job(_IMPORT_JOBS[job_id])
+
+    app_obj = current_app._get_current_object()
+    worker = Thread(target=_run_users_csv_import_job, args=(job_id, file_content, app_obj), daemon=True)
+    worker.start()
+
+    return jsonify({'job_id': job_id, 'import_type': 'csv', 'message': 'Importação em processamento.'})
 
 
 @bp.route('/importar_alunos_xlsx/status/<job_id>', methods=['GET'])
@@ -539,7 +538,14 @@ def importar_alunos_xlsx_status(job_id):
     if current_user.role != 'admin':
         return jsonify({"erro": "Negado"}), 403
 
-    return _import_status_response(job_id)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    filter_field = request.args.get('field', 'all', type=str)
+    filter_query = request.args.get('q', '', type=str)
+    payload = _build_import_job_payload(job_id, page, per_page, filter_field, filter_query)
+    if not payload:
+        return jsonify({'erro': 'Job não encontrado.'}), 404
+    return jsonify(payload)
 
 
 @bp.route('/importar_usuarios_csv/status/<job_id>', methods=['GET'])
@@ -548,37 +554,41 @@ def importar_usuarios_csv_status(job_id):
     if current_user.role != 'admin':
         return jsonify({"erro": "Negado"}), 403
 
-    return _import_status_response(job_id)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    filter_field = request.args.get('field', 'all', type=str)
+    filter_query = request.args.get('q', '', type=str)
+    payload = _build_import_job_payload(job_id, page, per_page, filter_field, filter_query)
+    if not payload:
+        return jsonify({'erro': 'Job não encontrado.'}), 404
+    return jsonify(payload)
 
 @bp.route('/atualizar_permissoes', methods=['POST'])
 @login_required
-@admin_required
 def atualizar_permissoes():
-    data, error = parse_json_body(required=True)
-    if error:
-        return error
-
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+        
+    data = request.json
     success, msg = admin_service.update_user_permissions(
         data.get('username'), 
         data.get('can_create_events')
     )
-    if success:
-        return json_success(msg)
-    return json_error(msg, 400)
+    if success: return jsonify({"mensagem": msg})
+    return jsonify({"erro": msg}), 400
 
 @bp.route('/permissoes_curso_lote', methods=['POST'])
 @login_required
-@admin_required
 def permissoes_curso_lote():
-    data, error = parse_json_body(required=True)
-    if error:
-        return error
-
+    if current_user.role != 'admin':
+        return jsonify({"erro": "Negado"}), 403
+        
+    data = request.json
     count, msg = admin_service.bulk_update_permissions_by_course(
         data.get('course_id'), 
         data.get('can_create_events')
     )
-    return json_success(msg, count=count)
+    return jsonify({"mensagem": msg, "count": count})
 
 
 @bp.route('/admin/certificados/cache/cleanup', methods=['POST'])

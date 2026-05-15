@@ -1,7 +1,6 @@
 import json
 from io import BytesIO
 from datetime import date, time
-import pytest
 from app.models import (
     Event,
     Activity,
@@ -19,7 +18,6 @@ from openpyxl import Workbook
 from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.api import admin as admin_api
-from app.api import auth as auth_api
 from app.api import certificates as certificates_api
 
 
@@ -35,11 +33,6 @@ def _extract_main_nav(html):
     start = html.index('<nav class="navbar navbar-expand-lg app-navbar sticky-top">')
     end = html.index('</nav>', start)
     return html[start:end]
-
-
-def _assert_nav_links(nav_html, expected_links):
-    for href in ['/cursos', '/usuarios', '/analitico', '/eventos_admin']:
-        assert (f'href="{href}"' in nav_html) is (href in expected_links)
 
 
 def _create_event_for_certs(app, owner_username='admin_test'):
@@ -896,7 +889,7 @@ def test_protected_api_returns_401_json_when_not_authenticated(client):
     assert res.get_json()['session_expired'] is True
 
 
-def test_dashboard_page_no_longer_renders_management_analytics(client, app, admin_user, auth_session):
+def test_dashboard_page_no_longer_renders_management_analytics(client, app, admin_user):
     seeded = _seed_dashboard_analytics_data(app)
 
     _login_admin(client)
@@ -905,41 +898,28 @@ def test_dashboard_page_no_longer_renders_management_analytics(client, app, admi
     assert 'id="modalSessionWarning"' in admin_html
     assert 'id="btnSessionWarningKeepAlive"' in admin_html
 
-    auth_session.switch(seeded['gestor_username'])
+    client.get('/api/logout')
+    _login_user(client, seeded['gestor_username'])
     gestor_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in gestor_html
 
-    auth_session.switch(seeded['coord_username'])
+    client.get('/api/logout')
+    _login_user(client, seeded['coord_username'])
     coord_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in coord_html
 
-    auth_session.switch(seeded['prof_eng_a_username'])
+    client.get('/api/logout')
+    _login_user(client, seeded['prof_eng_a_username'])
     professor_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in professor_html
 
-    auth_session.switch(seeded['participant_username'])
+    client.get('/api/logout')
+    _login_user(client, seeded['participant_username'])
     participante_html = client.get('/').get_data(as_text=True)
     assert 'Painel Analítico de Gestão' not in participante_html
 
 
-@pytest.mark.parametrize(
-    ('username_key', 'expected_links'),
-    [
-        ('gestor_username', {'/cursos', '/usuarios', '/analitico', '/eventos_admin'}),
-        ('coord_username', {'/analitico', '/eventos_admin'}),
-        ('participant_username', set()),
-    ],
-)
-def test_authenticated_navbar_links_by_role_matrix(client, app, admin_user, auth_session, username_key, expected_links):
-    seeded = _seed_dashboard_analytics_data(app)
-
-    auth_session.login(seeded[username_key])
-    nav_html = _extract_main_nav(client.get('/').get_data(as_text=True))
-
-    _assert_nav_links(nav_html, expected_links)
-
-
-def test_authenticated_navbar_keeps_mobile_collapse_and_role_links(client, app, admin_user, auth_session):
+def test_authenticated_navbar_keeps_mobile_collapse_and_role_links(client, app, admin_user):
     seeded = _seed_dashboard_analytics_data(app)
 
     _login_admin(client)
@@ -949,25 +929,52 @@ def test_authenticated_navbar_keeps_mobile_collapse_and_role_links(client, app, 
     assert 'data-bs-target="#navbarMain"' in admin_html
     assert 'aria-controls="navbarMain"' in admin_html
     assert 'collapse navbar-collapse app-navbar__panel' in admin_html
-    _assert_nav_links(admin_nav, {'/cursos', '/usuarios', '/analitico', '/eventos_admin'})
+    assert 'href="/cursos"' in admin_nav
+    assert 'href="/usuarios"' in admin_nav
+    assert 'href="/analitico"' in admin_nav
+    assert 'href="/eventos_admin"' in admin_nav
+
+    client.get('/api/logout')
+    _login_user(client, seeded['gestor_username'])
+    gestor_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
+    assert 'href="/cursos"' in gestor_nav
+    assert 'href="/usuarios"' in gestor_nav
+    assert 'href="/analitico"' in gestor_nav
+    assert 'href="/eventos_admin"' in gestor_nav
+
+    client.get('/api/logout')
+    _login_user(client, seeded['coord_username'])
+    coord_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
+    assert 'href="/cursos"' not in coord_nav
+    assert 'href="/usuarios"' not in coord_nav
+    assert 'href="/analitico"' in coord_nav
+    assert 'href="/eventos_admin"' in coord_nav
 
     with app.app_context():
         participant = db.session.get(User, seeded['participant_username'])
         participant.can_create_events = True
         db.session.commit()
 
-    auth_session.switch(seeded['participant_username'])
+    client.get('/api/logout')
+    _login_user(client, seeded['participant_username'])
     creator_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
-    _assert_nav_links(creator_nav, {'/eventos_admin'})
+    assert 'href="/eventos_admin"' in creator_nav
+    assert 'href="/cursos"' not in creator_nav
+    assert 'href="/usuarios"' not in creator_nav
+    assert 'href="/analitico"' not in creator_nav
 
     with app.app_context():
         participant = db.session.get(User, seeded['participant_username'])
         participant.can_create_events = False
         db.session.commit()
 
-    auth_session.switch(seeded['participant_username'])
+    client.get('/api/logout')
+    _login_user(client, seeded['participant_username'])
     participant_nav = _extract_main_nav(client.get('/').get_data(as_text=True))
-    _assert_nav_links(participant_nav, set())
+    assert 'href="/eventos_admin"' not in participant_nav
+    assert 'href="/cursos"' not in participant_nav
+    assert 'href="/usuarios"' not in participant_nav
+    assert 'href="/analitico"' not in participant_nav
 
 
 def test_dashboard_hides_event_management_when_user_has_no_visible_records(client, admin_user):
@@ -989,7 +996,7 @@ def test_dashboard_keeps_event_management_when_visible_records_exist(client, app
     assert '<h4 class="fw-bold mb-2">Gestão de Eventos</h4>' in html
 
 
-def test_analytics_page_visibility_by_role(client, app, admin_user, auth_session):
+def test_analytics_page_visibility_by_role(client, app, admin_user):
     seeded = _seed_dashboard_analytics_data(app)
 
     _login_admin(client)
@@ -998,36 +1005,28 @@ def test_analytics_page_visibility_by_role(client, app, admin_user, auth_session
     assert admin_res.status_code == 200
     assert 'Painel Analítico de Gestão' in admin_html
 
-    auth_session.switch(seeded['gestor_username'])
+    client.get('/logout')
+    _login_user(client, seeded['gestor_username'])
     gestor_res = client.get('/analitico')
     gestor_html = gestor_res.get_data(as_text=True)
     assert gestor_res.status_code == 200
     assert 'Painel Analítico de Gestão' in gestor_html
 
-    auth_session.switch(seeded['coord_username'])
+    client.get('/logout')
+    _login_user(client, seeded['coord_username'])
     coord_res = client.get('/analitico')
     coord_html = coord_res.get_data(as_text=True)
     assert coord_res.status_code == 200
     assert 'Painel Analítico de Gestão' in coord_html
     assert 'id="analyticsCourseFilter" disabled' in coord_html
 
+    client.get('/logout')
+    _login_user(client, seeded['prof_eng_a_username'])
+    assert client.get('/analitico').status_code == 403
 
-@pytest.mark.parametrize(
-    ('username_key', 'expected_status'),
-    [
-        ('gestor_username', 200),
-        ('coord_username', 200),
-        ('prof_eng_a_username', 403),
-        ('participant_username', 403),
-    ],
-)
-def test_analytics_page_visibility_matrix(client, app, admin_user, auth_session, username_key, expected_status):
-    seeded = _seed_dashboard_analytics_data(app)
-
-    auth_session.login(seeded[username_key])
-    res = client.get('/analitico')
-
-    assert res.status_code == expected_status
+    client.get('/logout')
+    _login_user(client, seeded['participant_username'])
+    assert client.get('/analitico').status_code == 403
 
 
 def test_dashboard_analytics_coordinator_is_scoped_to_own_course(client, app):
@@ -1925,169 +1924,6 @@ def test_importar_usuarios_csv_start_and_status_update_existing_user(client, app
         assert created.nome == 'Novo Usuario Async'
         assert created.role == 'participante'
         assert created.curso == 'Curso CSV Async'
-
-
-def test_importar_alunos_xlsx_start_and_status_processes_file(client, app, admin_user, monkeypatch):
-    with app.app_context():
-        db.session.add(Course(nome='Direito Async'))
-        db.session.commit()
-
-    class ImmediateThread:
-        def __init__(self, target=None, args=None, daemon=None):
-            self.target = target
-            self.args = args or ()
-
-        def start(self):
-            self.target(*self.args)
-
-    monkeypatch.setattr(admin_api, 'Thread', ImmediateThread)
-
-    _login_admin(client)
-    xlsx = _build_students_xlsx_for_api([
-        ['Aluno Async', 'Uni', 'Direito Async', 'T1', '12345678901', '', '', '', '', '', 'RA-ASYNC-01', '', '', '', '', '', '', '', 1, 'async@example.com']
-    ])
-
-    start_res = client.post(
-        '/api/importar_alunos_xlsx/start',
-        data={'file': (xlsx, 'alunos_async.xlsx')},
-        content_type='multipart/form-data',
-    )
-
-    assert start_res.status_code == 200
-    start_payload = start_res.get_json()
-    assert start_payload['job_id']
-    assert start_payload['import_type'] == 'xlsx'
-
-    status_res = client.get(
-        f"/api/importar_alunos_xlsx/status/{start_payload['job_id']}?page=1&per_page=10"
-    )
-
-    assert status_res.status_code == 200
-    payload = status_res.get_json()
-    assert payload['completed'] is True
-    assert payload['status'] == 'completed'
-    assert payload['import_type'] == 'xlsx'
-    assert payload['created'] == 1
-    assert payload['updated'] == 0
-    assert payload['errors_count'] == 0
-    assert payload['pagination']['total_items'] == 1
-    assert payload['rows'][0]['status'] == 'created'
-
-
-def test_importar_alunos_xlsx_start_read_failure_does_not_leave_active_job(client, admin_user, monkeypatch):
-    class BrokenUpload:
-        filename = 'alunos_broken.xlsx'
-
-        def read(self):
-            raise OSError('read failed')
-
-    original_uploaded_file_or_error = admin_api._uploaded_file_or_error
-    helper_calls = {'count': 0}
-
-    def fake_uploaded_file_or_error(field_name='file'):
-        helper_calls['count'] += 1
-        if helper_calls['count'] == 1:
-            return BrokenUpload(), None
-        return original_uploaded_file_or_error(field_name)
-
-    class ImmediateThread:
-        def __init__(self, target=None, args=None, daemon=None):
-            self.target = target
-            self.args = args or ()
-
-        def start(self):
-            self.target(*self.args)
-
-    monkeypatch.setattr(admin_api, '_uploaded_file_or_error', fake_uploaded_file_or_error)
-    monkeypatch.setattr(admin_api, 'Thread', ImmediateThread)
-
-    _login_admin(client)
-
-    with pytest.raises(OSError, match='read failed'):
-        client.post('/api/importar_alunos_xlsx/start', data={})
-
-    assert admin_api._get_active_job_for_user(admin_user.username) is None
-
-    xlsx = _build_students_xlsx_for_api([
-        ['Aluno Retry', 'Uni', 'Direito Retry', 'T1', '12345678910', '', '', '', '', '', 'RA-RETRY-01', '', '', '', '', '', '', '', 1, 'retry@example.com']
-    ])
-
-    retry_res = client.post(
-        '/api/importar_alunos_xlsx/start',
-        data={'file': (xlsx, 'alunos_retry.xlsx')},
-        content_type='multipart/form-data',
-    )
-
-    assert retry_res.status_code == 200
-    retry_payload = retry_res.get_json()
-    assert retry_payload['import_type'] == 'xlsx'
-    assert retry_payload.get('reused') is None
-
-
-def test_importar_alunos_xlsx_start_reuses_active_job_without_reading_new_upload(client, admin_user, monkeypatch):
-    existing_job = admin_api._new_import_job('xlsx', admin_user.username)
-
-    with admin_api._IMPORT_JOBS_LOCK:
-        admin_api._IMPORT_JOBS[existing_job['job_id']] = existing_job
-
-    class ExplodingUpload:
-        filename = 'should-not-read.xlsx'
-
-        def read(self):
-            raise AssertionError('upload should not be read when reusing active job')
-
-    monkeypatch.setattr(admin_api, '_uploaded_file_or_error', lambda field_name='file': (ExplodingUpload(), None))
-
-    _login_admin(client)
-
-    try:
-        res = client.post('/api/importar_alunos_xlsx/start', data={})
-
-        assert res.status_code == 202
-        payload = res.get_json()
-        assert payload['job_id'] == existing_job['job_id']
-        assert payload['import_type'] == 'xlsx'
-        assert payload['reused'] is True
-    finally:
-        with admin_api._IMPORT_JOBS_LOCK:
-            admin_api._IMPORT_JOBS.pop(existing_job['job_id'], None)
-
-def test_importar_alunos_xlsx_start_thread_failure_cleans_up_persisted_job(client, admin_user, monkeypatch):
-    with admin_api._IMPORT_JOBS_LOCK:
-        stale_job_ids = [
-            job_id for job_id, job in admin_api._IMPORT_JOBS.items()
-            if job.get('created_by') == 'admin_test' and not job.get('completed')
-        ]
-        for job_id in stale_job_ids:
-            admin_api._IMPORT_JOBS.pop(job_id, None)
-
-    started_job_ids = []
-
-    class FailingThread:
-        def __init__(self, target=None, args=None, daemon=None):
-            self.args = args or ()
-
-        def start(self):
-            started_job_ids.append(self.args[0])
-            raise RuntimeError('thread failed to start')
-
-    monkeypatch.setattr(admin_api, 'Thread', FailingThread)
-
-    _login_admin(client)
-    xlsx = _build_students_xlsx_for_api([
-        ['Aluno Thread Fail', 'Uni', 'Direito Thread', 'T1', '12345678911', '', '', '', '', '', 'RA-THREAD-01', '', '', '', '', '', '', '', 1, 'thread@example.com']
-    ])
-
-    with pytest.raises(RuntimeError, match='thread failed to start'):
-        client.post(
-            '/api/importar_alunos_xlsx/start',
-            data={'file': (xlsx, 'alunos_thread_fail.xlsx')},
-            content_type='multipart/form-data',
-        )
-
-    assert len(started_job_ids) == 1
-    assert admin_api._get_active_job_for_user('admin_test') is None
-    assert admin_api._load_job(started_job_ids[0]) is None
 
 
 def test_create_user_admin_endpoint_uses_cpf_as_username(client, admin_user):
@@ -3580,105 +3416,6 @@ def test_profile_certificates_return_public_download_and_preview_urls(client, ap
     assert inst_item['preview_url'].startswith('/api/institutional_certificates/preview_public/')
 
 
-def test_create_course_without_json_returns_structured_400(client, admin_user):
-    _login_admin(client)
-
-    res = client.post(
-        '/api/courses/',
-        data='',
-        content_type='application/json',
-    )
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Payload JSON obrigatório.'}
-
-
-def test_admin_update_permissions_without_json_returns_structured_400(client, admin_user):
-    _login_admin(client)
-
-    res = client.post(
-        '/api/atualizar_permissoes',
-        data='',
-        content_type='application/json',
-    )
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Payload JSON obrigatório.'}
-
-
-def test_create_course_with_malformed_json_returns_structured_400(client, admin_user):
-    _login_admin(client)
-
-    res = client.post(
-        '/api/courses/',
-        data='{"nome":',
-        content_type='application/json',
-    )
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Payload JSON inválido.'}
-
-
-def test_admin_update_permissions_with_malformed_json_returns_structured_400(client, admin_user):
-    _login_admin(client)
-
-    res = client.post(
-        '/api/atualizar_permissoes',
-        data='{"username":',
-        content_type='application/json',
-    )
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Payload JSON inválido.'}
-
-
-def test_create_course_service_failure_returns_400_json(client, admin_user):
-    _login_admin(client)
-
-    res = client.post('/api/courses/', json={})
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Nome do curso é obrigatório.'}
-
-
-def test_update_course_service_failure_returns_400_json(client, admin_user):
-    _login_admin(client)
-
-    res = client.put('/api/courses/999999', json={'nome': 'Curso inexistente'})
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Curso não encontrado.'}
-
-
-def test_delete_course_service_failure_returns_400_json(client, admin_user):
-    _login_admin(client)
-
-    res = client.delete('/api/courses/999999')
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Curso não encontrado.'}
-
-
-def test_admin_update_permissions_service_failure_returns_400_json(client, admin_user):
-    _login_admin(client)
-
-    res = client.post('/api/atualizar_permissoes', json={
-        'username': 'usuario_inexistente',
-        'can_create_events': True,
-    })
-
-    assert res.status_code == 400
-    assert res.is_json
-    assert res.get_json() == {'erro': 'Usuário não encontrado.'}
-
-
 def test_importar_alunos_xlsx_requires_admin(client, app, admin_user):
     with app.app_context():
         participant = User(
@@ -3757,40 +3494,6 @@ def test_password_forgot_always_returns_success(client):
     res = client.post('/api/password/forgot', json={'email': 'naoexiste@test.local'})
     assert res.status_code == 200
     assert 'mensagem' in res.get_json()
-
-
-def test_extract_moodle_identity_reads_cpf_name_and_email(app):
-    payload = {
-        'username': '123.456.789-01',
-        'lis_person_name_given': 'Maria',
-        'lis_person_name_family': 'Silva',
-        'lis_person_contact_email_primary': 'Maria.Silva@unieuro.edu.br',
-    }
-
-    with app.app_context():
-        identity = auth_api._extract_moodle_identity(payload)
-
-    assert identity == {
-        'cpf': '12345678901',
-        'nome': 'Maria Silva',
-        'email': 'maria.silva@unieuro.edu.br',
-    }
-
-
-def test_ava_direct_rejects_email_outside_allowed_domain(client, app):
-    app.config.update(
-        MOODLE_LOGIN_ENABLED=True,
-        MOODLE_ALLOWED_EMAIL_DOMAIN='unieuro.edu.br',
-    )
-
-    res = client.post('/api/ava/direct', json={
-        'username': '12345678901',
-        'email': 'externo@test.local',
-        'name': 'Pessoa Externa',
-    })
-
-    assert res.status_code == 403
-    assert res.get_json()['message'] == 'Acesso restrito à comunidade acadêmica Unieuro.'
 
 
 def test_password_reset_with_token_updates_password(client, app, admin_user):
