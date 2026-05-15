@@ -4,6 +4,7 @@ import os
 from io import BytesIO
 from datetime import date, datetime, time, timezone
 from types import SimpleNamespace
+from flask import current_app
 from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.services.certificate_service import CertificateService
@@ -656,6 +657,108 @@ def test_event_service_delete_event_sends_email_to_owner(app):
         assert sent_payloads[0]['to_email'] == 'owner_delete@test.local'
 
 
+def test_admin_service_manual_enroll_uses_base_path_in_urls(app, admin_user):
+    with app.app_context():
+        current_app.config['BASE_URL'] = 'https://portal.unieuro.br'
+        current_app.config['BASE_PATH'] = '/unieventos'
+
+        participant = User(
+            username='manual_base_path_user',
+            role='participante',
+            nome='Participante Base Path',
+            cpf='11122233366',
+            email='manual_base_path@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Base Path',
+            descricao='Descricao',
+            tipo='PADRAO',
+            token_publico='token-base-path',
+            data_inicio=date(2030, 4, 10),
+            hora_inicio=time(18, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade Base Path',
+            local='Laboratorio',
+            descricao='Descricao atividade',
+            data_atv=date(2030, 4, 11),
+            hora_atv=time(19, 30),
+            carga_horaria=4,
+            vagas=25,
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        sent_payloads = []
+        service = AdminService()
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        success, msg = service.manual_enroll(participant.cpf, activity.id)
+
+        assert success is True
+        assert msg == 'Inscrição realizada com sucesso.'
+        assert sent_payloads[0]['template_data']['event_details_url'] == 'https://portal.unieuro.br/unieventos/inscrever/token-base-path'
+        assert sent_payloads[0]['template_data']['my_events_url'] == 'https://portal.unieuro.br/unieventos/meus_eventos'
+
+
+def test_auth_service_request_password_reset_uses_base_path_in_reset_url(app):
+    with app.app_context():
+        current_app.config['BASE_URL'] = 'https://portal.unieuro.br'
+        current_app.config['BASE_PATH'] = '/unieventos'
+
+        user = User(
+            username='reset_base_path_user',
+            role='participante',
+            nome='Reset Base Path',
+            cpf='44455566677',
+            email='reset_base_path@test.local',
+        )
+        user.set_password('1234')
+        db.session.add(user)
+        db.session.commit()
+
+        sent_payloads = []
+        service = AuthService()
+        service.notifier.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        result = service.request_password_reset('reset_base_path@test.local')
+
+        assert result is True
+        assert sent_payloads[0]['template_data']['reset_url'].startswith(
+            'https://portal.unieuro.br/unieventos/resetar-senha/'
+        )
+
+
+def test_auth_service_register_omits_unsubscribe_url_without_base_url(app):
+    with app.app_context():
+        current_app.config.pop('BASE_URL', None)
+        current_app.config.pop('BASE_PATH', None)
+
+        sent_payloads = []
+        service = AuthService()
+        service.notifier.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        user = service.register_user({
+            'password': '1234',
+            'nome': 'Sem Base URL',
+            'cpf': '77766655544',
+            'email': 'sem-base-url@test.local',
+        })
+
+        assert user.email == 'sem-base-url@test.local'
+        assert sent_payloads[0]['template_name'] == 'welcome.html'
+        assert not sent_payloads[0]['template_data']['unsubscribe_url']
+
+
 def test_event_service_delete_event_blocks_when_event_has_registration(app):
     with app.app_context():
         owner = User(
@@ -938,6 +1041,53 @@ def test_admin_service_manual_enroll_duplicate_does_not_send_notification(app, a
         assert success is False
         assert msg == 'Usuário já está inscrito nesta atividade.'
         assert sent_payloads == []
+
+
+def test_event_service_enrollment_email_preserves_empty_schedule_fields(app, admin_user):
+    with app.app_context():
+        participant = User(
+            username='participant_empty_schedule_email',
+            role='participante',
+            nome='Participante Sem Horario',
+            cpf='11122233377',
+            email='participant_empty_schedule@test.local',
+        )
+        participant.set_password('1234')
+        db.session.add(participant)
+        db.session.flush()
+
+        event = Event(
+            owner_username=admin_user.username,
+            nome='Evento Sem Agenda',
+            descricao='Descricao',
+            tipo='PADRAO',
+            token_publico='token-empty-schedule',
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade Sem Agenda',
+            local='Sala Aberta',
+            descricao='Descricao atividade',
+            carga_horaria=2,
+            vagas=20,
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        service = EventService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        enrollment, msg = service.toggle_enrollment(participant, activity.id, 'inscrever')
+
+        assert enrollment is not None
+        assert msg == 'Inscrição Realizada!'
+        assert sent_payloads[0]['template_name'] == 'enrollment_confirmation.html'
+        assert sent_payloads[0]['template_data']['event_date'] == ''
+        assert sent_payloads[0]['template_data']['event_time'] == ''
 
 
 def test_manual_enrollment_email_template_renders_with_base_layout():
