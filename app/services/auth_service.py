@@ -3,7 +3,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
 from flask import current_app
 from datetime import datetime
-from app.utils import normalize_cpf
+from app.utils import build_absolute_app_url, normalize_cpf
 from app.extensions import db
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sqlalchemy import func
@@ -15,6 +15,14 @@ class AuthService:
     def __init__(self):
         self.user_repo = UserRepository()
         self.notifier = NotificationService()
+
+    def _account_email_context(self):
+        has_base_url = bool((current_app.config.get('BASE_URL') or '').strip())
+        return {
+            'year': datetime.now().year,
+            'app_url': build_absolute_app_url('/') if has_base_url else '',
+            'unsubscribe_url': build_absolute_app_url('/unsubscribe/') if has_base_url else '',
+        }
 
     def authenticate_user(self, login, password):
         """
@@ -104,7 +112,6 @@ class AuthService:
         
         # Send welcome email via RabbitMQ
         if saved_user.email:
-            app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
             self.notifier.send_email_task(
                 to_email=saved_user.email,
                 subject="Bem-vindo ao EuroEventos!",
@@ -112,9 +119,7 @@ class AuthService:
                 template_data={
                     'user_name': saved_user.nome,
                     'email': saved_user.email,
-                    'app_url': app_url,
-                    'year': datetime.now().year,
-                    'unsubscribe_url': f"{app_url}/unsubscribe/" if app_url else '',
+                    **self._account_email_context(),
                 },
             )
         
@@ -139,19 +144,13 @@ class AuthService:
         serializer = self._password_reset_serializer()
         token = serializer.dumps({'username': user.username})
 
-        app_url = (current_app.config.get('BASE_URL') or '').rstrip('/')
-        if app_url:
-            reset_url = f"{app_url}/resetar-senha/{token}"
-        else:
-            reset_url = f"/resetar-senha/{token}"
-
         return self.notifier.send_email_task(
             to_email=user.email,
             subject='Recuperação de senha - EuroEventos',
             template_name='password_reset.html',
             template_data={
                 'user_name': user.nome,
-                'reset_url': reset_url,
+                'reset_url': build_absolute_app_url(f'/resetar-senha/{token}'),
                 'expires_minutes': int(self._password_reset_max_age() / 60),
                 'year': datetime.now().year,
             },

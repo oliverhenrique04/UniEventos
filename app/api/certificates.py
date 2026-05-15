@@ -141,8 +141,12 @@ def _normalize_template_payload(template_source, designer_mode='event'):
 
 def _build_pdf_preview_response(pdf_path):
     from flask import send_file
+    from io import BytesIO
 
-    response = send_file(pdf_path, mimetype='application/pdf', conditional=False, max_age=0)
+    with open(pdf_path, 'rb') as pdf_file:
+        pdf_bytes = pdf_file.read()
+
+    response = send_file(BytesIO(pdf_bytes), mimetype='application/pdf', conditional=False, max_age=0)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'

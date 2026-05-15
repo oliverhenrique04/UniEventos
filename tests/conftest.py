@@ -31,3 +31,20 @@ def admin_user(app):
         db.session.refresh(user)
         db.session.expunge(user)
         return user
+
+
+@pytest.fixture
+def auth_session(client):
+    class AuthSession:
+        def login(self, username, password='1234'):
+            client.get('/api/logout')
+            return client.post('/api/login', json={'username': username, 'password': password})
+
+        def logout(self):
+            return client.get('/api/logout')
+
+        def switch(self, username, password='1234'):
+            self.logout()
+            return client.post('/api/login', json={'username': username, 'password': password})
+
+    return AuthSession()
