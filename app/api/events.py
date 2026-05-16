@@ -862,7 +862,6 @@ def dashboard_analytics():
         .with_entities(EventResponsible.user_username, User.nome)
         .filter(EventResponsible.user_username.isnot(None))
         .distinct()
-        .order_by(func.lower(func.coalesce(User.nome, EventResponsible.user_username)).asc())
         .all()
     )
 
@@ -873,7 +872,6 @@ def dashboard_analytics():
         .filter(Event.owner_username.isnot(None))
         .filter(~Event.responsibles.any())
         .distinct()
-        .order_by(func.lower(func.coalesce(User.nome, Event.owner_username)).asc())
         .all()
     )
 
