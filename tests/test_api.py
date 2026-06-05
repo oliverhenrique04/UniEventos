@@ -3339,6 +3339,26 @@ def test_event_management_allows_extensao_participants_but_blocks_notifications(
         assert enrollment is None
 
 
+def test_event_pages_expose_separate_team_certificate_access(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    _login_user(client, seeded['owner_username'])
+
+    events_admin_res = client.get('/eventos_admin')
+    dashboard_res = client.get('/')
+
+    assert events_admin_res.status_code == 200
+    events_admin_html = events_admin_res.get_data(as_text=True)
+    assert '/designer_certificado/${ev.id}' in events_admin_html
+    assert '/certificados_equipe/${ev.id}' in events_admin_html
+    assert 'Certificados da Equipe' in events_admin_html
+
+    assert dashboard_res.status_code == 200
+    dashboard_html = dashboard_res.get_data(as_text=True)
+    assert '/designer_certificado/${ev.id}' in dashboard_html
+    assert '/certificados_equipe/${ev.id}' in dashboard_html
+
+
 def test_event_management_allows_gestor_certificate_visualization_but_blocks_certificate_mutations(client, app, admin_user):
     seeded = _seed_certificate_management_data(app)
 

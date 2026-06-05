@@ -1515,11 +1515,17 @@
                                 <i class="fa-solid fa-envelope text-info"></i>
                             </button>
                             ${ev.can_view_certificates ? `
-                            <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificado">
+                            <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificados de Participantes">
                                 <i class="fa-solid fa-certificate text-warning"></i>
+                            </a>
+                            <a href="${pathUrl(`/certificados_equipe/${ev.id}`)}" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificados da Equipe">
+                                <i class="fa-solid fa-users text-primary"></i>
                             </a>` : `
                             <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificado indisponível" disabled>
                                 <i class="fa-solid fa-certificate text-muted"></i>
+                            </button>
+                            <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" title="Certificados da equipe indisponíveis" disabled>
+                                <i class="fa-solid fa-users text-muted"></i>
                             </button>`}
                             <button class="btn btn-sm btn-light border text-danger d-flex align-items-center justify-content-center" onclick="confirmarExcluirEvento(${ev.id})" title="${escapeHtml(ev.can_delete ? 'Excluir evento' : (ev.delete_block_reason || 'Sem permissão para excluir este evento.'))}" ${ev.can_delete ? '' : 'disabled'}>
                                 <i class="fa-solid fa-trash-can"></i>
