@@ -391,6 +391,10 @@
             <a href="{{ url_for('main.certificados_institucionais_page') }}" class="btn btn-light border">
                 <i class="fa-solid fa-arrow-left me-1"></i> Voltar
             </a>
+            {% elif designer_mode == 'team_event' %}
+            <a href="{{ url_for('main.certificados_equipe', event_id=event.id) }}" class="btn btn-light border">
+                <i class="fa-solid fa-truck-fast me-1"></i> Entregas
+            </a>
             {% else %}
             <a href="{{ url_for('main.gerenciar_entregas', event_id=event.id) }}" class="btn btn-light border">
                 <i class="fa-solid fa-truck-fast me-1"></i> Entregas
@@ -484,6 +488,15 @@
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CURSO_USUARIO}}', event)">{{CURSO_USUARIO}} — Curso do Usuário</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EMISSION_DATE}}', event)">{{EMISSION_DATE}} — Data</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{SIGNER}}', event)">{{SIGNER}} — Assinante</a></li>
+                        {% elif designer_mode == 'team_event' %}
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{NOME}}', event)">{{NOME}} — Nome</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{PAPEL}}', event)">{{PAPEL}} — Papel</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EVENTO}}', event)">{{EVENTO}} — Evento</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{ATIVIDADE}}', event)">{{ATIVIDADE}} — Atividade</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{HORAS}}', event)">{{HORAS}} — Horas</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{CPF}}', event)">{{CPF}} — CPF</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA}}', event)">{{DATA}} — Data</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{DATA_REALIZACAO}}', event)">{{DATA_REALIZACAO}} — Data do Evento</a></li>
                         {% else %}
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{NOME}}', event)">{{NOME}} — Nome</a></li>
                         <li><a class="dropdown-item small" href="#" onclick="return injectVar('{{EVENTO}}', event)">{{EVENTO}} — Evento</a></li>
@@ -592,6 +605,39 @@
                     <div class="variable-guide-item" onclick="injectVar('{{SIGNER}}')">
                         <div class="fw-bold text-primary small">{{ '{{SIGNER}}' }}</div>
                         <div class="text-muted x-small">Assinante</div>
+                    </div>
+                    {% elif designer_mode == 'team_event' %}
+                    <div class="variable-guide-item" onclick="injectVar('{{NOME}}')">
+                        <div class="fw-bold text-primary small">{{ '{{NOME}}' }}</div>
+                        <div class="text-muted x-small">Nome do Integrante</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{PAPEL}}')">
+                        <div class="fw-bold text-primary small">{{ '{{PAPEL}}' }}</div>
+                        <div class="text-muted x-small">Papel na Equipe</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{CPF}}')">
+                        <div class="fw-bold text-primary small">{{ '{{CPF}}' }}</div>
+                        <div class="text-muted x-small">Documento CPF</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{EVENTO}}')">
+                        <div class="fw-bold text-primary small">{{ '{{EVENTO}}' }}</div>
+                        <div class="text-muted x-small">Título do Evento</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{ATIVIDADE}}')">
+                        <div class="fw-bold text-primary small">{{ '{{ATIVIDADE}}' }}</div>
+                        <div class="text-muted x-small">Nome da Atividade</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{HORAS}}')">
+                        <div class="fw-bold text-primary small">{{ '{{HORAS}}' }}</div>
+                        <div class="text-muted x-small">Carga Horária</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{DATA}}')">
+                        <div class="fw-bold text-primary small">{{ '{{DATA}}' }}</div>
+                        <div class="text-muted x-small">Data de Emissão</div>
+                    </div>
+                    <div class="variable-guide-item" onclick="injectVar('{{DATA_REALIZACAO}}')">
+                        <div class="fw-bold text-primary small">{{ '{{DATA_REALIZACAO}}' }}</div>
+                        <div class="text-muted x-small">Data do Evento</div>
                     </div>
                     {% else %}
                     <div class="variable-guide-item" onclick="injectVar('{{NOME}}')">
@@ -726,6 +772,15 @@
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{CURSO_USUARIO}}' }}')">{{ '{{CURSO_USUARIO}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{EMISSION_DATE}}' }}')">{{ '{{EMISSION_DATE}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{SIGNER}}' }}')">{{ '{{SIGNER}}' }}</button>
+                    {% elif designer_mode == 'team_event' %}
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{NOME}}' }}')">{{ '{{NOME}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{PAPEL}}' }}')">{{ '{{PAPEL}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{EVENTO}}' }}')">{{ '{{EVENTO}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{ATIVIDADE}}' }}')">{{ '{{ATIVIDADE}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{HORAS}}' }}')">{{ '{{HORAS}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{CPF}}' }}')">{{ '{{CPF}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA}}' }}')">{{ '{{DATA}}' }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{DATA_REALIZACAO}}' }}')">{{ '{{DATA_REALIZACAO}}' }}</button>
                     {% else %}
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{NOME}}' }}')">{{ '{{NOME}}' }}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary var-chip-btn" onclick="insertVarInJodit('{{ '{{EVENTO}}' }}')">{{ '{{EVENTO}}' }}</button>
@@ -768,16 +823,16 @@
     const CAN_MANAGE_CERTIFICATES = {{ can_manage_certificates|tojson }};
     const apiBaseUrl = designerMode === 'institutional'
         ? apiUrl('/api/institutional_certificates')
-        : apiUrl('/api/certificates');
-    const setupUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/setup` : `${apiBaseUrl}/setup/${entityId}`;
-    const uploadAssetUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/upload_asset` : `${apiBaseUrl}/upload_asset/${entityId}`;
+        : (designerMode === 'team_event' ? apiUrl('/api/certificates/team/event') : apiUrl('/api/certificates'));
+    const setupUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/setup` : (designerMode === 'team_event' ? `${apiBaseUrl}/${entityId}/setup` : `${apiBaseUrl}/setup/${entityId}`);
+    const uploadAssetUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/upload_asset` : (designerMode === 'team_event' ? `${apiBaseUrl}/${entityId}/upload_asset` : `${apiBaseUrl}/upload_asset/${entityId}`);
     const previewLayoutUrl = designerMode === 'institutional'
         ? `${apiBaseUrl}/${entityId}/preview_layout`
-        : `${apiBaseUrl}/preview_layout/${entityId}`;
-    const sendBatchUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/send` : `${apiBaseUrl}/send_batch/${entityId}`;
+        : (designerMode === 'team_event' ? `${apiBaseUrl}/${entityId}/preview_layout` : `${apiBaseUrl}/preview_layout/${entityId}`);
+    const sendBatchUrl = designerMode === 'institutional' ? `${apiBaseUrl}/${entityId}/send` : (designerMode === 'team_event' ? `${apiBaseUrl}/${entityId}/send_batch` : `${apiBaseUrl}/send_batch/${entityId}`);
     const sendBatchStatusBaseUrl = designerMode === 'institutional'
         ? apiUrl('/api/institutional_certificates/send/status')
-        : apiUrl('/api/certificates/send_batch/status');
+        : (designerMode === 'team_event' ? apiUrl('/api/certificates/team/send_batch/status') : apiUrl('/api/certificates/send_batch/status'));
     const validationBaseUrl = new URL(pathUrl('/validar/'), window.location.origin).href;
     const toolbar = document.getElementById('floatingToolbar');
     const guideV = document.getElementById('guideV');
@@ -804,6 +859,7 @@
     const TAG_CARGA_HORARIA = "{{ '{{CARGA_HORARIA}}' }}";
     const TAG_CURSO_USUARIO = "{{ '{{CURSO_USUARIO}}' }}";
     const TAG_EMISSION_DATE = "{{ '{{EMISSION_DATE}}' }}";
+    const TAG_PAPEL = "{{ '{{PAPEL}}' }}";
     const TAG_SIGNER = "{{ '{{SIGNER}}' }}";
     const HASH_TAG = "{{ '{{HASH}}' }}";
     const HASH_ONE_LINE_SAMPLE = 'AAAAAAAAAAAAAAAA';
@@ -852,7 +908,9 @@
             type: 'text',
             text: designerMode === 'institutional'
                 ? 'Certificamos que {{RECIPIENT_NAME}} matriculado(a) no curso {{CURSO_USUARIO}} atuou como {{CATEGORY}} com carga horária de {{CARGA_HORARIA}}.'
-                : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}}.',
+                : (designerMode === 'team_event'
+                    ? 'Certificamos que {{NOME}}, CPF {{CPF}}, atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}}.'
+                    : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}}.'),
             x: 50,
             y: 50,
             w: designerMode === 'institutional' ? 80 : 82,
@@ -1261,6 +1319,19 @@
             };
         }
 
+        if (designerMode === 'team_event') {
+            return {
+                ...baseData,
+                [TAG_PAPEL]: ['Palestrante', 'Facilitador', 'Organizador', 'Coordenador'].sort(() => Math.random() - 0.5)[0],
+                [TAG_ATIVIDADE]: atividade,
+                [TAG_HORAS]: `${2 + Math.floor(Math.random() * 39)} horas`,
+                [TAG_CPF]: cpfNum,
+                [HASH_TAG]: hash,
+                [TAG_DATA]: data,
+                [TAG_DATA_REALIZACAO]: dataRealizacao,
+            };
+        }
+
         return baseData;
     }
 
@@ -1278,18 +1349,30 @@
                 [TAG_SIGNER, tags[TAG_SIGNER]],
                 [HASH_TAG, tags[HASH_TAG]]
             ]
-            : [
-                [TAG_NOME, tags[TAG_NOME]],
-                [TAG_CPF, tags[TAG_CPF]],
-                [TAG_EVENTO, tags[TAG_EVENTO]],
-                {% if event.tipo == 'PADRAO' %}[TAG_ATIVIDADE, tags[TAG_ATIVIDADE]],{% endif %}
-                {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTE, tags[TAG_PALESTRANTE]],{% endif %}
-                {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTES, tags[TAG_PALESTRANTES]],{% endif %}
-                [TAG_HORAS, tags[TAG_HORAS]],
-                [TAG_DATA, tags[TAG_DATA]],
-                [TAG_DATA_REALIZACAO, tags[TAG_DATA_REALIZACAO]],
-                [HASH_TAG, tags[HASH_TAG]]
-            ];
+            : (designerMode === 'team_event'
+                ? [
+                    [TAG_NOME, tags[TAG_NOME]],
+                    [TAG_PAPEL, tags[TAG_PAPEL]],
+                    [TAG_CPF, tags[TAG_CPF]],
+                    [TAG_EVENTO, tags[TAG_EVENTO]],
+                    [TAG_ATIVIDADE, tags[TAG_ATIVIDADE]],
+                    [TAG_HORAS, tags[TAG_HORAS]],
+                    [TAG_DATA, tags[TAG_DATA]],
+                    [TAG_DATA_REALIZACAO, tags[TAG_DATA_REALIZACAO]],
+                    [HASH_TAG, tags[HASH_TAG]]
+                ]
+                : [
+                    [TAG_NOME, tags[TAG_NOME]],
+                    [TAG_CPF, tags[TAG_CPF]],
+                    [TAG_EVENTO, tags[TAG_EVENTO]],
+                    {% if event.tipo == 'PADRAO' %}[TAG_ATIVIDADE, tags[TAG_ATIVIDADE]],{% endif %}
+                    {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTE, tags[TAG_PALESTRANTE]],{% endif %}
+                    {% if event.tipo == 'PADRAO' %}[TAG_PALESTRANTES, tags[TAG_PALESTRANTES]],{% endif %}
+                    [TAG_HORAS, tags[TAG_HORAS]],
+                    [TAG_DATA, tags[TAG_DATA]],
+                    [TAG_DATA_REALIZACAO, tags[TAG_DATA_REALIZACAO]],
+                    [HASH_TAG, tags[HASH_TAG]]
+                ]);
         list.innerHTML = rows
             .map(([k, v]) => `<div class="mb-2"><div class="text-muted x-small">${escapeHtml(k)}</div><div class="fw-semibold">${escapeHtml(v)}</div></div>`)
             .join('');
@@ -2376,13 +2459,24 @@
                 { label: '{{ "{{EMISSION_DATE}}" }}', description: 'Data em que o certificado foi emitido.' },
                 { label: '{{ "{{SIGNER}}" }}', description: 'Assinatura ou nome da autoridade emissora.' }
             ]
-            : [
-                { label: '{{ "{{NOME}}" }}', description: 'Nome completo do participante.' },
-                { label: '{{ "{{CPF}}" }}', description: 'CPF do participante.' },
-                { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento/atividade.' },
-                { label: '{{ "{{DATA_REALIZACAO}}" }}', description: 'Data de realização do evento.' },
-                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },{% endif %}
-                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Primeiro palestrante ou responsável principal da atividade.' },{% endif %}
+            : (designerMode === 'team_event'
+                ? [
+                    { label: '{{ "{{NOME}}" }}', description: 'Nome completo do integrante.' },
+                    { label: '{{ "{{PAPEL}}" }}', description: 'Papel na equipe.' },
+                    { label: '{{ "{{CPF}}" }}', description: 'CPF do integrante.' },
+                    { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento.' },
+                    { label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },
+                    { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
+                    { label: '{{ "{{DATA_REALIZACAO}}" }}', description: 'Data de realização do evento.' },
+                    { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' },
+                ]
+                : [
+                    { label: '{{ "{{NOME}}" }}', description: 'Nome completo do participante.' },
+                    { label: '{{ "{{CPF}}" }}', description: 'CPF do participante.' },
+                    { label: '{{ "{{EVENTO}}" }}', description: 'Nome do evento/atividade.' },
+                    { label: '{{ "{{DATA_REALIZACAO}}" }}', description: 'Data de realização do evento.' },
+                    {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },{% endif %}
+                    {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Primeiro palestrante ou responsável principal da atividade.' },{% endif %}
                 {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTES}}" }}', description: 'Lista completa de palestrantes da atividade.' },{% endif %}
                 { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
                 { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' },
@@ -3168,7 +3262,9 @@
 
         Swal.fire({
             title: 'Confirmar Envio?',
-            text: 'Os certificados serão enviados agora para todos os participantes presentes.',
+            text: designerMode === 'team_event'
+                ? 'Os certificados serão enviados para a equipe cadastrada neste evento.'
+                : 'Os certificados serão enviados agora para todos os participantes presentes.',
             icon: 'question',
             showCancelButton: true
         }).then(async (r) => {

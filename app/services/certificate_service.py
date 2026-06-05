@@ -77,7 +77,7 @@ class CertificateService:
     @classmethod
     def _designer_mode_for_entity(cls, event):
         mode = getattr(event, 'designer_mode', None)
-        if mode in {'event', 'institutional'}:
+        if mode in {'event', 'institutional', 'team_event'}:
             return mode
         return 'institutional' if getattr(event, 'is_institutional_certificate', False) else 'event'
 

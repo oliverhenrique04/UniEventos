@@ -249,6 +249,57 @@ def editar_evento_page(event_id):
         initial_event_responsibles=list(event_payload.get('responsaveis') or []),
     )
 
+@bp.route('/certificados_equipe/<int:event_id>')
+@login_required
+def certificados_equipe(event_id):
+    """Page for managing team certificate recipients and delivery."""
+    from app.models import Event
+    from app.services.event_service import EventService
+    event = db.session.get(Event, event_id)
+    if not event:
+        abort(404)
+    can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
+    if not EventService.can_view_event_certificates(current_user, event):
+        return "Acesso negado", 403
+    return render_template(
+        'team_certificate_delivery.html',
+        user=current_user,
+        event=event,
+        can_manage_certificates=can_manage_certificates,
+    )
+
+
+@bp.route('/designer_certificado_equipe/<int:event_id>')
+@login_required
+def designer_certificado_equipe(event_id):
+    """Page for designing team event certificates."""
+    from app.models import Event
+    from app.services.certificate_service import CertificateService
+    from app.services.event_service import EventService
+    from types import SimpleNamespace
+    event = db.session.get(Event, event_id)
+    if not event:
+        abort(404)
+    can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
+    if not EventService.can_view_event_certificates(current_user, event):
+        return "Acesso negado", 403
+    designer_event = SimpleNamespace(
+        id=event.id,
+        nome=event.nome,
+        tipo=event.tipo,
+        cert_bg_path=event.cert_team_bg_path,
+        cert_template_json=event.cert_team_template_json,
+    )
+    return render_template(
+        'certificate_designer.html',
+        user=current_user,
+        event=designer_event,
+        designer_mode='team_event',
+        can_manage_certificates=can_manage_certificates,
+        fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='event'),
+    )
+
+
 @bp.route('/validar')
 def validar_busca():
     """Public page to search and validate certificates by hash."""
@@ -260,7 +311,7 @@ def validar_hash(cert_hash):
     
     Supports both event certificates and institutional certificates.
     """
-    from app.models import Enrollment, Activity, Event, User, InstitutionalCertificateRecipient
+    from app.models import Enrollment, Activity, Event, User, InstitutionalCertificateRecipient, EventTeamCertificateRecipient
     
     # Try to find institutional certificate first
     institutional_recipient = InstitutionalCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
@@ -288,6 +339,30 @@ def validar_hash(cert_hash):
             hash=cert_hash,
         )
     
+    # Try to find team event certificate
+    team_recipient = EventTeamCertificateRecipient.query.filter_by(cert_hash=cert_hash).first()
+    if team_recipient:
+        event = db.session.get(Event, team_recipient.event_id)
+        activity = db.session.get(Activity, team_recipient.activity_id) if team_recipient.activity_id else None
+        data_br = event.data_inicio.strftime("%d/%m/%Y") if event and event.data_inicio else ""
+        if activity and activity.data_atv:
+            data_br = activity.data_atv.strftime("%d/%m/%Y")
+
+        return render_template(
+            'validation.html',
+            success=True,
+            certificado_tipo='equipe_evento',
+            nome=team_recipient.nome,
+            evento=event.nome if event else 'N/A',
+            data=data_br,
+            horas=team_recipient.workload_hours,
+            curso=team_recipient.role_label,
+            papel=team_recipient.role_label,
+            atividade=activity.nome if activity else None,
+            cpf=team_recipient.cpf or 'N/A',
+            hash=cert_hash,
+        )
+
     # Try to find event certificate
     enrollment = Enrollment.query.filter_by(cert_hash=cert_hash).first()
     if not enrollment:

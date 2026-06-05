@@ -60,6 +60,14 @@
                             </div>
                         </div>
                         {% endif %}
+                        {% if certificado_tipo == 'equipe_evento' %}
+                        <div class="alert alert-info border-0 rounded-4 mb-4 d-flex align-items-center gap-3">
+                            <i class="fa-solid fa-people-group fs-3"></i>
+                            <div class="mb-0">
+                                <div class="fw-bold">Certificado de Equipe do Evento</div>
+                            </div>
+                        </div>
+                        {% endif %}
 
                         <div class="details-card mb-4 position-relative">
                             <div class="details-watermark" aria-hidden="true">
@@ -82,20 +90,33 @@
 
                                 <div class="details-row">
                                     <div class="details-label">
-                                        {% if certificado_tipo == 'institucional' %}Denominação{% else %}Evento Acadêmico{% endif %}
+                                        {% if certificado_tipo == 'institucional' %}Denominação{% elif certificado_tipo == 'equipe_evento' %}Evento{% else %}Evento Acadêmico{% endif %}
                                     </div>
                                     <div class="details-value">{{ evento }}</div>
                                 </div>
                                 
+                                {% if certificado_tipo == 'equipe_evento' %}
+                                <div class="details-row">
+                                    <div class="details-label">Papel no Evento</div>
+                                    <div class="details-value">{{ papel }}</div>
+                                </div>
+                                {% if atividade %}
+                                <div class="details-row">
+                                    <div class="details-label">Atividade</div>
+                                    <div class="details-value">{{ atividade }}</div>
+                                </div>
+                                {% endif %}
+                                {% else %}
                                 <div class="details-row">
                                     <div class="details-label">
                                         {% if certificado_tipo == 'institucional' %}Categoria{% else %}Curso de Graduação{% endif %}
                                     </div>
                                     <div class="details-value">{{ curso }}</div>
                                 </div>
+                                {% endif %}
 
                                 <div class="row g-3 pt-2">
-                                    <!-- Show hours only for event certificates -->
+                                    <!-- Show hours for event and team event certificates -->
                                     {% if certificado_tipo != 'institucional' and horas %}
                                     <div class="col-6">
                                         <div class="details-label">Carga Horária Total</div>
@@ -104,7 +125,9 @@
                                     {% endif %}
                                     
                                     <div class="{% if certificado_tipo != 'institucional' and horas %}col-6{% else %}col-12{% endif %}">
-                                        <div class="details-label">Data de Emissão</div>
+                                        <div class="details-label">
+                                            {% if certificado_tipo == 'equipe_evento' %}Data do Evento{% else %}Data de Emissão{% endif %}
+                                        </div>
                                         <div class="details-value">{{ data }}</div>
                                     </div>
                                 </div>

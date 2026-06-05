@@ -1,6 +1,7 @@
 import json
 from io import BytesIO
 from datetime import date, time
+from sqlalchemy.exc import IntegrityError
 from app.models import (
     Event,
     Activity,
@@ -12,6 +13,7 @@ from app.models import (
     InstitutionalCertificateCategory,
     InstitutionalCertificate,
     InstitutionalCertificateRecipient,
+    EventTeamCertificateRecipient,
 )
 from app.extensions import db
 from openpyxl import Workbook
@@ -3506,3 +3508,472 @@ def test_password_reset_with_token_updates_password(client, app, admin_user):
 
     login_res = client.post('/api/login', json={'cpf': '00000000000', 'password': 'nova12345'})
     assert login_res.status_code == 200
+
+
+def test_team_certificate_sync_and_manual_crud(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+        speaker = ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Dra. Principal',
+            email='principal@example.com',
+            ordem=0,
+        )
+        db.session.add(speaker)
+        db.session.commit()
+
+    _login_user(client, seeded['owner_username'])
+
+    sync_res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/sync")
+    assert sync_res.status_code == 200
+    assert sync_res.get_json()['created'] >= 1
+
+    create_res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={
+        'nome': 'Facilitadora Manual',
+        'email': 'facilitadora.manual@test.local',
+        'cpf': '32165498700',
+        'role_label': 'Facilitador',
+        'activity_id': seeded['activity_id'],
+        'workload_hours': '3',
+    })
+    assert create_res.status_code == 201
+    recipient_id = create_res.get_json()['recipient']['id']
+
+    update_res = client.put(f'/api/certificates/team/recipients/{recipient_id}', json={
+        'nome': 'Facilitadora Manual Atualizada',
+        'email': 'facilitadora.atualizada@test.local',
+        'cpf': '32165498700',
+        'role_label': 'Equipe organizadora',
+        'activity_id': None,
+        'workload_hours': '5',
+    })
+    assert update_res.status_code == 200
+
+    list_res = client.get(f"/api/certificates/team/event/{seeded['event_id']}/recipients")
+    assert list_res.status_code == 200
+    items = list_res.get_json()['items']
+    manual = next(item for item in items if item['id'] == recipient_id)
+    assert manual['nome'] == 'Facilitadora Manual Atualizada'
+    assert manual['role_label'] == 'Equipe organizadora'
+    assert manual['source'] == 'manual'
+
+    delete_res = client.delete(f'/api/certificates/team/recipients/{recipient_id}')
+    assert delete_res.status_code == 200
+
+
+def test_team_certificate_sync_returns_conflict_on_integrity_error(client, app, admin_user, monkeypatch):
+    seeded = _seed_certificate_management_data(app)
+    _login_user(client, seeded['owner_username'])
+
+    def fail_sync(event):
+        raise IntegrityError('INSERT', {}, Exception('duplicate key'))
+
+    monkeypatch.setattr(certificates_api.team_cert_service, 'sync_event_recipients', fail_sync)
+
+    res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/sync")
+
+    assert res.status_code == 409
+    assert 'sincroniza' in res.get_json()['erro'].lower()
+
+
+def test_team_certificate_gestor_can_view_but_cannot_mutate(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team certificate\n')
+
+    with app.app_context():
+        recipient = EventTeamCertificateRecipient(
+            event_id=seeded['event_id'],
+            activity_id=seeded['activity_id'],
+            nome='Palestrante Gestor',
+            email='palestrante.gestor@test.local',
+            role_label='Palestrante',
+            source='manual',
+            cert_hash='TEAMGESTORHASH1',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+        recipient_id = recipient.id
+
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    _login_user(client, seeded['manager_username'])
+
+    list_res = client.get(f"/api/certificates/team/event/{seeded['event_id']}/recipients")
+    preview_res = client.get(f'/api/certificates/team/recipients/{recipient_id}/preview')
+    download_res = client.get(f'/api/certificates/team/recipients/{recipient_id}/download')
+    create_res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={'nome': 'Bloqueado', 'role_label': 'Equipe'})
+    send_res = client.post(f'/api/certificates/team/recipients/{recipient_id}/resend')
+    sync_res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/sync")
+    update_res = client.put(f'/api/certificates/team/recipients/{recipient_id}', json={'nome': 'Alterado', 'role_label': 'Facilitador'})
+    delete_res = client.delete(f'/api/certificates/team/recipients/{recipient_id}')
+
+    assert list_res.status_code == 200
+    assert preview_res.status_code == 200
+    assert preview_res.mimetype == 'application/pdf'
+    assert download_res.status_code == 200
+    assert create_res.status_code == 403
+    assert send_res.status_code == 403
+    assert sync_res.status_code == 403
+    assert update_res.status_code == 403
+    assert delete_res.status_code == 403
+
+
+def test_team_certificate_public_download_and_preview_by_hash(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-public.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team public certificate\n')
+
+    with app.app_context():
+        recipient = EventTeamCertificateRecipient(
+            event_id=seeded['event_id'],
+            activity_id=seeded['activity_id'],
+            nome='Palestrante Publico',
+            email='palestrante.publico@test.local',
+            role_label='Palestrante',
+            source='manual',
+            cert_hash='TEAMPUBLIC12345',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+
+    download_res = client.get('/api/certificates/team/download_public/TEAMPUBLIC12345')
+    preview_res = client.get('/api/certificates/team/preview_public/TEAMPUBLIC12345')
+
+    assert download_res.status_code == 200
+    assert preview_res.status_code == 200
+    assert preview_res.mimetype == 'application/pdf'
+
+
+def test_team_certificate_manual_duplicate_validation(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    with app.app_context():
+        existing = EventTeamCertificateRecipient(
+            event_id=seeded['event_id'],
+            nome='Duplicada',
+            email='duplicada@test.local',
+            cpf='11122233344',
+            role_label='Facilitador',
+            source='manual',
+        )
+        db.session.add(existing)
+        db.session.commit()
+
+    _login_user(client, seeded['owner_username'])
+
+    dup1 = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={
+        'nome': 'Outro Nome',
+        'email': 'duplicada@test.local',
+        'role_label': 'Facilitador',
+    })
+    assert dup1.status_code == 400
+    assert 'já existe' in dup1.get_json()['erro'].lower()
+
+    dup2 = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={
+        'nome': 'Outro Nome',
+        'cpf': '11122233344',
+        'email': 'outro@test.local',
+        'role_label': 'Facilitador',
+    })
+    assert dup2.status_code == 400
+
+    dup3 = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={
+        'nome': 'Duplicada',
+        'role_label': 'Facilitador',
+    })
+    assert dup3.status_code == 400
+
+    different_role = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={
+        'nome': 'Duplicada',
+        'email': 'duplicada@test.local',
+        'role_label': 'Equipe organizadora',
+    })
+    assert different_role.status_code == 201
+
+    different_activity = client.post(f"/api/certificates/team/event/{seeded['event_id']}/recipients", json={
+        'nome': 'Duplicada',
+        'email': 'duplicada@test.local',
+        'role_label': 'Facilitador',
+        'activity_id': seeded['activity_id'],
+    })
+    assert different_activity.status_code == 201
+
+
+def test_team_certificate_resend_queues_email_and_public_validation(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-send.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team certificate\n')
+    sent = []
+
+    with app.app_context():
+        recipient = EventTeamCertificateRecipient(
+            event_id=seeded['event_id'],
+            activity_id=seeded['activity_id'],
+            nome='Palestrante Publica',
+            email='palestrante.publica@test.local',
+            cpf='55566677788',
+            role_label='Palestrante',
+            workload_hours='2',
+            source='manual',
+            cert_hash='TEAMPUBLICHASH1',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+        recipient_id = recipient.id
+
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    monkeypatch.setattr(certificates_api.team_cert_service.notifier, 'send_email_task', lambda **kwargs: sent.append(kwargs) or True)
+
+    _login_user(client, seeded['owner_username'])
+    resend_res = client.post(f'/api/certificates/team/recipients/{recipient_id}/resend')
+    validation_res = client.get('/validar/TEAMPUBLICHASH1')
+
+    assert resend_res.status_code == 200
+    assert sent and sent[0]['template_name'] == 'team_certificate_ready.html'
+    assert 'download_public/TEAMPUBLICHASH1' in sent[0]['template_data']['download_url']
+    assert validation_res.status_code == 200
+    validation_html = validation_res.get_data(as_text=True)
+    assert 'Certificado de Equipe do Evento' in validation_html
+    assert 'Palestrante Publica' in validation_html
+    assert 'Palestrante' in validation_html
+
+    with app.app_context():
+        saved = db.session.get(EventTeamCertificateRecipient, recipient_id)
+        assert saved.cert_entregue is True
+        assert saved.cert_data_envio is not None
+
+
+def test_team_certificate_send_batch_runs_background_job(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-batch.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team batch certificate\n')
+    sent = []
+
+    with app.app_context():
+        db.session.add(EventTeamCertificateRecipient(
+            event_id=seeded['event_id'],
+            nome='Equipe Batch',
+            email='equipe.batch@test.local',
+            role_label='Equipe organizadora',
+            source='manual',
+            cert_hash='TEAMBATCHHASH01',
+        ))
+        db.session.commit()
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=None, daemon=None):
+            self.target = target
+            self.args = args or ()
+        def start(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(certificates_api, 'Thread', ImmediateThread)
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    monkeypatch.setattr(certificates_api.team_cert_service.notifier, 'send_email_task', lambda **kwargs: sent.append(kwargs) or True)
+
+    _login_user(client, seeded['owner_username'])
+    res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/send_batch")
+
+    assert res.status_code == 202
+    payload = res.get_json()
+    assert payload['job_id']
+    status_res = client.get(f"/api/certificates/team/send_batch/status/{payload['job_id']}")
+    assert status_res.status_code == 200
+    assert status_res.get_json()['total_enviado'] == 1
+    assert sent
+
+
+def test_team_certificate_send_batch_commits_missing_hashes_once_before_delivery(
+    client, app, admin_user, monkeypatch, tmp_path
+):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-batch-hash.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team batch certificate\n')
+
+    with app.app_context():
+        certificates_api._SEND_TEAM_BATCH_JOBS.clear()
+        db.session.add_all(
+            [
+                EventTeamCertificateRecipient(
+                    event_id=seeded['event_id'],
+                    nome='Equipe Batch Hash 1',
+                    email='equipe.batch1@test.local',
+                    role_label='Equipe organizadora',
+                    source='manual',
+                ),
+                EventTeamCertificateRecipient(
+                    event_id=seeded['event_id'],
+                    nome='Equipe Batch Hash 2',
+                    email='equipe.batch2@test.local',
+                    role_label='Equipe organizadora',
+                    source='manual',
+                ),
+            ]
+        )
+        db.session.commit()
+
+        real_commit = db.session.commit
+        commits = []
+
+        def tracked_commit():
+            commits.append('commit')
+            return real_commit()
+
+        monkeypatch.setattr(db.session, 'commit', tracked_commit)
+        monkeypatch.setattr(
+            certificates_api.team_cert_service.certificate_service,
+            'generate_pdf',
+            lambda *args, **kwargs: str(pdf_path),
+        )
+        monkeypatch.setattr(
+            certificates_api.team_cert_service.notifier,
+            'send_email_task',
+            lambda **kwargs: True,
+        )
+
+        job_id = 'team-batch-job-hash'
+        certificates_api._SEND_TEAM_BATCH_JOBS[job_id] = {
+            'job_id': job_id,
+            'event_id': seeded['event_id'],
+            'created_by': seeded['owner_username'],
+            'status': 'queued',
+            'completed': False,
+            'resultado': 'processando',
+            'message': 'Teste',
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+            'created_at': 0,
+            'updated_at': 0,
+        }
+
+        certificates_api._run_send_team_batch_job(
+            job_id,
+            seeded['event_id'],
+            certificates_api.current_app._get_current_object(),
+        )
+
+        recipients = EventTeamCertificateRecipient.query.filter_by(event_id=seeded['event_id']).order_by(
+            EventTeamCertificateRecipient.nome.asc()
+        ).all()
+
+        assert len(commits) == 2
+        assert all(item.cert_hash for item in recipients)
+        assert all(item.cert_entregue is True for item in recipients)
+
+
+def test_prune_job_cache_removes_old_completed_entries(monkeypatch):
+    jobs = {
+        'old': {'completed': True, 'updated_at': 100},
+        'fresh': {'completed': True, 'updated_at': 1900},
+        'running': {'completed': False, 'updated_at': 50},
+    }
+
+    monkeypatch.setattr(certificates_api.time, 'time', lambda: 2000)
+
+    certificates_api._prune_job_cache(jobs, max_completed_age=300, max_entries=10)
+
+    assert 'old' not in jobs
+    assert 'fresh' in jobs
+    assert 'running' in jobs
+
+
+def test_team_certificate_pages_load_for_owner_and_gestor(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    for username in [seeded['owner_username'], seeded['manager_username']]:
+        client.get('/api/logout')
+        _login_user(client, username)
+        delivery_res = client.get(f"/certificados_equipe/{seeded['event_id']}")
+        designer_res = client.get(f"/designer_certificado_equipe/{seeded['event_id']}")
+
+        assert delivery_res.status_code == 200
+        assert 'Certificados da Equipe' in delivery_res.get_data(as_text=True)
+        assert designer_res.status_code == 200
+        designer_html = designer_res.get_data(as_text=True)
+        assert 'team_event' in designer_html
+        assert '/api/certificates/team/event' in designer_html
+
+
+def test_team_certificate_designer_setup_and_preview_return_pdf(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+    _login_user(client, seeded['owner_username'])
+
+    payload = {
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'elements': [
+            {
+                'id': 'txt2',
+                'type': 'text',
+                'text': 'Certificamos que {{NOME}} atuou como {{PAPEL}} no evento {{EVENTO}}.',
+                'x': 50,
+                'y': 50,
+                'w': 80,
+                'h': 16,
+                'font': 22,
+                'color': '#111111',
+                'align': 'center',
+                'font_family': 'Helvetica',
+                'visible': True,
+            }
+        ],
+    }
+    setup_res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/setup", data={'template': json.dumps(payload)})
+    preview_res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/preview_layout", json={
+        'template': payload,
+        'preview_data': {
+            '{{NOME}}': 'Integrante Preview',
+            '{{PAPEL}}': 'Facilitador',
+            '{{EVENTO}}': 'Evento Preview',
+            '{{ATIVIDADE}}': 'Oficina Preview',
+            '{{HORAS}}': '4',
+            '{{CPF}}': '12345678901',
+            '{{HASH}}': 'TEAMPREVIEWHASH',
+        },
+    })
+
+    assert setup_res.status_code == 200
+    assert preview_res.status_code == 200
+    assert preview_res.mimetype == 'application/pdf'
+    assert preview_res.data.startswith(b'%PDF')
+
+
+def test_team_certificate_delivery_page_safe_with_special_chars(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+    _login_user(client, seeded['owner_username'])
+
+    with app.app_context():
+        recipient = EventTeamCertificateRecipient(
+            event_id=seeded['event_id'],
+            nome="Integrante com \"aspas\" e 'simples'",
+            email="quote.test@test.local",
+            role_label="Palestrante com <b>tags</b>",
+            source='manual',
+            workload_hours='2',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+        rid = recipient.id
+
+    res = client.get(f"/certificados_equipe/{seeded['event_id']}")
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert 'Certificados da Equipe' in html
+    assert 'jsArg(' in html
+    assert 'JSON.stringify' in html
+    assert 'escapeHtml' in html
+    # The page source contains JS template literals with safe jsArg calls
+    assert 'abrirModalEditar(' in html and 'jsArg(' in html
+    # Verify no unsafe single-quoted pattern: onclick="abrirModalEditar(..., '...'
+    import re
+    unsafe_pattern = re.search(r'onclick="abrirModalEditar\([^)]*\'\w', html)
+    assert unsafe_pattern is None, f"Unsafe onclick found: {unsafe_pattern.group() if unsafe_pattern else 'none'}"
+
+    with app.app_context():
+        db.session.delete(db.session.get(EventTeamCertificateRecipient, rid))
+        db.session.commit()

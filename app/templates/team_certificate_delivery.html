@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 fade-in-up">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.designer_certificado_equipe', event_id=event.id) }}" class="text-decoration-none">Designer</a></li>
+                    <li class="breadcrumb-item active">Certificados da Equipe</li>
+                </ol>
+            </nav>
+            <h3 class="fw-bold m-0"><i class="fa-solid fa-users text-primary me-2"></i>Certificados da Equipe</h3>
+            <p class="text-muted mb-0">Gerencie os certificados da equipe do evento: <strong>{{ event.nome }}</strong></p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="carregarDestinatarios()" class="btn btn-light border"><i class="fa-solid fa-sync me-1"></i> Atualizar</button>
+            {% if can_manage_certificates %}
+            <button onclick="sincronizarEquipe()" class="btn btn-outline-secondary"><i class="fa-solid fa-arrows-rotate me-1"></i> Sincronizar</button>
+            <button onclick="abrirModalAdicionar()" class="btn btn-primary shadow-sm"><i class="fa-solid fa-plus me-1"></i> Adicionar</button>
+            <button onclick="dispararLoteEquipe()" class="btn btn-dark shadow-sm"><i class="fa-solid fa-paper-plane me-1"></i> Enviar em Lote</button>
+            {% else %}
+            <span class="badge bg-light text-dark border align-self-center">Somente visualização</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="glass-panel p-0 overflow-hidden mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Nome</th>
+                        <th>Papel</th>
+                        <th>Atividade</th>
+                        <th>Carga Horária</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaEquipe">
+                    <tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar/Editar Destinatario -->
+<div class="modal fade" id="modalDestinatario" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold" id="modalDestinatarioLabel">Adicionar Destinatário</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editRecipientId">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Nome</label>
+                    <input type="text" id="recipientNome" class="form-control" placeholder="Nome completo">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Papel</label>
+                    <input type="text" id="recipientRole" class="form-control" placeholder="Ex: Palestrante, Facilitador">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">E-mail</label>
+                    <input type="email" id="recipientEmail" class="form-control" placeholder="email@exemplo.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">CPF (opcional)</label>
+                    <input type="text" id="recipientCpf" class="form-control" placeholder="Apenas digitos">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">ID da Atividade (opcional)</label>
+                    <input type="text" id="recipientActivityId" class="form-control" placeholder="Deixe em branco se não aplicável">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Carga Horária</label>
+                    <input type="text" id="recipientWorkload" class="form-control" placeholder="Ex: 4">
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button onclick="salvarDestinatario()" class="btn btn-primary px-4">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Preview Certificado -->
+<div class="modal fade" id="modalPreviewEquipe" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="height: 90vh;">
+            <div class="modal-header border-0 bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-certificate me-2"></i>Visualização de Certificado</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-secondary">
+                <iframe id="framePreviewEquipe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const eventId = {{ event.id }};
+    const CAN_MANAGE_CERTIFICATES = {{ can_manage_certificates|tojson }};
+
+    function jsArg(value) { return JSON.stringify(value ?? ''); }
+
+    document.addEventListener('DOMContentLoaded', () => carregarDestinatarios());
+
+    async function carregarDestinatarios() {
+        try {
+            const res = await fetch(apiUrl(`/api/certificates/team/event/${eventId}/recipients`));
+            const data = await res.json();
+            const tbody = document.getElementById('tabelaEquipe');
+            tbody.innerHTML = '';
+
+            if (!data.items || data.items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Nenhum destinatário cadastrado.</td></tr>';
+                return;
+            }
+
+            data.items.forEach(item => {
+                const statusBadge = item.cert_entregue
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="fa-solid fa-check me-1"></i> Enviado</span>'
+                    : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill"><i class="fa-solid fa-clock me-1"></i> Pendente</span>';
+
+                const emailDisplay = item.email || '-';
+
+                tbody.innerHTML += `
+                    <tr class="animate__animated animate__fadeIn">
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">${escapeHtml(item.nome)}</div>
+                            <div class="text-muted x-small">${escapeHtml(emailDisplay)}</div>
+                        </td>
+                        <td><span class="fw-semibold">${escapeHtml(item.role_label)}</span></td>
+                        <td><small class="text-muted">${escapeHtml(item.activity_name || '-')}</small></td>
+                        <td>${escapeHtml(item.workload_hours || '-')}</td>
+                        <td>${statusBadge}</td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group shadow-sm">
+                                <button onclick="abrirPreviewEquipe(${item.id})" class="btn btn-sm btn-light border" title="Visualizar">
+                                    <i class="fa-solid fa-eye text-primary"></i>
+                                </button>
+                                <a href="${apiUrl('/api/certificates/team/recipients/' + item.id + '/download')}" class="btn btn-sm btn-light border" title="Baixar PDF">
+                                    <i class="fa-solid fa-file-pdf text-danger"></i>
+                                </a>
+                                ${CAN_MANAGE_CERTIFICATES
+                                    ? `<button onclick="abrirModalEditar(${item.id}, ${jsArg(item.nome)}, ${jsArg(item.role_label)}, ${jsArg(item.email)}, ${jsArg(item.cpf)}, ${jsArg(String(item.activity_id || ''))}, ${jsArg(String(item.workload_hours || ''))})" class="btn btn-sm btn-light border" title="Editar">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
+                                    <button onclick="confirmarExcluir(${item.id})" class="btn btn-sm btn-light border text-danger" title="Excluir">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                    <button onclick="enviarIndividual(${item.id})" class="btn btn-sm btn-outline-primary rounded-end px-3">
+                                        <i class="fa-solid fa-paper-plane me-1"></i> ${item.cert_entregue ? 'Reenviar' : 'Enviar'}
+                                    </button>`
+                                    : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao carregar destinatários.' });
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function abrirPreviewEquipe(recipientId) {
+        const frame = document.getElementById('framePreviewEquipe');
+        frame.src = '';
+        frame.src = apiUrl(`/api/certificates/team/recipients/${recipientId}/preview?t=${Date.now()}`);
+        new bootstrap.Modal(document.getElementById('modalPreviewEquipe')).show();
+    }
+
+    function abrirModalAdicionar() {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
+        document.getElementById('modalDestinatarioLabel').innerText = 'Adicionar Destinatário';
+        document.getElementById('editRecipientId').value = '';
+        document.getElementById('recipientNome').value = '';
+        document.getElementById('recipientRole').value = '';
+        document.getElementById('recipientEmail').value = '';
+        document.getElementById('recipientCpf').value = '';
+        document.getElementById('recipientActivityId').value = '';
+        document.getElementById('recipientWorkload').value = '';
+        new bootstrap.Modal(document.getElementById('modalDestinatario')).show();
+    }
+
+    function abrirModalEditar(id, nome, role, email, cpf, activityId, workload) {
+        if (!CAN_MANAGE_CERTIFICATES) {
+            Toast.fire({ icon: 'warning', title: 'Seu perfil tem acesso somente para visualização.' });
+            return;
+        }
+        document.getElementById('modalDestinatarioLabel').innerText = 'Editar Destinatário';
+        document.getElementById('editRecipientId').value = id;
+        document.getElementById('recipientNome').value = nome;
+        document.getElementById('recipientRole').value = role;
+        document.getElementById('recipientEmail').value = email || '';
+        document.getElementById('recipientCpf').value = cpf || '';
+        document.getElementById('recipientActivityId').value = activityId || '';
+        document.getElementById('recipientWorkload').value = workload || '';
+        new bootstrap.Modal(document.getElementById('modalDestinatario')).show();
+    }
+
+    async function salvarDestinatario() {
+        if (!CAN_MANAGE_CERTIFICATES) return;
+        const id = document.getElementById('editRecipientId').value;
+        const payload = {
+            nome: document.getElementById('recipientNome').value.trim(),
+            role_label: document.getElementById('recipientRole').value.trim(),
+            email: document.getElementById('recipientEmail').value.trim() || null,
+            cpf: document.getElementById('recipientCpf').value.trim() || null,
+            activity_id: document.getElementById('recipientActivityId').value.trim() || null,
+            workload_hours: document.getElementById('recipientWorkload').value.trim() || null,
+        };
+
+        const isEdit = !!id;
+        const url = isEdit
+            ? apiUrl(`/api/certificates/team/recipients/${id}`)
+            : apiUrl(`/api/certificates/team/event/${eventId}/recipients`);
+        const method = isEdit ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('modalDestinatario')).hide();
+                carregarDestinatarios();
+                Toast.fire({ icon: 'success', title: json.mensagem });
+            } else {
+                Toast.fire({ icon: 'error', title: json.erro || 'Erro ao salvar.' });
+            }
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro de conexão.' });
+        }
+    }
+
+    async function confirmarExcluir(id) {
+        if (!CAN_MANAGE_CERTIFICATES) return;
+        const confirm = await Swal.fire({
+            title: 'Remover destinatário?',
+            text: 'Esta ação não pode ser desfeita.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, remover'
+        });
+        if (!confirm.isConfirmed) return;
+
+        try {
+            const res = await fetch(apiUrl(`/api/certificates/team/recipients/${id}`), { method: 'DELETE' });
+            if (res.ok) {
+                carregarDestinatarios();
+                Toast.fire({ icon: 'success', title: 'Destinatário removido.' });
+            }
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao remover.' });
+        }
+    }
+
+    async function enviarIndividual(id) {
+        if (!CAN_MANAGE_CERTIFICATES) return;
+        Toast.fire({ icon: 'info', title: 'Enviando certificado...' });
+        try {
+            const res = await fetch(apiUrl(`/api/certificates/team/recipients/${id}/resend`), { method: 'POST' });
+            const json = await res.json();
+            if (res.ok) {
+                carregarDestinatarios();
+                Swal.fire('Sucesso!', json.mensagem, 'success');
+            } else {
+                Swal.fire('Erro', json.erro || 'Falha no envio.', 'error');
+            }
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao enviar.' });
+        }
+    }
+
+    async function sincronizarEquipe() {
+        if (!CAN_MANAGE_CERTIFICATES) return;
+        Toast.fire({ icon: 'info', title: 'Sincronizando...' });
+        try {
+            const res = await fetch(apiUrl(`/api/certificates/team/event/${eventId}/sync`), { method: 'POST' });
+            const json = await res.json();
+            if (res.ok) {
+                carregarDestinatarios();
+                Swal.fire('Sincronizado!', `Criados: ${json.created || 0}. Atualizados: ${json.updated || 0}.`, 'success');
+            } else {
+                Toast.fire({ icon: 'error', title: json.erro || 'Erro ao sincronizar.' });
+            }
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro de conexão.' });
+        }
+    }
+
+    async function dispararLoteEquipe() {
+        if (!CAN_MANAGE_CERTIFICATES) return;
+        const confirm = await Swal.fire({
+            title: 'Enviar certificados da equipe?',
+            text: 'Isso disparará o envio para todos os destinatários da equipe cadastrados neste evento.',
+            icon: 'question',
+            showCancelButton: true
+        });
+        if (!confirm.isConfirmed) return;
+
+        Toast.fire({ icon: 'info', title: 'Iniciando lote...' });
+        try {
+            const res = await fetch(apiUrl(`/api/certificates/team/event/${eventId}/send_batch`), { method: 'POST' });
+            if (res.ok) {
+                setTimeout(carregarDestinatarios, 2000);
+                Swal.fire('Iniciado!', 'O processo de envio em lote foi iniciado.', 'success');
+            }
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao iniciar lote.' });
+        }
+    }
+</script>
+{% endblock %}

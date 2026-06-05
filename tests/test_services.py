@@ -4,6 +4,7 @@ import os
 from io import BytesIO
 from datetime import date, datetime, time, timezone
 from types import SimpleNamespace
+from sqlalchemy.exc import IntegrityError
 from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.services.certificate_service import CertificateService
@@ -964,6 +965,34 @@ def test_manual_enrollment_email_template_renders_with_base_layout():
     assert 'Abrir página do evento' in html
 
 
+def test_event_team_certificate_email_template_renders_links():
+    service = EmailTemplateService()
+
+    html = service.render_template('team_certificate_ready.html', {
+        'recipient_name': 'Pessoa Equipe',
+        'event_name': 'Evento Equipe',
+        'role_label': 'Facilitador',
+        'certificate_number': 'TEAMHASH1234567',
+        'download_url': 'http://localhost:5000/api/certificates/team/download_public/TEAMHASH1234567',
+        'preview_url': 'http://localhost:5000/api/certificates/team/preview_public/TEAMHASH1234567',
+        'validation_url': 'http://localhost:5000/validar/TEAMHASH1234567',
+        'year': 2026,
+        'subject': 'Certificado de Equipe - Evento Equipe',
+    })
+
+    assert 'EuroEventos' in html
+    assert 'Certificado de equipe emitido' in html
+    assert 'Pessoa Equipe' in html
+    assert 'Evento Equipe' in html
+    assert 'Facilitador' in html
+    assert 'TEAMHASH1234567' in html
+    assert 'Baixar certificado' in html
+    assert 'api/certificates/team/download_public/TEAMHASH1234567' in html
+    assert 'api/certificates/team/preview_public/TEAMHASH1234567' in html
+    assert 'validar/TEAMHASH1234567' in html
+    assert 'Validacao publica' in html
+
+
 def test_event_service_get_event_participants_paginated_returns_newest_first(app, admin_user):
     with app.app_context():
         event = Event(
@@ -1719,3 +1748,304 @@ def test_auth_service_update_profile_sends_only_changed_fields(app):
                 'new': 'Nome Novo',
             }
         ]
+
+
+def test_event_team_certificate_service_syncs_speakers_and_responsibles_without_duplicates(app, admin_user):
+    from app.models import ActivitySpeaker, EventResponsible, EventTeamCertificateRecipient
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    with app.app_context():
+        owner = User(
+            username='team_owner',
+            role='professor',
+            nome='Responsavel Evento',
+            cpf='10120230344',
+            email='owner_team@test.local',
+            can_create_events=True,
+        )
+        owner.set_password('1234')
+        helper = User(
+            username='team_helper',
+            role='professor',
+            nome='Apoio Evento',
+            cpf='10120230345',
+            email='helper_team@test.local',
+            can_create_events=True,
+        )
+        helper.set_password('1234')
+        db.session.add_all([owner, helper])
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Equipe Sync',
+            descricao='Teste',
+            tipo='PADRAO',
+            data_inicio=date(2030, 4, 1),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        db.session.add_all([
+            EventResponsible(event_id=event.id, user_username=owner.username, is_primary=True),
+            EventResponsible(event_id=event.id, user_username=helper.username, is_primary=False),
+        ])
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Mesa Redonda',
+            data_atv=date(2030, 4, 2),
+            hora_atv=time(14, 0),
+            carga_horaria=3,
+            vagas=50,
+        )
+        db.session.add(activity)
+        db.session.flush()
+        db.session.add_all([
+            ActivitySpeaker(activity_id=activity.id, nome='Palestrante Um', email='speaker1@test.local', ordem=0),
+            ActivitySpeaker(activity_id=activity.id, nome='Palestrante Dois', email='speaker2@test.local', ordem=1),
+        ])
+        db.session.commit()
+
+        service = EventTeamCertificateService()
+        first = service.sync_event_recipients(event)
+        second = service.sync_event_recipients(event)
+
+        recipients = EventTeamCertificateRecipient.query.filter_by(event_id=event.id).order_by(
+            EventTeamCertificateRecipient.source_key
+        ).all()
+        assert first == {'created': 4, 'updated': 0}
+        assert second == {'created': 0, 'updated': 4}
+        assert len(recipients) == 4
+        assert {item.role_label for item in recipients} == {
+            'Palestrante',
+            'Responsavel pelo evento',
+            'Equipe organizadora',
+        }
+        assert all(item.source == 'automatico' for item in recipients)
+        assert all(item.source_key for item in recipients)
+
+
+def test_event_team_certificate_service_retries_sync_after_integrity_error(app, admin_user, monkeypatch):
+    from app.models import ActivitySpeaker, EventResponsible, EventTeamCertificateRecipient
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    with app.app_context():
+        owner = User(
+            username='team_owner_retry',
+            role='professor',
+            nome='Responsavel Retry',
+            cpf='10120230355',
+            email='owner_retry@test.local',
+            can_create_events=True,
+        )
+        owner.set_password('1234')
+        db.session.add(owner)
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Equipe Retry',
+            descricao='Teste',
+            tipo='PADRAO',
+            data_inicio=date(2030, 4, 3),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        db.session.add(EventResponsible(event_id=event.id, user_username=owner.username, is_primary=True))
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Mesa Retry',
+            data_atv=date(2030, 4, 4),
+            hora_atv=time(14, 0),
+            carga_horaria=3,
+            vagas=50,
+        )
+        db.session.add(activity)
+        db.session.flush()
+        db.session.add(
+            ActivitySpeaker(
+                activity_id=activity.id,
+                nome='Palestrante Retry',
+                email='speaker.retry@test.local',
+                ordem=0,
+            )
+        )
+        db.session.commit()
+
+        service = EventTeamCertificateService()
+        real_commit = db.session.commit
+        attempts = {'count': 0}
+
+        def flaky_commit():
+            if attempts['count'] == 0:
+                attempts['count'] += 1
+                raise IntegrityError('INSERT', {}, Exception('duplicate key'))
+            attempts['count'] += 1
+            return real_commit()
+
+        monkeypatch.setattr(db.session, 'commit', flaky_commit)
+
+        summary = service.sync_event_recipients(event)
+
+        recipients = EventTeamCertificateRecipient.query.filter_by(event_id=event.id).all()
+        assert summary == {'created': 2, 'updated': 0}
+        assert len(recipients) == 2
+        assert attempts['count'] == 2
+
+
+def test_event_team_certificate_service_generates_pdf_with_team_tags(monkeypatch):
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    service = EventTeamCertificateService()
+    captured = {}
+
+    def fake_generate_pdf(event, user, activities, total_hours, enrollment=None, template_override=None, tag_overrides=None):
+        captured['event'] = event
+        captured['user'] = user
+        captured['activities'] = activities
+        captured['total_hours'] = total_hours
+        captured['tag_overrides'] = dict(tag_overrides or {})
+        return 'team.pdf'
+
+    monkeypatch.setattr(service.certificate_service, 'generate_pdf', fake_generate_pdf)
+
+    event = SimpleNamespace(id=7, nome='Evento Tags', data_inicio=None, cert_team_bg_path='', cert_team_template_json=None)
+    activity = SimpleNamespace(id=3, nome='Oficina Tags', data_atv=None, carga_horaria=6)
+    recipient = SimpleNamespace(
+        id=11,
+        nome='Facilitadora Tags',
+        cpf='12345678901',
+        email='facilitadora@test.local',
+        role_label='Facilitador',
+        workload_hours='',
+        cert_hash='TEAMHASH1234567',
+        activity=activity,
+    )
+
+    pdf_path = service.generate_recipient_pdf(event, recipient)
+
+    assert pdf_path == 'team.pdf'
+    assert captured['event'].designer_mode == 'event'
+    assert captured['user'].cpf == 'TEAM-11'
+    assert captured['activities'] == [activity]
+    assert captured['total_hours'] == '6'
+    assert captured['tag_overrides']['{{PAPEL}}'] == 'Facilitador'
+    assert captured['tag_overrides']['{{ATIVIDADE}}'] == 'Oficina Tags'
+    assert captured['tag_overrides']['{{HORAS}}'] == '6'
+    assert captured['tag_overrides']['{{CPF}}'] == '12345678901'
+    assert captured['tag_overrides']['{{HASH}}'] == 'TEAMHASH1234567'
+
+
+def test_event_team_certificate_service_default_template_uses_team_text():
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    service = EventTeamCertificateService()
+    event = SimpleNamespace(cert_team_bg_path='')
+    template = service.build_default_team_template(event)
+
+    by_id = {item['id']: item for item in template['elements']}
+    assert 'txt2' in by_id
+    assert '{{PAPEL}}' in by_id['txt2']['text']
+    assert 'participou do evento' not in by_id['txt2']['text']
+    for element_id in ('name_fixed', 'date_fixed', 'hash', 'qrcode'):
+        assert element_id in by_id
+
+
+def test_event_team_certificate_service_queue_email_uses_team_links(app, monkeypatch):
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    with app.app_context():
+        service = EventTeamCertificateService()
+        captured = {}
+
+        def fake_send_email_task(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        monkeypatch.setattr(service.notifier, 'send_email_task', fake_send_email_task)
+
+        event = SimpleNamespace(nome='Evento Links')
+        recipient = SimpleNamespace(
+            nome='Pessoa Teste',
+            email='pessoa@test.local',
+            role_label='Facilitador',
+            cert_hash='HASH1234567890AB',
+        )
+
+        result = service.queue_email(event, recipient, 'attachment.pdf')
+
+        assert result is True
+        assert captured['to_email'] == 'pessoa@test.local'
+        assert captured['template_name'] == 'team_certificate_ready.html'
+        assert captured['subject'] == 'Certificado de Equipe - Evento Links'
+        assert captured['template_data']['recipient_name'] == 'Pessoa Teste'
+        assert captured['template_data']['event_name'] == 'Evento Links'
+        assert captured['template_data']['role_label'] == 'Facilitador'
+        assert captured['template_data']['certificate_number'] == 'HASH1234567890AB'
+        assert captured['template_data']['download_url'].endswith('/api/certificates/team/download_public/HASH1234567890AB')
+        assert captured['template_data']['preview_url'].endswith('/api/certificates/team/preview_public/HASH1234567890AB')
+        assert captured['template_data']['validation_url'].endswith('/validar/HASH1234567890AB')
+        assert captured['attachment_path'] == 'attachment.pdf'
+
+
+def test_event_team_certificate_service_persists_generated_hash(app, admin_user, monkeypatch):
+    from app.models import EventTeamCertificateRecipient
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    with app.app_context():
+        event = Event(
+            owner_username='admin_test',
+            nome='Evento Persist Hash',
+            descricao='Teste',
+            tipo='PADRAO',
+            data_inicio=date(2030, 5, 1),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Oficina Hash',
+            data_atv=date(2030, 5, 1),
+            hora_atv=time(10, 0),
+            carga_horaria=4,
+            vagas=30,
+        )
+        db.session.add(activity)
+        db.session.flush()
+
+        recipient = EventTeamCertificateRecipient(
+            event_id=event.id,
+            activity_id=activity.id,
+            nome='Pessoa Hash',
+            email='hash@test.local',
+            role_label='Palestrante',
+            source='automatico',
+            source_key='speaker:1:hash@test.local',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+
+        service = EventTeamCertificateService()
+
+        def fake_generate_pdf(event_obj, user, activities, total_hours, enrollment=None, template_override=None, tag_overrides=None):
+            return 'team_hash.pdf'
+
+        monkeypatch.setattr(service.certificate_service, 'generate_pdf', fake_generate_pdf)
+
+        pdf_path = service.generate_recipient_pdf(event, recipient)
+
+        assert pdf_path == 'team_hash.pdf'
+        assert recipient.cert_hash is not None
+        assert len(recipient.cert_hash) == 16
+        assert recipient.cert_hash == recipient.cert_hash.upper()
+
+        db.session.expire_all()
+        stored = db.session.get(EventTeamCertificateRecipient, recipient.id)
+        assert stored.cert_hash == recipient.cert_hash

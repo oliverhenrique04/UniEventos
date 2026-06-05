@@ -1,6 +1,7 @@
 from .extensions import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+import sqlalchemy as sa
 from sqlalchemy.types import TypeDecorator, String
 from sqlalchemy.sql import operators
 from app.utils import normalize_cpf
@@ -197,6 +198,8 @@ class Event(db.Model):
     # Certificate Customization
     cert_bg_path = db.Column(db.String(200), nullable=True, default='file/fundo_padrao.png')
     cert_template_json = db.Column(db.Text, nullable=True) # JSON with positions of variables
+    cert_team_bg_path = db.Column(db.String(200), nullable=True, default='file/fundo_padrao.png')
+    cert_team_template_json = db.Column(db.Text, nullable=True)
 
     course_obj = db.relationship('Course', backref='events')
     activities = db.relationship('Activity', backref='event', cascade="all, delete-orphan")
@@ -226,6 +229,16 @@ class Event(db.Model):
             db.desc(EventResponsible.is_primary),
             EventResponsible.created_at,
             EventResponsible.user_username,
+        ),
+    )
+    team_certificate_recipients = db.relationship(
+        'EventTeamCertificateRecipient',
+        back_populates='event',
+        cascade='all, delete-orphan',
+        order_by=lambda: (
+            EventTeamCertificateRecipient.role_label,
+            EventTeamCertificateRecipient.nome,
+            EventTeamCertificateRecipient.id,
         ),
     )
 
@@ -283,6 +296,44 @@ class EventResponsible(db.Model):
             sqlite_where=db.text('is_primary = 1'),
             postgresql_where=db.text('is_primary = true'),
         ),
+    )
+
+
+class EventTeamCertificateRecipient(db.Model):
+    __tablename__ = 'event_team_certificate_recipients'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
+    activity_id = db.Column(db.Integer, db.ForeignKey('activities.id', ondelete='SET NULL'), nullable=True)
+    nome = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=True)
+    cpf = db.Column(CPFDigitsType(), nullable=True)
+    role_label = db.Column(db.String(80), nullable=False)
+    workload_hours = db.Column(db.String(20), nullable=True)
+    source = db.Column(db.String(20), nullable=False, default='manual')
+    source_key = db.Column(db.String(160), nullable=True)
+    cert_hash = db.Column(db.String(16), unique=True, nullable=True)
+    cert_entregue = db.Column(db.Boolean, nullable=False, default=False, server_default=sa.false())
+    cert_data_envio = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now(), nullable=False)
+
+    event = db.relationship('Event', back_populates='team_certificate_recipients')
+    activity = db.relationship('Activity', back_populates='team_certificate_recipients')
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "source in ('automatico', 'manual')",
+            name='ck_event_team_cert_recipient_source',
+        ),
+        db.UniqueConstraint(
+            'event_id', 'source', 'source_key',
+            name='uq_event_team_cert_recipient_source_key',
+        ),
+        db.Index('ix_event_team_cert_recipient_event_id', 'event_id'),
+        db.Index('ix_event_team_cert_recipient_activity_id', 'activity_id'),
+        db.Index('ix_event_team_cert_recipient_entregue', 'cert_entregue'),
+        db.Index('ix_event_team_cert_recipient_source', 'source'),
     )
 
 
@@ -400,6 +451,11 @@ class Activity(db.Model):
         order_by='(ActivitySpeaker.ordem, ActivitySpeaker.id)',
     )
     enrollments = db.relationship('Enrollment', backref='activity', cascade="all, delete-orphan")
+    team_certificate_recipients = db.relationship(
+        'EventTeamCertificateRecipient',
+        back_populates='activity',
+        passive_deletes=True,
+    )
 
     def get_speakers_payload(self, include_emails=True):
         payload = []

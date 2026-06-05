@@ -1,0 +1,259 @@
+import hashlib
+import json
+from datetime import datetime, timezone
+from types import SimpleNamespace
+
+from sqlalchemy.exc import IntegrityError
+
+from app.utils import build_absolute_app_url, current_certificate_issue_date_label
+
+from app.services.certificate_service import CertificateService
+from app.services.notification_service import NotificationService
+from app.models import EventTeamCertificateRecipient
+from app.extensions import db
+
+
+class EventTeamCertificateService:
+
+    def __init__(self):
+        self.certificate_service = CertificateService()
+        self.notifier = NotificationService()
+
+    @staticmethod
+    def build_hash(event_id, recipient_name, role_label, email=None):
+        issued_at = datetime.now(timezone.utc).isoformat()
+        raw = f"{event_id}|{recipient_name}|{role_label}|{email or ''}|{issued_at}"
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16].upper()
+
+    @staticmethod
+    def normalize_workload_hours(value):
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            if value < 0:
+                return None
+            return str(value)
+        if isinstance(value, str):
+            stripped = value.strip().replace(',', '.')
+            if not stripped:
+                return None
+            try:
+                num = float(stripped)
+                if num < 0:
+                    return None
+                if num == int(num):
+                    return str(int(num))
+                return str(num)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _speaker_source_key(activity_id, email, nome):
+        identifier = (email or '').strip().lower() or (nome or '').strip().lower()
+        return f"speaker:{activity_id}:{identifier}"
+
+    @staticmethod
+    def _responsible_source_key(username):
+        return f"responsible:{username}"
+
+    def sync_event_recipients(self, event):
+        max_retries = 1
+        for attempt in range(max_retries + 1):
+            created = 0
+            updated = 0
+            try:
+                for activity in event.activities:
+                    for speaker in activity.speakers:
+                        speaker_name = (speaker.nome or '').strip()
+                        if not speaker_name:
+                            continue
+                        speaker_email = (speaker.email or '').strip() or None
+                        source_key = self._speaker_source_key(activity.id, speaker_email, speaker_name)
+                        hours = self.normalize_workload_hours(activity.carga_horaria)
+
+                        existing = EventTeamCertificateRecipient.query.filter_by(
+                            event_id=event.id,
+                            source='automatico',
+                            source_key=source_key,
+                        ).first()
+
+                        if existing:
+                            existing.nome = speaker_name
+                            existing.email = speaker_email
+                            existing.role_label = 'Palestrante'
+                            existing.workload_hours = hours
+                            existing.activity_id = activity.id
+                            updated += 1
+                        else:
+                            recipient = EventTeamCertificateRecipient(
+                                event_id=event.id,
+                                activity_id=activity.id,
+                                nome=speaker_name,
+                                email=speaker_email,
+                                role_label='Palestrante',
+                                workload_hours=hours,
+                                source='automatico',
+                                source_key=source_key,
+                            )
+                            db.session.add(recipient)
+                            created += 1
+
+                for responsible in event.responsibles:
+                    user = responsible.user
+                    user_name = user.nome if user and user.nome else ''
+                    if not user_name:
+                        continue
+                    user_email = (user.email or '').strip() if user and user.email else None
+                    source_key = self._responsible_source_key(responsible.user_username)
+                    role_label = 'Responsavel pelo evento' if responsible.is_primary else 'Equipe organizadora'
+
+                    existing = EventTeamCertificateRecipient.query.filter_by(
+                        event_id=event.id,
+                        source='automatico',
+                        source_key=source_key,
+                    ).first()
+
+                    if existing:
+                        existing.nome = user_name
+                        existing.email = user_email
+                        existing.cpf = user.cpf if user and user.cpf else existing.cpf
+                        existing.role_label = role_label
+                        updated += 1
+                    else:
+                        recipient = EventTeamCertificateRecipient(
+                            event_id=event.id,
+                            activity_id=None,
+                            nome=user_name,
+                            email=user_email,
+                            cpf=user.cpf if user else None,
+                            role_label=role_label,
+                            workload_hours=None,
+                            source='automatico',
+                            source_key=source_key,
+                        )
+                        db.session.add(recipient)
+                        created += 1
+
+                db.session.commit()
+                return {'created': created, 'updated': updated}
+            except IntegrityError:
+                db.session.rollback()
+                if attempt == max_retries:
+                    raise
+
+    def build_default_team_template(self, event):
+        fixed_elements = self.certificate_service.get_fixed_validation_elements(designer_mode='event')
+        team_text_element = {
+            'id': 'txt2',
+            'type': 'text',
+            'text': (
+                'Certificamos que {{NOME}}, CPF {{CPF}}, atuou como {{PAPEL}} '
+                'no evento {{EVENTO}} na data {{DATA_REALIZACAO}}.'
+            ),
+            'x': 50,
+            'y': 50,
+            'w': 82,
+            'h': 24,
+            'font': 22,
+            'color': '#334155',
+            'align': 'center',
+            'bold': False,
+            'italic': False,
+            'font_family': 'Helvetica',
+            'zIndex': 3,
+            'locked': False,
+            'visible': True,
+        }
+        return {
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'bg': str(getattr(event, 'cert_team_bg_path', '') or '').strip(),
+            'elements': [team_text_element] + json.loads(json.dumps(fixed_elements)),
+        }
+
+    def generate_recipient_pdf(self, event, recipient, template_override=None, tag_overrides=None):
+        activity = getattr(recipient, 'activity', None)
+        activity_name = activity.nome if activity and getattr(activity, 'nome', None) else ''
+
+        if recipient.workload_hours not in (None, ''):
+            workload_hours = recipient.workload_hours
+        else:
+            workload_hours = self.normalize_workload_hours(
+                getattr(activity, 'carga_horaria', None) if activity else None
+            )
+        total_hours = workload_hours or '0'
+
+        if not recipient.cert_hash:
+            recipient.cert_hash = self.build_hash(
+                event.id, recipient.nome, recipient.role_label, recipient.email
+            )
+            db.session.commit()
+
+        team_template_json = getattr(event, 'cert_team_template_json', None)
+        team_bg_path = getattr(event, 'cert_team_bg_path', '') or ''
+
+        issue_date = current_certificate_issue_date_label()
+
+        default_tag_overrides = {
+            '{{PAPEL}}': recipient.role_label or '',
+            '{{ATIVIDADE}}': activity_name,
+            '{{HORAS}}': total_hours,
+            '{{CPF}}': recipient.cpf or '',
+            '{{HASH}}': recipient.cert_hash or '',
+            '{{DATA}}': issue_date,
+            '{{EMISSION_DATE}}': issue_date,
+        }
+        merged_overrides = {
+            **default_tag_overrides,
+            **{str(k): '' if v is None else str(v) for k, v in (tag_overrides or {}).items()},
+        }
+        merged_overrides['{{DATA}}'] = issue_date
+        merged_overrides['{{EMISSION_DATE}}'] = issue_date
+
+        fake_event = SimpleNamespace(
+            id=f"team-{event.id}",
+            nome=getattr(event, 'nome', ''),
+            data_inicio=getattr(event, 'data_inicio', None),
+            cert_bg_path=team_bg_path,
+            cert_template_json=team_template_json,
+            designer_mode='event',
+        )
+        fake_user = SimpleNamespace(
+            id=recipient.id,
+            nome=recipient.nome,
+            cpf=f"TEAM-{recipient.id}",
+            email=recipient.email or '',
+        )
+        fake_enrollment = SimpleNamespace(cert_hash=recipient.cert_hash)
+
+        return self.certificate_service.generate_pdf(
+            fake_event,
+            fake_user,
+            [activity] if activity else [],
+            total_hours,
+            enrollment=fake_enrollment,
+            template_override=template_override,
+            tag_overrides=merged_overrides,
+        )
+
+    def queue_email(self, event, recipient, attachment_path):
+        if not recipient.email:
+            return False
+        event_name = getattr(event, 'nome', '')
+        subject = f"Certificado de Equipe - {event_name}"
+        return self.notifier.send_email_task(
+            to_email=recipient.email,
+            subject=subject,
+            template_name='team_certificate_ready.html',
+            template_data={
+                'recipient_name': recipient.nome,
+                'event_name': event_name,
+                'role_label': recipient.role_label,
+                'certificate_number': recipient.cert_hash,
+                'download_url': build_absolute_app_url(f"/api/certificates/team/download_public/{recipient.cert_hash}"),
+                'preview_url': build_absolute_app_url(f"/api/certificates/team/preview_public/{recipient.cert_hash}"),
+                'validation_url': build_absolute_app_url(f"/validar/{recipient.cert_hash}"),
+            },
+            attachment_path=attachment_path,
+        )

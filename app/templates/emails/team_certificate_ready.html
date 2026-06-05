@@ -1,0 +1,24 @@
+{% extends 'emails/base.html' %}
+
+{% block email_content %}
+<h2 style="margin:0 0 10px 0; color:#0f172a; font-size:24px;">Certificado de equipe emitido</h2>
+<p style="margin:0 0 14px 0;">Prezado(a) <strong>{{ recipient_name }}</strong>,</p>
+<p style="margin:0 0 14px 0;">O certificado de atuacao no evento esta disponivel para download.</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0; background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #044d84; border-radius:10px;">
+    <tr><td style="padding:14px;"><strong>Evento:</strong> {{ event_name }}</td></tr>
+    {% if role_label %}<tr><td style="padding:0 14px 6px 14px;"><strong>Papel:</strong> {{ role_label }}</td></tr>{% endif %}
+    {% if certificate_number %}<tr><td style="padding:0 14px 14px 14px;"><strong>Numero:</strong> {{ certificate_number }}</td></tr>{% endif %}
+</table>
+
+<table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 10px 0;">
+    <tr>
+        <td style="background:#044d84; border-radius:8px;">
+            <a href="{{ download_url }}" style="display:inline-block; padding:11px 18px; color:#fff; text-decoration:none; font-weight:700;">Baixar certificado (PDF)</a>
+        </td>
+    </tr>
+</table>
+
+{% if preview_url %}<p style="margin:0;"><a href="{{ preview_url }}" style="color:#044d84;">Visualizar certificado</a></p>{% endif %}
+{% if validation_url %}<p style="margin:6px 0 0 0;"><a href="{{ validation_url }}" style="color:#044d84;">Validacao publica</a></p>{% endif %}
+{% endblock %}
