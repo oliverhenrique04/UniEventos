@@ -754,10 +754,13 @@ class EventService:
 
     @staticmethod
     def get_event_delete_block_status(event):
+        from app.models import EventTeamCertificateRecipient
+
         if not event:
             return {
                 'linked_event_registrations_count': 0,
                 'linked_enrollments_count': 0,
+                'linked_team_certificate_recipients_count': 0,
                 'has_linked_records': False,
                 'delete_block_reason': None,
             }
@@ -771,16 +774,22 @@ class EventService:
             .filter(Activity.event_id == event.id)
             .count()
         )
+        linked_team_certificate_recipients_count = (
+            EventTeamCertificateRecipient.query.filter_by(event_id=event.id).count()
+        )
         has_linked_records = (
-            linked_event_registrations_count > 0 or linked_enrollments_count > 0
+            linked_event_registrations_count > 0
+            or linked_enrollments_count > 0
+            or linked_team_certificate_recipients_count > 0
         )
 
         return {
             'linked_event_registrations_count': linked_event_registrations_count,
             'linked_enrollments_count': linked_enrollments_count,
+            'linked_team_certificate_recipients_count': linked_team_certificate_recipients_count,
             'has_linked_records': has_linked_records,
             'delete_block_reason': (
-                'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+                'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.'
                 if has_linked_records else None
             ),
         }

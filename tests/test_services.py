@@ -706,9 +706,10 @@ def test_event_service_delete_event_blocks_when_event_has_registration(app):
 
         assert status['linked_event_registrations_count'] == 1
         assert status['linked_enrollments_count'] == 0
+        assert status['linked_team_certificate_recipients_count'] == 0
         assert status['has_linked_records'] is True
         assert success is False
-        assert msg == 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+        assert msg == 'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.'
         assert len(sent_payloads) == 0
         assert db.session.get(Event, event.id) is not None
 
@@ -763,9 +764,63 @@ def test_event_service_delete_event_blocks_when_event_has_legacy_enrollment(app)
 
         assert status['linked_event_registrations_count'] == 0
         assert status['linked_enrollments_count'] == 1
+        assert status['linked_team_certificate_recipients_count'] == 0
         assert status['has_linked_records'] is True
         assert success is False
-        assert msg == 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+        assert msg == 'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.'
+        assert len(sent_payloads) == 0
+        assert db.session.get(Event, event.id) is not None
+
+
+def test_event_service_delete_event_blocks_when_event_has_team_certificate_recipients(app):
+    from app.models import EventTeamCertificateRecipient
+
+    with app.app_context():
+        owner = User(
+            username='event_owner_blocked_team_cert',
+            role='professor',
+            nome='Owner Blocked Team Cert',
+            cpf='55566677793',
+            email='owner_blocked_team_cert@test.local',
+            can_create_events=True,
+        )
+        owner.set_password('1234')
+        db.session.add(owner)
+        db.session.commit()
+
+        service = EventService()
+        sent_payloads = []
+        service.notification_service.send_email_task = lambda **kwargs: sent_payloads.append(kwargs) or True
+
+        event = service.create_event(owner.username, {
+            'nome': 'Evento Com Destinatario de Equipe',
+            'descricao': 'Desc',
+            'is_rapido': True,
+            'carga_horaria_rapida': 2,
+            'data_inicio': '2030-01-06',
+            'hora_inicio': '12:00',
+        })
+        sent_payloads.clear()
+
+        recipient = EventTeamCertificateRecipient(
+            event_id=event.id,
+            nome='Equipe Teste',
+            email='team_delete_block@test.local',
+            role_label='Equipe organizadora',
+            source='manual',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+
+        status = service.get_event_delete_block_status(event)
+        success, msg = service.delete_event(event.id, owner)
+
+        assert status['linked_event_registrations_count'] == 0
+        assert status['linked_enrollments_count'] == 0
+        assert status['linked_team_certificate_recipients_count'] == 1
+        assert status['has_linked_records'] is True
+        assert success is False
+        assert msg == 'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.'
         assert len(sent_payloads) == 0
         assert db.session.get(Event, event.id) is not None
 

@@ -4159,8 +4159,11 @@
                   <i class="fa-solid fa-users-viewfinder me-1"></i> Relatório
                 </button>
                                 ${ev.can_view_certificates ? `
-                                <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Designer de Certificado">
+                                <a href="${pathUrl(`/designer_certificado/${ev.id}`)}" class="btn btn-sm btn-light border" title="Certificados de Participantes">
                                     <i class="fa-solid fa-certificate"></i>
+                                </a>
+                                <a href="${pathUrl(`/certificados_equipe/${ev.id}`)}" class="btn btn-sm btn-light border" title="Certificados da Equipe">
+                                    <i class="fa-solid fa-users"></i>
                                 </a>` : ''}
                 <button onclick="abrirProjetor(${ev.id})" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm">
                   <i class="fa-solid fa-display me-1"></i> Projetar
