@@ -2048,6 +2048,56 @@ def test_event_team_certificate_service_queue_email_uses_team_links(app, monkeyp
         assert captured['attachment_path'] == 'attachment.pdf'
 
 
+def test_certificate_service_build_designer_bootstrap_falls_back_when_event_template_is_invalid():
+    service = CertificateService()
+    event = SimpleNamespace(
+        id=42,
+        nome='Evento Fallback',
+        data_inicio=date(2030, 1, 10),
+        cert_template_json='isto nao eh json valido{',
+        cert_bg_path='file/bg_event.png',
+        cert_team_template_json=None,
+        cert_team_bg_path=None,
+        designer_mode=None,
+        is_institutional_certificate=False,
+    )
+
+    result = service.build_designer_bootstrap(event, designer_mode='event')
+
+    assert result['designer_mode'] == 'event'
+    assert result['entity_id'] == 42
+    assert result['template']['version'] == 2
+    assert isinstance(result['template']['elements'], list)
+    assert len(result['template']['elements']) > 0
+    assert isinstance(result['warnings'], list)
+    assert len(result['warnings']) > 0
+    assert any('fallback' in str(w.get('code', '')).lower() for w in result['warnings'])
+
+
+def test_certificate_service_build_designer_bootstrap_supports_team_event_mode():
+    service = CertificateService()
+    event = SimpleNamespace(
+        id=99,
+        nome='Evento Equipe',
+        data_inicio=date(2030, 5, 1),
+        cert_template_json=None,
+        cert_bg_path=None,
+        cert_team_template_json=None,
+        cert_team_bg_path='file/fundo_equipe.png',
+        designer_mode=None,
+        is_institutional_certificate=False,
+    )
+
+    result = service.build_designer_bootstrap(event, designer_mode='team_event')
+
+    assert result['designer_mode'] == 'team_event'
+    assert result['entity_id'] == 99
+    assert result['template']['version'] == 2
+    fixed_ids = {el['id'] for el in result['fixed_validation_elements']}
+    assert 'name_fixed' in fixed_ids
+    assert '{{PAPEL}}' in json.dumps(result['preview_data'])
+
+
 def test_event_team_certificate_service_persists_generated_hash(app, admin_user, monkeypatch):
     from app.models import EventTeamCertificateRecipient
     from app.services.event_team_certificate_service import EventTeamCertificateService
