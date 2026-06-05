@@ -276,27 +276,19 @@ def designer_certificado_equipe(event_id):
     from app.models import Event
     from app.services.certificate_service import CertificateService
     from app.services.event_service import EventService
-    from types import SimpleNamespace
     event = db.session.get(Event, event_id)
     if not event:
         abort(404)
     can_manage_certificates = EventService.can_manage_event_certificates(current_user, event)
     if not EventService.can_view_event_certificates(current_user, event):
         return "Acesso negado", 403
-    designer_event = SimpleNamespace(
-        id=event.id,
-        nome=event.nome,
-        tipo=event.tipo,
-        cert_bg_path=event.cert_team_bg_path,
-        cert_template_json=event.cert_team_template_json,
-    )
     return render_template(
         'certificate_designer.html',
         user=current_user,
-        event=designer_event,
+        event=event,
         designer_mode='team_event',
         can_manage_certificates=can_manage_certificates,
-        fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='event'),
+        fixed_validation_elements=CertificateService.get_fixed_validation_elements(designer_mode='team_event'),
     )
 
 

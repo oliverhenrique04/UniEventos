@@ -834,6 +834,11 @@
         ? apiUrl('/api/institutional_certificates/send/status')
         : (designerMode === 'team_event' ? apiUrl('/api/certificates/team/send_batch/status') : apiUrl('/api/certificates/send_batch/status'));
     const validationBaseUrl = new URL(pathUrl('/validar/'), window.location.origin).href;
+    const bootstrapUrl = designerMode === 'institutional'
+        ? null
+        : (designerMode === 'team_event'
+            ? apiUrl(`/api/certificates/team/event/${entityId}/bootstrap`)
+            : apiUrl(`/api/certificates/bootstrap/${entityId}`));
     const toolbar = document.getElementById('floatingToolbar');
     const guideV = document.getElementById('guideV');
     const guideH = document.getElementById('guideH');
@@ -3483,6 +3488,17 @@
         });
     }
 
+    async function fetchDesignerBootstrap() {
+        const response = await fetch(bootstrapUrl, {
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) {
+            throw new Error('Falha ao carregar bootstrap (status ' + response.status + ')');
+        }
+        return await response.json();
+    }
+
     async function boot() {
         designer = new fabric.Canvas('certCanvas', {
             width: W,
@@ -3491,15 +3507,31 @@
             selection: true
         });
 
-        try {
-            if (persistedTemplateRaw) {
-                const parsed = JSON.parse(persistedTemplateRaw);
-                template = applyTemplateDefaults(parsed);
+        if (bootstrapUrl) {
+            try {
+                const bootstrap = await fetchDesignerBootstrap();
+                template = applyTemplateDefaults(bootstrap.template);
+                bgPath = bootstrap.background || template.bg || '';
+                if (bootstrap.warnings && bootstrap.warnings.length > 0) {
+                    const messages = bootstrap.warnings.map(function (w) { return w.message; }).join('. ');
+                    Toast.fire({ icon: 'warning', title: messages });
+                }
+            } catch (err) {
+                template = JSON.parse(JSON.stringify(defaultTemplate));
+                bgPath = template.bg || '';
+                Toast.fire({ icon: 'error', title: 'Erro ao carregar configuracao do certificado. Usando template padrao.' });
             }
-        } catch (e) {
-            template = JSON.parse(JSON.stringify(defaultTemplate));
+        } else {
+            try {
+                if (persistedTemplateRaw) {
+                    const parsed = JSON.parse(persistedTemplateRaw);
+                    template = applyTemplateDefaults(parsed);
+                }
+            } catch (e) {
+                template = JSON.parse(JSON.stringify(defaultTemplate));
+            }
+            bgPath = template.bg || '';
         }
-        bgPath = template.bg || '';
 
         await loadBackground(bgPath);
         await applyTemplateOnCanvas(template);

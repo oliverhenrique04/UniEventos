@@ -3935,6 +3935,40 @@ def test_team_certificate_send_batch_commits_missing_hashes_once_before_delivery
         assert all(item.cert_entregue is True for item in recipients)
 
 
+def test_certificate_designer_bootstrap_returns_normalized_template_and_warnings(client, app, admin_user):
+    event_id = _create_event_for_certs(app)
+
+    with app.app_context():
+        event = db.session.get(Event, event_id)
+        event.cert_template_json = '{{broken json'
+        db.session.commit()
+
+    _login_admin(client)
+    res = client.get(f'/api/certificates/bootstrap/{event_id}')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['designer_mode'] == 'event'
+    assert payload['template']['version'] == 2
+    assert isinstance(payload['template']['elements'], list)
+    assert len(payload['template']['elements']) > 0
+    assert len(payload['warnings']) > 0
+
+
+def test_team_certificate_designer_bootstrap_returns_team_mode_payload(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    _login_user(client, seeded['owner_username'])
+    res = client.get(f"/api/certificates/team/event/{seeded['event_id']}/bootstrap")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['designer_mode'] == 'team_event'
+    assert payload['template']['version'] == 2
+    assert isinstance(payload['template']['elements'], list)
+    assert '{{PAPEL}}' in json.dumps(payload['preview_data'])
+
+
 def test_prune_job_cache_removes_old_completed_entries(monkeypatch):
     jobs = {
         'old': {'completed': True, 'updated_at': 100},

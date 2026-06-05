@@ -705,6 +705,34 @@ def preview_single(enrollment_id):
     return _build_pdf_preview_response(pdf_path)
 
 
+@bp.route('/bootstrap/<int:event_id>', methods=['GET'])
+@login_required
+def designer_bootstrap(event_id):
+    event = _get_or_404(Event, event_id)
+    if not _can_view_certificates(event):
+        return jsonify({'erro': 'Acesso negado para este evento'}), 403
+
+    bootstrap = cert_service.build_designer_bootstrap(event, designer_mode='event')
+    bootstrap['can_manage_certificates'] = _can_manage_certificates(event)
+    bootstrap['can_view_certificates'] = _can_view_certificates(event)
+    bootstrap['recipient_scope'] = 'event_participants'
+    return jsonify(bootstrap)
+
+
+@bp.route('/team/event/<int:event_id>/bootstrap', methods=['GET'])
+@login_required
+def team_designer_bootstrap(event_id):
+    event = _get_or_404(Event, event_id)
+    if not _can_view_certificates(event):
+        return jsonify({'erro': 'Acesso negado para este evento'}), 403
+
+    bootstrap = cert_service.build_designer_bootstrap(event, designer_mode='team_event')
+    bootstrap['can_manage_certificates'] = _can_manage_certificates(event)
+    bootstrap['can_view_certificates'] = _can_view_certificates(event)
+    bootstrap['recipient_scope'] = 'event_team_resolved'
+    return jsonify(bootstrap)
+
+
 @bp.route('/team/event/<int:event_id>/recipients', methods=['GET'])
 @login_required
 def list_team_recipients(event_id):
