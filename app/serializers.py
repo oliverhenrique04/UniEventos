@@ -166,6 +166,7 @@ def serialize_event(event, current_user=None):
     delete_block_status = {
         'linked_event_registrations_count': 0,
         'linked_enrollments_count': 0,
+        'linked_team_certificate_recipients_count': 0,
         'has_linked_records': False,
         'delete_block_reason': None,
     }
@@ -287,6 +288,7 @@ def serialize_event(event, current_user=None):
         'can_delete_permission': can_delete_permission,
         'linked_event_registrations_count': delete_block_status['linked_event_registrations_count'],
         'linked_enrollments_count': delete_block_status['linked_enrollments_count'],
+        'linked_team_certificate_recipients_count': delete_block_status['linked_team_certificate_recipients_count'],
         'has_linked_records': delete_block_status['has_linked_records'],
         'delete_block_reason': delete_block_reason,
         'can_manage_participants': can_manage_participants,

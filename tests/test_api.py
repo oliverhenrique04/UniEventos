@@ -1433,9 +1433,10 @@ def test_delete_event_returns_400_and_admin_payload_blocks_when_event_has_regist
     delete_res = client.delete(f'/api/deletar_evento/{event_id}')
     assert delete_res.status_code == 400
     assert delete_res.get_json() == {
-        'erro': 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.',
+        'erro': 'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.',
         'linked_event_registrations_count': 1,
         'linked_enrollments_count': 0,
+        'linked_team_certificate_recipients_count': 0,
     }
 
     list_res = client.get('/api/eventos_admin')
@@ -1446,8 +1447,9 @@ def test_delete_event_returns_400_and_admin_payload_blocks_when_event_has_regist
     assert blocked_item['can_delete_permission'] is True
     assert blocked_item['linked_event_registrations_count'] == 1
     assert blocked_item['linked_enrollments_count'] == 0
+    assert blocked_item['linked_team_certificate_recipients_count'] == 0
     assert blocked_item['has_linked_records'] is True
-    assert blocked_item['delete_block_reason'] == 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.'
+    assert blocked_item['delete_block_reason'] == 'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.'
 
 
 def test_delete_event_returns_400_when_event_has_legacy_enrollment(client, app, admin_user):
@@ -1486,10 +1488,57 @@ def test_delete_event_returns_400_when_event_has_legacy_enrollment(client, app, 
     delete_res = client.delete(f'/api/deletar_evento/{event_id}')
     assert delete_res.status_code == 400
     assert delete_res.get_json() == {
-        'erro': 'Não é possível excluir o evento porque existem inscrições ou matrículas vinculadas.',
+        'erro': 'Não é possível excluir o evento porque existem inscrições, matrículas ou destinatários de certificados de equipe vinculados.',
         'linked_event_registrations_count': 0,
         'linked_enrollments_count': 1,
+        'linked_team_certificate_recipients_count': 0,
     }
+
+
+def test_delete_event_endpoint_reports_team_certificate_recipient_block(client, app, admin_user):
+    with app.app_context():
+        owner = User(
+            username='event_delete_team_owner',
+            role='professor',
+            nome='Owner Delete Team',
+            cpf='55566677794',
+            email='event_delete_team_owner@test.local',
+            can_create_events=True,
+        )
+        owner.set_password('1234')
+        db.session.add(owner)
+        db.session.commit()
+
+        service = EventService()
+        event = service.create_event(owner.username, {
+            'nome': 'Evento API Block Team Recipient',
+            'descricao': 'Desc',
+            'is_rapido': True,
+            'carga_horaria_rapida': 2,
+            'data_inicio': '2030-01-07',
+            'hora_inicio': '12:00',
+        })
+
+        recipient = EventTeamCertificateRecipient(
+            event_id=event.id,
+            nome='Equipe API',
+            email='event_delete_team_api@test.local',
+            role_label='Equipe organizadora',
+            source='manual',
+        )
+        db.session.add(recipient)
+        db.session.commit()
+        event_id = event.id
+
+    _login_user(client, 'event_delete_team_owner')
+    res = client.delete(f'/api/deletar_evento/{event_id}')
+
+    assert res.status_code == 400
+    payload = res.get_json()
+    assert payload['linked_event_registrations_count'] == 0
+    assert payload['linked_enrollments_count'] == 0
+    assert payload['linked_team_certificate_recipients_count'] == 1
+    assert 'certificados de equipe' in payload['erro'].lower()
 
 
 def test_dashboard_analytics_professor_owner_filter_remains_disabled(client, app):

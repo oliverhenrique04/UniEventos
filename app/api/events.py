@@ -488,6 +488,7 @@ def deletar_evento(event_id):
             "erro": msg,
             "linked_event_registrations_count": delete_block_status['linked_event_registrations_count'],
             "linked_enrollments_count": delete_block_status['linked_enrollments_count'],
+            "linked_team_certificate_recipients_count": delete_block_status['linked_team_certificate_recipients_count'],
         }), 400
     return jsonify({"erro": msg}), 403
 
