@@ -3935,6 +3935,69 @@ def test_team_certificate_send_batch_commits_missing_hashes_once_before_delivery
         assert all(item.cert_entregue is True for item in recipients)
 
 
+def test_team_certificate_send_batch_persists_automatic_resolved_rows_before_delivery(
+    client, app, admin_user, monkeypatch, tmp_path
+):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-batch-auto-persist.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team automatic persistence\n')
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+
+        certificates_api._SEND_TEAM_BATCH_JOBS.clear()
+        db.session.add(ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Speaker Auto Persistido',
+            email='speaker.auto.persistido@test.local',
+            ordem=0,
+        ))
+        db.session.commit()
+
+        monkeypatch.setattr(
+            certificates_api.team_cert_service.certificate_service,
+            'generate_pdf',
+            lambda *args, **kwargs: str(pdf_path),
+        )
+        monkeypatch.setattr(
+            certificates_api.team_cert_service.notifier,
+            'send_email_task',
+            lambda **kwargs: True,
+        )
+
+        job_id = 'team-batch-job-auto-persist'
+        certificates_api._SEND_TEAM_BATCH_JOBS[job_id] = {
+            'job_id': job_id,
+            'event_id': seeded['event_id'],
+            'created_by': seeded['owner_username'],
+            'status': 'queued',
+            'completed': False,
+            'resultado': 'processando',
+            'message': 'Teste',
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+            'created_at': 0,
+            'updated_at': 0,
+        }
+
+        certificates_api._run_send_team_batch_job(
+            job_id,
+            seeded['event_id'],
+            certificates_api.current_app._get_current_object(),
+        )
+
+        persisted = EventTeamCertificateRecipient.query.filter_by(
+            event_id=seeded['event_id'],
+            source='automatico',
+            nome='Speaker Auto Persistido',
+        ).one()
+
+        assert persisted.cert_hash
+        assert persisted.cert_entregue is True
+        assert persisted.cert_data_envio is not None
+
+
 def test_certificate_designer_bootstrap_returns_normalized_template_and_warnings(client, app, admin_user):
     event_id = _create_event_for_certs(app)
 
@@ -4035,6 +4098,12 @@ def test_prune_job_cache_removes_old_completed_entries(monkeypatch):
 def test_team_certificate_pages_load_for_owner_and_gestor(client, app, admin_user):
     seeded = _seed_certificate_management_data(app)
 
+    with app.app_context():
+        event = db.session.get(Event, seeded['event_id'])
+        event.cert_team_bg_path = 'file/team-specific.png'
+        event.cert_bg_path = 'file/event-specific.png'
+        db.session.commit()
+
     for username in [seeded['owner_username'], seeded['manager_username']]:
         client.get('/api/logout')
         _login_user(client, username)
@@ -4047,6 +4116,14 @@ def test_team_certificate_pages_load_for_owner_and_gestor(client, app, admin_use
         designer_html = designer_res.get_data(as_text=True)
         assert 'team_event' in designer_html
         assert '/api/certificates/team/event' in designer_html
+        assert 'previewData = bootstrap.preview_data || buildRandomPreviewData();' in designer_html
+        import re
+
+        assert re.search(
+            r'bg:\s*designerMode === \'team_event\'\s*\? "file/team-specific\.png"\s*:\s*"file/event-specific\.png"',
+            designer_html,
+        )
+        assert 'atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}}.' in designer_html
 
 
 def test_team_certificate_designer_setup_and_preview_return_pdf(client, app, admin_user):

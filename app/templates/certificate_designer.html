@@ -914,7 +914,7 @@
             text: designerMode === 'institutional'
                 ? 'Certificamos que {{RECIPIENT_NAME}} matriculado(a) no curso {{CURSO_USUARIO}} atuou como {{CATEGORY}} com carga horária de {{CARGA_HORARIA}}.'
                 : (designerMode === 'team_event'
-                    ? 'Certificamos que {{NOME}}, CPF {{CPF}}, atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}}.'
+                    ? 'Certificamos que {{NOME}}, CPF {{CPF}}, atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}}.'
                     : 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}}.'),
             x: 50,
             y: 50,
@@ -936,7 +936,9 @@
     const defaultTemplate = {
         version: 2,
         document: { gridSize: 2, snap: true, guides: true },
-        bg: "{{ event.cert_bg_path or '' }}",
+        bg: designerMode === 'team_event'
+            ? "{{ event.cert_team_bg_path or event.cert_bg_path or '' }}"
+            : "{{ event.cert_bg_path or '' }}",
         elements: defaultTemplateElements
     };
 
@@ -3512,6 +3514,7 @@
                 const bootstrap = await fetchDesignerBootstrap();
                 template = applyTemplateDefaults(bootstrap.template);
                 bgPath = bootstrap.background || template.bg || '';
+                previewData = bootstrap.preview_data || buildRandomPreviewData();
                 if (bootstrap.warnings && bootstrap.warnings.length > 0) {
                     const messages = bootstrap.warnings.map(function (w) { return w.message; }).join('. ');
                     Toast.fire({ icon: 'warning', title: messages });
@@ -3519,6 +3522,7 @@
             } catch (err) {
                 template = JSON.parse(JSON.stringify(defaultTemplate));
                 bgPath = template.bg || '';
+                previewData = buildRandomPreviewData();
                 Toast.fire({ icon: 'error', title: 'Erro ao carregar configuracao do certificado. Usando template padrao.' });
             }
         } else {
@@ -3531,6 +3535,7 @@
                 template = JSON.parse(JSON.stringify(defaultTemplate));
             }
             bgPath = template.bg || '';
+            previewData = buildRandomPreviewData();
         }
 
         await loadBackground(bgPath);

@@ -13,7 +13,7 @@ from app.services.admin_service import AdminService
 from app.services.email_template_service import EmailTemplateService
 from app.models import User
 from app.extensions import db
-from app.models import Event, Course, Activity, Enrollment, EventRegistration
+from app.models import Event, Course, Activity, ActivitySpeaker, Enrollment, EventRegistration, EventTeamCertificateRecipient
 from openpyxl import Workbook
 
 def test_auth_service_register(app):
@@ -1233,6 +1233,83 @@ def test_event_team_certificate_service_resolves_activity_and_responsible_recipi
         assert key_a != key_resp
         assert key_a.split('|', 2)[0] == 'activity'
         assert key_a.split('|', 2)[1] == str(event.id)
+
+
+def test_event_team_certificate_service_reuses_persisted_automatic_rows(app):
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    with app.app_context():
+        owner = User(
+            username='owner_resolve_persist',
+            role='admin',
+            nome='Owner Persist',
+            cpf='12312312312',
+            email='owner.persist@test.local',
+        )
+        db.session.add(owner)
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Persistencia Equipe',
+            descricao='Desc',
+            tipo='PADRAO',
+            data_inicio=date(2030, 4, 1),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity = Activity(
+            event_id=event.id,
+            nome='Atividade Persistida',
+            local='Sala 1',
+            descricao='Desc',
+            data_atv=date(2030, 4, 1),
+            hora_atv=time(10, 0),
+            carga_horaria=4,
+            vagas=10,
+        )
+        db.session.add(activity)
+        db.session.flush()
+
+        db.session.add(ActivitySpeaker(
+            activity_id=activity.id,
+            nome='Speaker Persistido',
+            email='speaker.persistido@test.local',
+            ordem=0,
+        ))
+        db.session.flush()
+
+        source_key = EventTeamCertificateService._speaker_source_key(
+            activity.id,
+            'speaker.persistido@test.local',
+            'Speaker Persistido',
+        )
+        persisted = EventTeamCertificateRecipient(
+            event_id=event.id,
+            activity_id=activity.id,
+            nome='Speaker Persistido',
+            email='speaker.persistido@test.local',
+            role_label='Palestrante',
+            workload_hours='4',
+            source='automatico',
+            source_key=source_key,
+            cert_hash='HASHAUTO12345678',
+            cert_entregue=True,
+            cert_data_envio=datetime(2030, 4, 2, 12, 0),
+        )
+        db.session.add(persisted)
+        db.session.commit()
+
+        service = EventTeamCertificateService()
+        resolved = service.resolve_event_recipients(event)
+
+        row = next(item for item in resolved if item['source'] == 'activity' and item['nome'] == 'Speaker Persistido')
+        assert row['id'] == persisted.id
+        assert row['cert_hash'] == 'HASHAUTO12345678'
+        assert row['cert_entregue'] is True
+        assert row['cert_data_envio'] == persisted.cert_data_envio.isoformat()
 
 
 def test_certificate_service_generates_pdf_with_bounded_overflow_text(app, admin_user):

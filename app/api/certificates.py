@@ -929,6 +929,9 @@ def _handle_team_resolved_action(resolved_key, action):
             return jsonify({'erro': 'Acesso negado para este evento'}), 403
         if not recipient.email:
             return jsonify({'erro': 'E-mail nao definido para este destinatario.'}), 400
+        row = team_cert_service.ensure_persisted_automatic_recipient(event, row)
+        team_cert_service.ensure_recipient_hash(event.id, row)
+        recipient = team_cert_service.build_virtual_recipient(event, row)
         pdf_path = team_cert_service.generate_recipient_pdf(event, recipient)
         team_cert_service.queue_email(event, recipient, pdf_path)
         resolved_id = row.get('id')
@@ -973,20 +976,16 @@ def _run_send_team_batch_job(job_id, event_id, app_obj):
             missing_hashes = [r for r in resolved_rows if not r.get('cert_hash')]
             if missing_hashes:
                 for r in missing_hashes:
-                    r['cert_hash'] = team_cert_service.build_hash(
-                        event_id, r['nome'], r['role_label'], r.get('email')
-                    )
-                    resolved_id = r.get('id')
-                    if resolved_id is not None:
-                        persisted = db.session.get(EventTeamCertificateRecipient, resolved_id)
-                        if persisted:
-                            persisted.cert_hash = r['cert_hash']
+                    r = team_cert_service.ensure_persisted_automatic_recipient(event, r)
+                    team_cert_service.ensure_recipient_hash(event_id, r)
                 db.session.commit()
 
             for row in resolved_rows:
                 if not row.get('email'):
                     sem_email += 1
                     continue
+
+                row = team_cert_service.ensure_persisted_automatic_recipient(event, row)
 
                 recipient = team_cert_service.build_virtual_recipient(event, row)
                 try:
