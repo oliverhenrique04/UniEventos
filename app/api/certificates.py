@@ -14,8 +14,6 @@ import re
 import time
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
-
 from app.models import Event, Enrollment, User, Activity, EventTeamCertificateRecipient
 from app.extensions import db
 from app.utils import build_absolute_app_url, normalize_cpf
@@ -705,20 +703,59 @@ def preview_single(enrollment_id):
     return _build_pdf_preview_response(pdf_path)
 
 
+@bp.route('/bootstrap/<int:event_id>', methods=['GET'])
+@login_required
+def designer_bootstrap(event_id):
+    event = _get_or_404(Event, event_id)
+    if not _can_view_certificates(event):
+        return jsonify({'erro': 'Acesso negado para este evento'}), 403
+
+    bootstrap = cert_service.build_designer_bootstrap(event, designer_mode='event')
+    bootstrap['can_manage_certificates'] = _can_manage_certificates(event)
+    bootstrap['can_view_certificates'] = _can_view_certificates(event)
+    bootstrap['recipient_scope'] = 'event_participants'
+    return jsonify(bootstrap)
+
+
+@bp.route('/team/event/<int:event_id>/bootstrap', methods=['GET'])
+@login_required
+def team_designer_bootstrap(event_id):
+    event = _get_or_404(Event, event_id)
+    if not _can_view_certificates(event):
+        return jsonify({'erro': 'Acesso negado para este evento'}), 403
+
+    bootstrap = cert_service.build_designer_bootstrap(event, designer_mode='team_event')
+    bootstrap['can_manage_certificates'] = _can_manage_certificates(event)
+    bootstrap['can_view_certificates'] = _can_view_certificates(event)
+    bootstrap['recipient_scope'] = 'event_team_resolved'
+    return jsonify(bootstrap)
+
+
 @bp.route('/team/event/<int:event_id>/recipients', methods=['GET'])
 @login_required
 def list_team_recipients(event_id):
     event = _get_or_404(Event, event_id)
     if not _can_view_certificates(event):
         return jsonify({'erro': 'Acesso negado para este evento'}), 403
-    recipients = EventTeamCertificateRecipient.query.filter_by(event_id=event_id).options(
-        joinedload(EventTeamCertificateRecipient.activity)
-    ).order_by(
-        EventTeamCertificateRecipient.role_label.asc(),
-        EventTeamCertificateRecipient.nome.asc(),
-        EventTeamCertificateRecipient.id.asc(),
-    ).all()
-    return jsonify({'items': [_team_recipient_payload(item) for item in recipients], 'total': len(recipients)})
+    resolved = team_cert_service.resolve_event_recipients(event)
+    items = []
+    for row in resolved:
+        items.append({
+            'id': row.get('id'),
+            'nome': row['nome'],
+            'email': row.get('email'),
+            'cpf': row.get('cpf'),
+            'role_label': row['role_label'],
+            'activity_id': row.get('activity_id'),
+            'activity_name': row.get('activity_name'),
+            'workload_hours': row.get('workload_hours'),
+            'source': row['source'],
+            'resolved_key': row['resolved_key'],
+            'cert_hash': row.get('cert_hash'),
+            'cert_entregue': row.get('cert_entregue', False),
+            'cert_data_envio': row.get('cert_data_envio'),
+        })
+    return jsonify({'items': items, 'total': len(items)})
 
 
 @bp.route('/team/event/<int:event_id>/sync', methods=['POST'])
@@ -836,6 +873,79 @@ def resend_team_recipient(recipient_id):
     return jsonify({'mensagem': 'Reenvio solicitado.'})
 
 
+@bp.route('/team/resolved/<path:resolved_key>/preview', methods=['GET'])
+@login_required
+def preview_team_resolved(resolved_key):
+    return _handle_team_resolved_action(resolved_key, 'preview')
+
+
+@bp.route('/team/resolved/<path:resolved_key>/download', methods=['GET'])
+@login_required
+def download_team_resolved(resolved_key):
+    return _handle_team_resolved_action(resolved_key, 'download')
+
+
+@bp.route('/team/resolved/<path:resolved_key>/resend', methods=['POST'])
+@login_required
+def resend_team_resolved(resolved_key):
+    return _handle_team_resolved_action(resolved_key, 'resend')
+
+
+def _event_id_from_resolved_key(resolved_key):
+    try:
+        _, event_id, _ = str(resolved_key or '').split('|', 2)
+        return int(event_id)
+    except (TypeError, ValueError):
+        abort(404, description='Destinatario resolvido nao encontrado para esta chave.')
+
+
+def _handle_team_resolved_action(resolved_key, action):
+    event_id = _event_id_from_resolved_key(resolved_key)
+    event = db.session.get(Event, event_id)
+    row = None
+    if event:
+        for candidate in team_cert_service.resolve_event_recipients(event):
+            if candidate.get('resolved_key') == resolved_key:
+                row = candidate
+                break
+
+    if not event or not row:
+        abort(404, description='Destinatario resolvido nao encontrado para esta chave.')
+
+    if not _can_view_certificates(event):
+        return jsonify({'erro': 'Acesso negado para este evento'}), 403
+
+    recipient = team_cert_service.build_virtual_recipient(event, row)
+
+    if action == 'preview':
+        pdf_path = team_cert_service.generate_recipient_pdf(event, recipient)
+        return _build_pdf_preview_response(pdf_path)
+    elif action == 'download':
+        pdf_path = team_cert_service.generate_recipient_pdf(event, recipient)
+        filename = f"Certificado_Equipe_{recipient.nome.replace(' ', '_')}.pdf"
+        return send_file(pdf_path, as_attachment=True, download_name=filename)
+    elif action == 'resend':
+        if not _can_manage_certificates(event):
+            return jsonify({'erro': 'Acesso negado para este evento'}), 403
+        if not recipient.email:
+            return jsonify({'erro': 'E-mail nao definido para este destinatario.'}), 400
+        row = team_cert_service.ensure_persisted_automatic_recipient(event, row)
+        team_cert_service.ensure_recipient_hash(event.id, row)
+        recipient = team_cert_service.build_virtual_recipient(event, row)
+        pdf_path = team_cert_service.generate_recipient_pdf(event, recipient)
+        team_cert_service.queue_email(event, recipient, pdf_path)
+        resolved_id = row.get('id')
+        if resolved_id is not None:
+            persisted = db.session.get(EventTeamCertificateRecipient, resolved_id)
+            if persisted:
+                persisted.cert_entregue = True
+                persisted.cert_data_envio = datetime.now()
+                db.session.commit()
+        return jsonify({'mensagem': 'Reenvio solicitado.'})
+    else:
+        abort(400)
+
+
 def _run_send_team_batch_job(job_id, event_id, app_obj):
     with app_obj.app_context():
         try:
@@ -844,34 +954,51 @@ def _run_send_team_batch_job(job_id, event_id, app_obj):
                 status='running',
                 message='Gerando PDFs e enfileirando e-mails de equipe.',
             )
-            recipients = EventTeamCertificateRecipient.query.filter_by(event_id=event_id).options(
-                joinedload(EventTeamCertificateRecipient.activity)
-            ).all()
+            event = db.session.get(Event, event_id)
+            if not event:
+                _update_send_team_batch_job(
+                    job_id,
+                    status='error',
+                    completed=True,
+                    resultado='erro',
+                    message='Evento nao encontrado.',
+                    total_enviado=0,
+                    sem_email=0,
+                    falha_fila=0,
+                )
+                return
+
+            resolved_rows = team_cert_service.resolve_event_recipients(event)
             total_enviado = 0
             sem_email = 0
             falha_fila = 0
 
-            missing_hashes = [r for r in recipients if not r.cert_hash]
+            missing_hashes = [r for r in resolved_rows if not r.get('cert_hash')]
             if missing_hashes:
-                event = db.session.get(Event, event_id)
                 for r in missing_hashes:
-                    r.cert_hash = team_cert_service.build_hash(event_id, r.nome, r.role_label, r.email)
+                    r = team_cert_service.ensure_persisted_automatic_recipient(event, r)
+                    team_cert_service.ensure_recipient_hash(event_id, r)
                 db.session.commit()
 
-            for recipient in recipients:
-                event = db.session.get(Event, event_id)
-                if not event:
-                    continue
-                if not recipient.email:
+            for row in resolved_rows:
+                if not row.get('email'):
                     sem_email += 1
                     continue
+
+                row = team_cert_service.ensure_persisted_automatic_recipient(event, row)
+
+                recipient = team_cert_service.build_virtual_recipient(event, row)
                 try:
                     pdf_path = team_cert_service.generate_recipient_pdf(event, recipient)
                     if not team_cert_service.queue_email(event, recipient, pdf_path):
                         falha_fila += 1
                         continue
-                    recipient.cert_entregue = True
-                    recipient.cert_data_envio = datetime.now()
+                    resolved_id = row.get('id')
+                    if resolved_id is not None:
+                        persisted_rec = db.session.get(EventTeamCertificateRecipient, resolved_id)
+                        if persisted_rec:
+                            persisted_rec.cert_entregue = True
+                            persisted_rec.cert_data_envio = datetime.now()
                     total_enviado += 1
                 except Exception:
                     falha_fila += 1
@@ -994,7 +1121,7 @@ def setup_team_certificate(event_id):
     template_json = request.form.get('template')
     remove_bg = request.form.get('remove_bg') == 'true'
 
-    normalized_template, template_error = _normalize_template(template_json, designer_mode='event')
+    normalized_template, template_error = _normalize_template(template_json, designer_mode='team_event')
     if template_error:
         return jsonify({'erro': template_error}), 400
 
@@ -1036,7 +1163,7 @@ def preview_team_layout(event_id):
         return jsonify({'erro': 'Acesso negado para este evento'}), 403
 
     payload = request.get_json(silent=True) or {}
-    normalized_template, template_error = _normalize_template_payload(payload.get('template'), designer_mode='event')
+    normalized_template, template_error = _normalize_template_payload(payload.get('template'), designer_mode='team_event')
     if template_error:
         return jsonify({'erro': template_error}), 400
 

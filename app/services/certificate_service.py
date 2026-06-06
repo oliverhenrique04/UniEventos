@@ -173,34 +173,140 @@ class CertificateService:
     def build_default_template(cls, designer_mode='event', bg=''):
         text_elements = []
 
+        if designer_mode == 'institutional':
+            default_text = 'Certificamos que {{RECIPIENT_NAME}} participou como {{CATEGORY}} do curso {{CURSO_USUARIO}}, com carga horária de {{CARGA_HORARIA}} horas.'
+            default_w = 80
+        elif designer_mode == 'team_event':
+            default_text = 'Certificamos que {{NOME}}, CPF {{CPF}}, atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}}.'
+            default_w = 82
+        else:
+            default_text = 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}} horas.'
+            default_w = 82
+
         text_elements.append({
-        'id': 'txt2',
-        'type': 'text',
-        'text': (
-            'Certificamos que {{RECIPIENT_NAME}} participou como {{CATEGORY}} do curso {{CURSO_USUARIO}}, com carga horária de {{CARGA_HORARIA}} horas.'
-            if designer_mode == 'institutional'
-            else 'Certificamos que {{NOME}}, CPF {{CPF}}, participou do evento {{EVENTO}} na data {{DATA_REALIZACAO}} com carga horária de {{HORAS}} horas.'
-        ),
-        'x': 50,
-        'y': 50,
-        'w': 82 if designer_mode == 'event' else 80,
-        'h': 24,
-        'font': 22,
-        'color': '#334155',
-        'align': 'center',
-        'bold': False,
-        'italic': False,
-        'font_family': 'Helvetica',
-        'zIndex': 3,
-        'locked': False,
-        'visible': True,
-    })
+            'id': 'txt2',
+            'type': 'text',
+            'text': default_text,
+            'x': 50,
+            'y': 50,
+            'w': default_w,
+            'h': 24,
+            'font': 22,
+            'color': '#334155',
+            'align': 'center',
+            'bold': False,
+            'italic': False,
+            'font_family': 'Helvetica',
+            'zIndex': 3,
+            'locked': False,
+            'visible': True,
+        })
 
         return {
             'version': 2,
             'document': {'gridSize': 2, 'snap': True, 'guides': True},
             'bg': str(bg or '').strip(),
             'elements': text_elements + json.loads(json.dumps(cls.get_fixed_validation_elements(designer_mode=designer_mode))),
+        }
+
+    @classmethod
+    def _background_for_entity(cls, event, designer_mode='event'):
+        if designer_mode == 'team_event':
+            return getattr(event, 'cert_team_bg_path', None) or getattr(event, 'cert_bg_path', None)
+        return getattr(event, 'cert_bg_path', None)
+
+    @classmethod
+    def _template_json_for_entity(cls, event, designer_mode='event'):
+        if designer_mode == 'team_event':
+            return getattr(event, 'cert_team_template_json', None) or getattr(event, 'cert_template_json', None)
+        return getattr(event, 'cert_template_json', None)
+
+    @classmethod
+    def build_preview_data(cls, event, designer_mode='event'):
+        if designer_mode == 'team_event':
+            return {
+                '{{NOME}}': 'Nome da Pessoa',
+                '{{CPF}}': '000.000.000-00',
+                '{{PAPEL}}': 'Função na equipe',
+                '{{EVENTO}}': getattr(event, 'nome', ''),
+                '{{DATA_REALIZACAO}}': '01/01/2030',
+            }
+        if designer_mode == 'institutional':
+            return {
+                '{{RECIPIENT_NAME}}': 'Nome do Destinatario',
+                '{{CATEGORY}}': 'Categoria',
+                '{{CURSO_USUARIO}}': 'Nome do Curso',
+                '{{CARGA_HORARIA}}': '40 horas',
+            }
+        return {
+            '{{NOME}}': 'Nome do Participante',
+            '{{CPF}}': '000.000.000-00',
+            '{{EVENTO}}': getattr(event, 'nome', ''),
+            '{{DATA_REALIZACAO}}': '01/01/2030',
+            '{{HORAS}}': '4 horas',
+        }
+
+    def build_designer_bootstrap(self, event, designer_mode='event'):
+        warnings = []
+        entity_id = getattr(event, 'id', None)
+        resolved_mode = self._designer_mode_for_entity(event) if designer_mode == 'event' and not getattr(event, 'designer_mode', None) else designer_mode
+        if not resolved_mode or resolved_mode not in ('event', 'institutional', 'team_event'):
+            resolved_mode = 'event'
+
+        bg = self._background_for_entity(event, designer_mode=resolved_mode) or ''
+        template_json = self._template_json_for_entity(event, designer_mode=resolved_mode)
+
+        default_template = self.build_default_template(designer_mode=resolved_mode, bg=bg)
+        if not template_json:
+            normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
+            return {
+                'designer_mode': resolved_mode,
+                'entity_id': entity_id,
+                'template': normalized,
+                'background': bg,
+                'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
+                'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
+                'warnings': warnings,
+            }
+
+        try:
+            template = json.loads(template_json)
+        except Exception:
+            warnings.append({'code': 'fallback_invalid_json', 'message': 'Template armazenado invalido. Usando template padrao.'})
+            normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
+            return {
+                'designer_mode': resolved_mode,
+                'entity_id': entity_id,
+                'template': normalized,
+                'background': bg,
+                'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
+                'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
+                'warnings': warnings,
+            }
+
+        if isinstance(template, dict) and isinstance(template.get('elements'), list):
+            template.setdefault('bg', bg)
+            normalized = self.normalize_template_payload(template, designer_mode=resolved_mode)
+            return {
+                'designer_mode': resolved_mode,
+                'entity_id': entity_id,
+                'template': normalized,
+                'background': normalized.get('bg') or bg,
+                'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
+                'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
+                'warnings': warnings,
+            }
+
+        warnings.append({'code': 'fallback_invalid_json', 'message': 'Template armazenado invalido. Usando template padrao.'})
+        normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
+        return {
+            'designer_mode': resolved_mode,
+            'entity_id': entity_id,
+            'template': normalized,
+            'background': bg,
+            'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
+            'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
+            'warnings': warnings,
         }
 
     @classmethod
@@ -392,6 +498,9 @@ class CertificateService:
                 for element in (elements or [])
             )
 
+        event_bg = self._background_for_entity(event, designer_mode=designer_mode) or ''
+        event_template_json = self._template_json_for_entity(event, designer_mode=designer_mode)
+
         if template_override is not None:
             if isinstance(template_override, str):
                 try:
@@ -400,43 +509,43 @@ class CertificateService:
                     template_override = {}
 
             normalized_override = self.normalize_template_payload(template_override or {}, designer_mode=designer_mode)
-            return normalized_override.get('elements', []), (normalized_override.get('bg') or getattr(event, 'cert_bg_path', None))
+            return normalized_override.get('elements', []), (normalized_override.get('bg') or event_bg)
 
-        default_template = self.build_default_template(designer_mode=designer_mode, bg=getattr(event, 'cert_bg_path', ''))
+        default_template = self.build_default_template(designer_mode=designer_mode, bg=event_bg)
 
-        if not event.cert_template_json:
+        if not event_template_json:
             normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
-            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+            return normalized.get('elements', []), (normalized.get('bg') or event_bg)
 
         try:
-            template = json.loads(event.cert_template_json)
+            template = json.loads(event_template_json)
         except Exception:
             normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
-            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+            return normalized.get('elements', []), (normalized.get('bg') or event_bg)
 
         if isinstance(template, dict) and isinstance(template.get('elements'), list):
             normalized = self.normalize_template_payload(template, designer_mode=designer_mode)
             if designer_mode == 'institutional' and not _has_custom_elements(normalized.get('elements', [])):
                 normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
-            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+            return normalized.get('elements', []), (normalized.get('bg') or event_bg)
 
         if isinstance(template, dict):
             legacy_elements = self._normalize_legacy_elements(template)
             if designer_mode == 'institutional' and not _has_custom_elements(legacy_elements):
                 normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
-                return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+                return normalized.get('elements', []), (normalized.get('bg') or event_bg)
 
             normalized_legacy = {
                 'version': 2,
                 'document': {'gridSize': 2, 'snap': True, 'guides': True},
-                'bg': getattr(event, 'cert_bg_path', ''),
+                'bg': event_bg,
                 'elements': legacy_elements,
             }
             normalized = self.normalize_template_payload(normalized_legacy, designer_mode=designer_mode)
-            return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+            return normalized.get('elements', []), (normalized.get('bg') or event_bg)
 
         normalized = self.normalize_template_payload(default_template, designer_mode=designer_mode)
-        return normalized.get('elements', []), (normalized.get('bg') or getattr(event, 'cert_bg_path', None))
+        return normalized.get('elements', []), (normalized.get('bg') or event_bg)
 
     def _normalize_legacy_elements(self, legacy_dict):
         """Converts old dictionary schema into list-based schema."""

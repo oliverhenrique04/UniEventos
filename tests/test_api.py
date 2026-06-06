@@ -3935,6 +3935,150 @@ def test_team_certificate_send_batch_commits_missing_hashes_once_before_delivery
         assert all(item.cert_entregue is True for item in recipients)
 
 
+def test_team_certificate_send_batch_persists_automatic_resolved_rows_before_delivery(
+    client, app, admin_user, monkeypatch, tmp_path
+):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-batch-auto-persist.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team automatic persistence\n')
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+
+        certificates_api._SEND_TEAM_BATCH_JOBS.clear()
+        db.session.add(ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Speaker Auto Persistido',
+            email='speaker.auto.persistido@test.local',
+            ordem=0,
+        ))
+        db.session.commit()
+
+        monkeypatch.setattr(
+            certificates_api.team_cert_service.certificate_service,
+            'generate_pdf',
+            lambda *args, **kwargs: str(pdf_path),
+        )
+        monkeypatch.setattr(
+            certificates_api.team_cert_service.notifier,
+            'send_email_task',
+            lambda **kwargs: True,
+        )
+
+        job_id = 'team-batch-job-auto-persist'
+        certificates_api._SEND_TEAM_BATCH_JOBS[job_id] = {
+            'job_id': job_id,
+            'event_id': seeded['event_id'],
+            'created_by': seeded['owner_username'],
+            'status': 'queued',
+            'completed': False,
+            'resultado': 'processando',
+            'message': 'Teste',
+            'total_enviado': 0,
+            'sem_email': 0,
+            'falha_fila': 0,
+            'created_at': 0,
+            'updated_at': 0,
+        }
+
+        certificates_api._run_send_team_batch_job(
+            job_id,
+            seeded['event_id'],
+            certificates_api.current_app._get_current_object(),
+        )
+
+        persisted = EventTeamCertificateRecipient.query.filter_by(
+            event_id=seeded['event_id'],
+            source='automatico',
+            nome='Speaker Auto Persistido',
+        ).one()
+
+        assert persisted.cert_hash
+        assert persisted.cert_entregue is True
+        assert persisted.cert_data_envio is not None
+
+
+def test_certificate_designer_bootstrap_returns_normalized_template_and_warnings(client, app, admin_user):
+    event_id = _create_event_for_certs(app)
+
+    with app.app_context():
+        event = db.session.get(Event, event_id)
+        event.cert_template_json = '{{broken json'
+        db.session.commit()
+
+    _login_admin(client)
+    res = client.get(f'/api/certificates/bootstrap/{event_id}')
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['designer_mode'] == 'event'
+    assert payload['template']['version'] == 2
+    assert isinstance(payload['template']['elements'], list)
+    assert len(payload['template']['elements']) > 0
+    assert len(payload['warnings']) > 0
+
+
+def test_team_certificate_designer_bootstrap_returns_team_mode_payload(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    _login_user(client, seeded['owner_username'])
+    res = client.get(f"/api/certificates/team/event/{seeded['event_id']}/bootstrap")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['designer_mode'] == 'team_event'
+    assert payload['template']['version'] == 2
+    assert isinstance(payload['template']['elements'], list)
+    assert '{{PAPEL}}' in json.dumps(payload['preview_data'])
+
+
+def test_team_certificate_delivery_list_returns_resolved_activity_and_responsible_rows(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    with app.app_context():
+        from app.models import ActivitySpeaker, EventResponsible
+        speaker = ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Palestrante API Resolve',
+            email='palestrante.api.resolve@example.com',
+            ordem=0,
+        )
+        db.session.add(speaker)
+
+        owner_user = db.session.get(User, seeded['owner_username'])
+        responsible = EventResponsible(
+            event_id=seeded['event_id'],
+            user_username=owner_user.username,
+            is_primary=True,
+        )
+        db.session.add(responsible)
+        db.session.commit()
+
+    _login_user(client, seeded['owner_username'])
+
+    res = client.get(f"/api/certificates/team/event/{seeded['event_id']}/recipients")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['total'] >= 2
+
+    activity_items = [item for item in payload['items'] if item['source'] == 'activity']
+    responsible_items = [item for item in payload['items'] if item['source'] == 'responsible']
+
+    assert len(activity_items) >= 1
+    assert len(responsible_items) >= 1
+
+    speaker_item = next(item for item in activity_items if item['nome'] == 'Palestrante API Resolve')
+    assert speaker_item['role_label'] == 'Palestrante'
+    assert speaker_item['resolved_key'] is not None
+
+    for item in payload['items']:
+        assert 'resolved_key' in item
+        assert 'source' in item
+        assert 'id' in item
+        assert 'nome' in item
+
+
 def test_prune_job_cache_removes_old_completed_entries(monkeypatch):
     jobs = {
         'old': {'completed': True, 'updated_at': 100},
@@ -3954,6 +4098,12 @@ def test_prune_job_cache_removes_old_completed_entries(monkeypatch):
 def test_team_certificate_pages_load_for_owner_and_gestor(client, app, admin_user):
     seeded = _seed_certificate_management_data(app)
 
+    with app.app_context():
+        event = db.session.get(Event, seeded['event_id'])
+        event.cert_team_bg_path = 'file/team-specific.png'
+        event.cert_bg_path = 'file/event-specific.png'
+        db.session.commit()
+
     for username in [seeded['owner_username'], seeded['manager_username']]:
         client.get('/api/logout')
         _login_user(client, username)
@@ -3966,6 +4116,14 @@ def test_team_certificate_pages_load_for_owner_and_gestor(client, app, admin_use
         designer_html = designer_res.get_data(as_text=True)
         assert 'team_event' in designer_html
         assert '/api/certificates/team/event' in designer_html
+        assert 'previewData = bootstrap.preview_data || buildRandomPreviewData();' in designer_html
+        import re
+
+        assert re.search(
+            r'bg:\s*designerMode === \'team_event\'\s*\? "file/team-specific\.png"\s*:\s*"file/event-specific\.png"',
+            designer_html,
+        )
+        assert 'atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}}.' in designer_html
 
 
 def test_team_certificate_designer_setup_and_preview_return_pdf(client, app, admin_user):
@@ -4046,3 +4204,103 @@ def test_team_certificate_delivery_page_safe_with_special_chars(client, app, adm
     with app.app_context():
         db.session.delete(db.session.get(EventTeamCertificateRecipient, rid))
         db.session.commit()
+
+
+def test_team_certificate_send_batch_uses_resolved_activity_rows(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-batch-resolved.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team batch resolved certificate\n')
+    sent = []
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+        db.session.add_all([
+            ActivitySpeaker(
+                activity_id=seeded['activity_id'],
+                nome='Palestrante Resolvido 1',
+                email='resolvido1@test.local',
+                ordem=0,
+            ),
+            ActivitySpeaker(
+                activity_id=seeded['activity_id'],
+                nome='Palestrante Resolvido 2',
+                email='resolvido2@test.local',
+                ordem=1,
+            ),
+        ])
+        db.session.commit()
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=None, daemon=None):
+            self.target = target
+            self.args = args or ()
+        def start(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(certificates_api, 'Thread', ImmediateThread)
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    monkeypatch.setattr(certificates_api.team_cert_service.notifier, 'send_email_task', lambda **kwargs: sent.append(kwargs) or True)
+
+    _login_user(client, seeded['owner_username'])
+    res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/send_batch")
+
+    assert res.status_code == 202
+    payload = res.get_json()
+    assert payload['job_id']
+    status_res = client.get(f"/api/certificates/team/send_batch/status/{payload['job_id']}")
+    assert status_res.status_code == 200
+    status = status_res.get_json()
+    assert status['total_enviado'] >= 2
+    assert sent
+    team_emails = [s['to_email'] for s in sent]
+    assert 'resolvido1@test.local' in team_emails
+    assert 'resolvido2@test.local' in team_emails
+
+
+def test_team_certificate_resolved_preview_and_resend_accept_resolved_key(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-resolved-preview.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team resolved preview\n')
+    sent = []
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+        speaker = ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Palestrante Chave',
+            email='palestrante.chave@test.local',
+            ordem=0,
+        )
+        db.session.add(speaker)
+        db.session.commit()
+
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    monkeypatch.setattr(certificates_api.team_cert_service.notifier, 'send_email_task', lambda **kwargs: sent.append(kwargs) or True)
+
+    with app.app_context():
+        event = db.session.get(Event, seeded['event_id'])
+        resolved = certificates_api.team_cert_service.resolve_event_recipients(event)
+    speaker_rows = [r for r in resolved if r['nome'] == 'Palestrante Chave']
+    assert len(speaker_rows) == 1
+    resolved_key = speaker_rows[0]['resolved_key']
+
+    _login_user(client, seeded['owner_username'])
+
+    preview_res = client.get(
+        f"/api/certificates/team/resolved/{resolved_key}/preview"
+    )
+    assert preview_res.status_code == 200
+    assert preview_res.mimetype == 'application/pdf'
+
+    download_res = client.get(
+        f"/api/certificates/team/resolved/{resolved_key}/download"
+    )
+    assert download_res.status_code == 200
+
+    resend_res = client.post(
+        f"/api/certificates/team/resolved/{resolved_key}/resend"
+    )
+    assert resend_res.status_code == 200
+    assert sent
+    assert sent[0]['to_email'] == 'palestrante.chave@test.local'
+    assert sent[0]['template_name'] == 'team_certificate_ready.html'

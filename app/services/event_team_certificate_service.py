@@ -57,6 +57,131 @@ class EventTeamCertificateService:
     def _responsible_source_key(username):
         return f"responsible:{username}"
 
+    def resolve_event_recipients(self, event):
+        resolved = []
+        automatic_rows = {
+            item.source_key: item
+            for item in event.team_certificate_recipients
+            if item.source == 'automatico' and item.source_key
+        }
+        consumed_automatic_keys = set()
+
+        for activity in event.activities:
+            for speaker in activity.speakers:
+                speaker_name = (speaker.nome or '').strip()
+                if not speaker_name:
+                    continue
+                speaker_email = (speaker.email or '').strip() or None
+                source_key = self._speaker_source_key(activity.id, speaker_email, speaker_name)
+                persisted = automatic_rows.get(source_key)
+                consumed_automatic_keys.add(source_key)
+                hours = self.normalize_workload_hours(activity.carga_horaria)
+                resolved.append({
+                    'source': 'activity',
+                    'event_id': event.id,
+                    'activity_id': activity.id,
+                    'activity_name': activity.nome or '',
+                    'nome': speaker_name,
+                    'email': speaker_email,
+                    'cpf': None,
+                    'role_label': 'Palestrante',
+                    'workload_hours': hours,
+                    'source_key': source_key,
+                    'cert_hash': persisted.cert_hash if persisted else None,
+                    'cert_entregue': bool(persisted.cert_entregue) if persisted else False,
+                    'cert_data_envio': persisted.cert_data_envio.isoformat() if persisted and persisted.cert_data_envio else None,
+                    'id': persisted.id if persisted else None,
+                })
+
+        for responsible in event.responsibles:
+            user = responsible.user
+            user_name = user.nome if user and user.nome else ''
+            if not user_name:
+                continue
+            user_email = (user.email or '').strip() if user and user.email else None
+            source_key = self._responsible_source_key(responsible.user_username)
+            persisted = automatic_rows.get(source_key)
+            consumed_automatic_keys.add(source_key)
+            role_label = 'Responsavel pelo evento' if responsible.is_primary else 'Equipe organizadora'
+            resolved.append({
+                'source': 'responsible',
+                'event_id': event.id,
+                'activity_id': None,
+                'activity_name': None,
+                'nome': user_name,
+                'email': user_email,
+                'cpf': user.cpf if user else None,
+                'role_label': role_label,
+                'workload_hours': None,
+                'source_key': source_key,
+                'cert_hash': persisted.cert_hash if persisted else None,
+                'cert_entregue': bool(persisted.cert_entregue) if persisted else False,
+                'cert_data_envio': persisted.cert_data_envio.isoformat() if persisted and persisted.cert_data_envio else None,
+                'id': persisted.id if persisted else None,
+            })
+
+        for recipient in event.team_certificate_recipients:
+            if recipient.source != 'manual':
+                continue
+            activity = getattr(recipient, 'activity', None)
+            resolved.append({
+                'source': 'manual',
+                'event_id': recipient.event_id,
+                'activity_id': recipient.activity_id,
+                'activity_name': activity.nome if activity else None,
+                'nome': recipient.nome,
+                'email': recipient.email,
+                'cpf': recipient.cpf,
+                'role_label': recipient.role_label,
+                'workload_hours': recipient.workload_hours,
+                'source_key': None,
+                'cert_hash': recipient.cert_hash,
+                'cert_entregue': bool(recipient.cert_entregue),
+                'cert_data_envio': recipient.cert_data_envio.isoformat() if recipient.cert_data_envio else None,
+                'id': recipient.id,
+            })
+
+        for source_key, recipient in automatic_rows.items():
+            if source_key in consumed_automatic_keys:
+                continue
+            activity = getattr(recipient, 'activity', None)
+            resolved.append({
+                'source': 'automatico',
+                'event_id': recipient.event_id,
+                'activity_id': recipient.activity_id,
+                'activity_name': activity.nome if activity else None,
+                'nome': recipient.nome,
+                'email': recipient.email,
+                'cpf': recipient.cpf,
+                'role_label': recipient.role_label,
+                'workload_hours': recipient.workload_hours,
+                'source_key': recipient.source_key,
+                'cert_hash': recipient.cert_hash,
+                'cert_entregue': bool(recipient.cert_entregue),
+                'cert_data_envio': recipient.cert_data_envio.isoformat() if recipient.cert_data_envio else None,
+                'id': recipient.id,
+            })
+
+        for row in resolved:
+            row['resolved_key'] = self.build_resolved_key(row)
+
+        resolved.sort(key=lambda r: (r['role_label'] or '', r['nome'] or '', r['activity_name'] or ''))
+
+        return resolved
+
+    @staticmethod
+    def build_resolved_key(row):
+        parts = [
+            row.get('source') or '',
+            str(row.get('event_id') or ''),
+            str(row.get('activity_id') or ''),
+            (row.get('nome') or '').strip(),
+            (row.get('email') or '').strip(),
+            (row.get('role_label') or '').strip(),
+        ]
+        digest = hashlib.sha256('|'.join(parts).encode('utf-8')).hexdigest()[:16]
+        return f"{parts[0]}|{parts[1]}|{digest}"
+
     def sync_event_recipients(self, event):
         max_retries = 1
         for attempt in range(max_retries + 1):
@@ -142,8 +267,95 @@ class EventTeamCertificateService:
                 if attempt == max_retries:
                     raise
 
+    def build_virtual_recipient(self, event, resolved_row):
+        if resolved_row is None:
+            return None
+        activity_id = resolved_row.get('activity_id')
+        activity = None
+        if activity_id is not None:
+            for act in event.activities:
+                if act.id == activity_id:
+                    activity = act
+                    break
+        workload_hours = resolved_row.get('workload_hours') or self.normalize_workload_hours(
+            getattr(activity, 'carga_horaria', None) if activity else None
+        )
+        return SimpleNamespace(
+            id=resolved_row.get('id'),
+            nome=resolved_row['nome'],
+            email=resolved_row.get('email'),
+            cpf=resolved_row.get('cpf'),
+            role_label=resolved_row['role_label'],
+            workload_hours=workload_hours,
+            cert_hash=resolved_row.get('cert_hash'),
+            activity=activity,
+            cert_entregue=resolved_row.get('cert_entregue', False),
+            cert_data_envio=resolved_row.get('cert_data_envio'),
+        )
+
+    def ensure_persisted_automatic_recipient(self, event, resolved_row):
+        if not resolved_row or resolved_row.get('id') is not None or resolved_row.get('source') == 'manual':
+            return resolved_row
+
+        source_key = resolved_row.get('source_key')
+        if not source_key:
+            return resolved_row
+
+        persisted = EventTeamCertificateRecipient.query.filter_by(
+            event_id=event.id,
+            source='automatico',
+            source_key=source_key,
+        ).first()
+        if not persisted:
+            persisted = EventTeamCertificateRecipient(
+                event_id=event.id,
+                activity_id=resolved_row.get('activity_id'),
+                nome=resolved_row.get('nome') or '',
+                email=resolved_row.get('email'),
+                cpf=resolved_row.get('cpf'),
+                role_label=resolved_row.get('role_label') or '',
+                workload_hours=resolved_row.get('workload_hours'),
+                source='automatico',
+                source_key=source_key,
+            )
+            db.session.add(persisted)
+            db.session.flush()
+
+        persisted.activity_id = resolved_row.get('activity_id')
+        persisted.nome = resolved_row.get('nome') or persisted.nome
+        persisted.email = resolved_row.get('email')
+        persisted.cpf = resolved_row.get('cpf')
+        persisted.role_label = resolved_row.get('role_label') or persisted.role_label
+        persisted.workload_hours = resolved_row.get('workload_hours')
+
+        resolved_row['id'] = persisted.id
+        resolved_row['cert_hash'] = persisted.cert_hash
+        resolved_row['cert_entregue'] = bool(persisted.cert_entregue)
+        resolved_row['cert_data_envio'] = persisted.cert_data_envio.isoformat() if persisted.cert_data_envio else None
+        return resolved_row
+
+    def ensure_recipient_hash(self, event_id, resolved_row):
+        if not resolved_row or resolved_row.get('cert_hash'):
+            return resolved_row
+
+        cert_hash = self.build_hash(
+            event_id,
+            resolved_row.get('nome'),
+            resolved_row.get('role_label'),
+            resolved_row.get('email'),
+        )
+        resolved_row['cert_hash'] = cert_hash
+
+        resolved_id = resolved_row.get('id')
+        if resolved_id is not None:
+            persisted = db.session.get(EventTeamCertificateRecipient, resolved_id)
+            if persisted and not persisted.cert_hash:
+                persisted.cert_hash = cert_hash
+
+        return resolved_row
+
     def build_default_team_template(self, event):
-        fixed_elements = self.certificate_service.get_fixed_validation_elements(designer_mode='event')
+        fixed_elements = self.certificate_service.get_fixed_validation_elements(designer_mode='team_event')
         team_text_element = {
             'id': 'txt2',
             'type': 'text',
