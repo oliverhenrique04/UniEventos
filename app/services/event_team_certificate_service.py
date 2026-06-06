@@ -233,6 +233,32 @@ class EventTeamCertificateService:
                 if attempt == max_retries:
                     raise
 
+    def build_virtual_recipient(self, event, resolved_row):
+        if resolved_row is None:
+            return None
+        activity_id = resolved_row.get('activity_id')
+        activity = None
+        if activity_id is not None:
+            for act in event.activities:
+                if act.id == activity_id:
+                    activity = act
+                    break
+        workload_hours = resolved_row.get('workload_hours') or self.normalize_workload_hours(
+            getattr(activity, 'carga_horaria', None) if activity else None
+        )
+        return SimpleNamespace(
+            id=resolved_row.get('id'),
+            nome=resolved_row['nome'],
+            email=resolved_row.get('email'),
+            cpf=resolved_row.get('cpf'),
+            role_label=resolved_row['role_label'],
+            workload_hours=workload_hours,
+            cert_hash=resolved_row.get('cert_hash'),
+            activity=activity,
+            cert_entregue=resolved_row.get('cert_entregue', False),
+            cert_data_envio=resolved_row.get('cert_data_envio'),
+        )
+
     def build_default_team_template(self, event):
         fixed_elements = self.certificate_service.get_fixed_validation_elements(designer_mode='event')
         team_text_element = {

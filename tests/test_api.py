@@ -4127,3 +4127,103 @@ def test_team_certificate_delivery_page_safe_with_special_chars(client, app, adm
     with app.app_context():
         db.session.delete(db.session.get(EventTeamCertificateRecipient, rid))
         db.session.commit()
+
+
+def test_team_certificate_send_batch_uses_resolved_activity_rows(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-batch-resolved.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team batch resolved certificate\n')
+    sent = []
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+        db.session.add_all([
+            ActivitySpeaker(
+                activity_id=seeded['activity_id'],
+                nome='Palestrante Resolvido 1',
+                email='resolvido1@test.local',
+                ordem=0,
+            ),
+            ActivitySpeaker(
+                activity_id=seeded['activity_id'],
+                nome='Palestrante Resolvido 2',
+                email='resolvido2@test.local',
+                ordem=1,
+            ),
+        ])
+        db.session.commit()
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=None, daemon=None):
+            self.target = target
+            self.args = args or ()
+        def start(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(certificates_api, 'Thread', ImmediateThread)
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    monkeypatch.setattr(certificates_api.team_cert_service.notifier, 'send_email_task', lambda **kwargs: sent.append(kwargs) or True)
+
+    _login_user(client, seeded['owner_username'])
+    res = client.post(f"/api/certificates/team/event/{seeded['event_id']}/send_batch")
+
+    assert res.status_code == 202
+    payload = res.get_json()
+    assert payload['job_id']
+    status_res = client.get(f"/api/certificates/team/send_batch/status/{payload['job_id']}")
+    assert status_res.status_code == 200
+    status = status_res.get_json()
+    assert status['total_enviado'] >= 2
+    assert sent
+    team_emails = [s['to_email'] for s in sent]
+    assert 'resolvido1@test.local' in team_emails
+    assert 'resolvido2@test.local' in team_emails
+
+
+def test_team_certificate_resolved_preview_and_resend_accept_resolved_key(client, app, admin_user, monkeypatch, tmp_path):
+    seeded = _seed_certificate_management_data(app)
+    pdf_path = tmp_path / 'team-resolved-preview.pdf'
+    pdf_path.write_bytes(b'%PDF-1.4\n% mocked team resolved preview\n')
+    sent = []
+
+    with app.app_context():
+        from app.models import ActivitySpeaker
+        speaker = ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Palestrante Chave',
+            email='palestrante.chave@test.local',
+            ordem=0,
+        )
+        db.session.add(speaker)
+        db.session.commit()
+
+    monkeypatch.setattr(certificates_api.team_cert_service, 'generate_recipient_pdf', lambda *args, **kwargs: str(pdf_path))
+    monkeypatch.setattr(certificates_api.team_cert_service.notifier, 'send_email_task', lambda **kwargs: sent.append(kwargs) or True)
+
+    with app.app_context():
+        event = db.session.get(Event, seeded['event_id'])
+        resolved = certificates_api.team_cert_service.resolve_event_recipients(event)
+    speaker_rows = [r for r in resolved if r['nome'] == 'Palestrante Chave']
+    assert len(speaker_rows) == 1
+    resolved_key = speaker_rows[0]['resolved_key']
+
+    _login_user(client, seeded['owner_username'])
+
+    preview_res = client.get(
+        f"/api/certificates/team/resolved/{resolved_key}/preview"
+    )
+    assert preview_res.status_code == 200
+    assert preview_res.mimetype == 'application/pdf'
+
+    download_res = client.get(
+        f"/api/certificates/team/resolved/{resolved_key}/download"
+    )
+    assert download_res.status_code == 200
+
+    resend_res = client.post(
+        f"/api/certificates/team/resolved/{resolved_key}/resend"
+    )
+    assert resend_res.status_code == 200
+    assert sent
+    assert sent[0]['to_email'] == 'palestrante.chave@test.local'
+    assert sent[0]['template_name'] == 'team_certificate_ready.html'

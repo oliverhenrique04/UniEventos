@@ -143,10 +143,10 @@
 
                 const previewUrl = item.id
                     ? apiUrl('/api/certificates/team/recipients/' + item.id + '/preview')
-                    : apiUrl('/api/certificates/team/recipients_by_key/' + encodeURIComponent(item.resolved_key) + '/preview');
+                    : apiUrl('/api/certificates/team/resolved/' + encodeURIComponent(item.resolved_key) + '/preview');
                 const downloadUrl = item.id
                     ? apiUrl('/api/certificates/team/recipients/' + item.id + '/download')
-                    : apiUrl('/api/certificates/team/recipients_by_key/' + encodeURIComponent(item.resolved_key) + '/download');
+                    : apiUrl('/api/certificates/team/resolved/' + encodeURIComponent(item.resolved_key) + '/download');
 
                 const manualActions = CAN_MANAGE_CERTIFICATES && isManual
                     ? `<button onclick="abrirModalEditar(${item.id}, ${jsArg(item.nome)}, ${jsArg(item.role_label)}, ${jsArg(item.email)}, ${jsArg(item.cpf)}, ${jsArg(String(item.activity_id || ''))}, ${jsArg(String(item.workload_hours || ''))})" class="btn btn-sm btn-light border" title="Editar">
@@ -206,7 +206,7 @@
         frame.src = '';
         const previewPath = recipientId
             ? `/api/certificates/team/recipients/${recipientId}/preview`
-            : `/api/certificates/team/recipients_by_key/${encodeURIComponent(resolvedKey)}/preview`;
+            : `/api/certificates/team/resolved/${encodeURIComponent(resolvedKey)}/preview`;
         frame.src = apiUrl(previewPath + '?t=' + Date.now());
         new bootstrap.Modal(document.getElementById('modalPreviewEquipe')).show();
     }
@@ -324,7 +324,7 @@
         if (recipientId) return enviarIndividual(recipientId);
         Toast.fire({ icon: 'info', title: 'Enviando certificado...' });
         try {
-            const res = await fetch(apiUrl(`/api/certificates/team/recipients_by_key/${encodeURIComponent(resolvedKey)}/resend`), { method: 'POST' });
+            const res = await fetch(apiUrl(`/api/certificates/team/resolved/${encodeURIComponent(resolvedKey)}/resend`), { method: 'POST' });
             const json = await res.json();
             if (res.ok) {
                 carregarDestinatarios();
