@@ -842,7 +842,7 @@
     const toolbar = document.getElementById('floatingToolbar');
     const guideV = document.getElementById('guideV');
     const guideH = document.getElementById('guideH');
-    const persistedTemplateRaw = {{ (event.cert_template_json or '')|tojson }};
+    const persistedTemplateRaw = {% if designer_mode == 'team_event' %}{{ (event.cert_team_template_json or event.cert_template_json or '')|tojson }}{% else %}{{ (event.cert_template_json or '')|tojson }}{% endif %};
     const fixedValidationElements = {{ (fixed_validation_elements or [])|tojson }};
 
     const A4_LANDSCAPE_MM = { w: 297, h: 210 };
@@ -937,7 +937,7 @@
         version: 2,
         document: { gridSize: 2, snap: true, guides: true },
         bg: designerMode === 'team_event'
-            ? "{{ event.cert_team_bg_path or event.cert_bg_path or '' }}"
+            ? "{{ event.cert_team_bg_path or event.cert_bg_path or ('file/fundo_padrao.png' if not event.cert_team_template_json and not event.cert_template_json else '') }}"
             : "{{ event.cert_bg_path or '' }}",
         elements: defaultTemplateElements
     };
@@ -1858,7 +1858,7 @@
         out.document.gridSize = Number(raw.document?.gridSize || 2);
         out.document.snap = raw.document?.snap !== false;
         out.document.guides = raw.document?.guides !== false;
-        out.bg = raw.bg || template.bg;
+        out.bg = raw.bg === undefined || raw.bg === null ? template.bg : raw.bg;
 
         if (Array.isArray(raw.elements)) {
             out.elements = raw.elements.map((el, idx) => normalizeFixedElementConfig({
@@ -2484,10 +2484,10 @@
                     { label: '{{ "{{DATA_REALIZACAO}}" }}', description: 'Data de realização do evento.' },
                     {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{ATIVIDADE}}" }}', description: 'Nome da atividade.' },{% endif %}
                     {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTE}}" }}', description: 'Primeiro palestrante ou responsável principal da atividade.' },{% endif %}
-                {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTES}}" }}', description: 'Lista completa de palestrantes da atividade.' },{% endif %}
-                { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
-                { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' },
-            ];
+                    {% if event.tipo == 'PADRAO' %}{ label: '{{ "{{PALESTRANTES}}" }}', description: 'Lista completa de palestrantes da atividade.' },{% endif %}
+                    { label: '{{ "{{HORAS}}" }}', description: 'Carga horária.' },
+                    { label: '{{ "{{DATA}}" }}', description: 'Data usada como referência de emissão.' },
+                ]);
 
         variableChecks.forEach(({ label, description }) => {
             const present = allText.includes(label);

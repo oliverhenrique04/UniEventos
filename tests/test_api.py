@@ -1,4 +1,7 @@
 import json
+import re
+import subprocess
+import tempfile
 from io import BytesIO
 from datetime import date, time
 from sqlalchemy.exc import IntegrityError
@@ -21,6 +24,24 @@ from app.services.auth_service import AuthService
 from app.services.event_service import EventService
 from app.api import admin as admin_api
 from app.api import certificates as certificates_api
+
+
+def _assert_last_inline_script_is_valid_javascript(html):
+    scripts = re.findall(r'<script>(.*?)</script>', html, flags=re.DOTALL)
+    assert scripts, 'Nenhum script inline encontrado na página.'
+    script = scripts[-1]
+
+    with tempfile.NamedTemporaryFile('w', suffix='.js', encoding='utf-8', delete=True) as handle:
+        handle.write(script)
+        handle.flush()
+        result = subprocess.run(
+            ['node', '--check', handle.name],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 def _login_user(client, username, password='1234'):
@@ -4117,13 +4138,71 @@ def test_team_certificate_pages_load_for_owner_and_gestor(client, app, admin_use
         assert 'team_event' in designer_html
         assert '/api/certificates/team/event' in designer_html
         assert 'previewData = bootstrap.preview_data || buildRandomPreviewData();' in designer_html
-        import re
 
         assert re.search(
             r'bg:\s*designerMode === \'team_event\'\s*\? "file/team-specific\.png"\s*:\s*"file/event-specific\.png"',
             designer_html,
         )
         assert 'atuou como {{PAPEL}} no evento {{EVENTO}} na data {{DATA_REALIZACAO}}.' in designer_html
+        _assert_last_inline_script_is_valid_javascript(designer_html)
+
+
+def test_team_certificate_designer_page_uses_team_template_fallback(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+    team_template = json.dumps({
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'bg': '',
+        'elements': [{'id': 'team_only', 'type': 'text', 'text': '__TEAM_TEMPLATE_ONLY__'}],
+    })
+    event_template = json.dumps({
+        'version': 2,
+        'document': {'gridSize': 2, 'snap': True, 'guides': True},
+        'bg': '',
+        'elements': [{'id': 'event_only', 'type': 'text', 'text': '__EVENT_TEMPLATE_ONLY__'}],
+    })
+
+    with app.app_context():
+        event = db.session.get(Event, seeded['event_id'])
+        event.cert_team_bg_path = None
+        event.cert_bg_path = None
+        event.cert_team_template_json = team_template
+        event.cert_template_json = event_template
+        db.session.commit()
+
+    _login_user(client, seeded['owner_username'])
+    designer_res = client.get(f"/designer_certificado_equipe/{seeded['event_id']}")
+
+    assert designer_res.status_code == 200
+    designer_html = designer_res.get_data(as_text=True)
+    assert '__TEAM_TEMPLATE_ONLY__' in designer_html
+    assert '__EVENT_TEMPLATE_ONLY__' not in designer_html
+    _assert_last_inline_script_is_valid_javascript(designer_html)
+
+
+def test_team_certificate_designer_page_uses_default_background_when_unconfigured(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    with app.app_context():
+        event = db.session.get(Event, seeded['event_id'])
+        event.cert_team_bg_path = None
+        event.cert_bg_path = None
+        event.cert_team_template_json = None
+        event.cert_template_json = None
+        db.session.commit()
+
+    _login_user(client, seeded['owner_username'])
+    designer_res = client.get(f"/designer_certificado_equipe/{seeded['event_id']}")
+
+    assert designer_res.status_code == 200
+    designer_html = designer_res.get_data(as_text=True)
+    import re
+
+    assert re.search(
+        r'bg:\s*designerMode === \'team_event\'\s*\? "file/fundo_padrao\.png"\s*:\s*""',
+        designer_html,
+    )
+    _assert_last_inline_script_is_valid_javascript(designer_html)
 
 
 def test_team_certificate_designer_setup_and_preview_return_pdf(client, app, admin_user):

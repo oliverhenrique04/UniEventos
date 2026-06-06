@@ -18,6 +18,7 @@ class CertificateService:
     """Service for managing, generating and distributing academic certificates."""
 
     SUPPORTED_FONT_FAMILIES = ('Helvetica', 'Times-Roman', 'Courier')
+    DEFAULT_BACKGROUND_PATH = 'file/fundo_padrao.png'
     PAGE_WIDTH_MM = 297
     PAGE_HEIGHT_MM = 210
     DEFAULT_FIXED_LAYOUT_MM = {
@@ -212,7 +213,16 @@ class CertificateService:
     @classmethod
     def _background_for_entity(cls, event, designer_mode='event'):
         if designer_mode == 'team_event':
-            return getattr(event, 'cert_team_bg_path', None) or getattr(event, 'cert_bg_path', None)
+            team_bg = getattr(event, 'cert_team_bg_path', None) or getattr(event, 'cert_bg_path', None)
+            if team_bg:
+                return team_bg
+
+            has_team_template = bool(getattr(event, 'cert_team_template_json', None))
+            has_event_template = bool(getattr(event, 'cert_template_json', None))
+            if not has_team_template and not has_event_template:
+                return cls.DEFAULT_BACKGROUND_PATH
+
+            return ''
         return getattr(event, 'cert_bg_path', None)
 
     @classmethod

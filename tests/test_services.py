@@ -2230,6 +2230,7 @@ def test_event_team_certificate_service_generates_pdf_with_team_tags(monkeypatch
 
     assert pdf_path == 'team.pdf'
     assert captured['event'].designer_mode == 'event'
+    assert captured['event'].cert_bg_path == 'file/fundo_padrao.png'
     assert captured['user'].cpf == 'TEAM-11'
     assert captured['activities'] == [activity]
     assert captured['total_hours'] == '6'
@@ -2244,10 +2245,11 @@ def test_event_team_certificate_service_default_template_uses_team_text():
     from app.services.event_team_certificate_service import EventTeamCertificateService
 
     service = EventTeamCertificateService()
-    event = SimpleNamespace(cert_team_bg_path='')
+    event = SimpleNamespace(cert_team_bg_path=None, cert_bg_path=None, cert_team_template_json=None)
     template = service.build_default_team_template(event)
 
     by_id = {item['id']: item for item in template['elements']}
+    assert template['bg'] == 'file/fundo_padrao.png'
     assert 'txt2' in by_id
     assert '{{PAPEL}}' in by_id['txt2']['text']
     assert 'participou do evento' not in by_id['txt2']['text']
@@ -2340,6 +2342,53 @@ def test_certificate_service_build_designer_bootstrap_supports_team_event_mode()
     fixed_ids = {el['id'] for el in result['fixed_validation_elements']}
     assert 'name_fixed' in fixed_ids
     assert '{{PAPEL}}' in json.dumps(result['preview_data'])
+
+
+def test_certificate_service_build_designer_bootstrap_uses_default_background_for_unconfigured_team_event():
+    service = CertificateService()
+    event = SimpleNamespace(
+        id=101,
+        nome='Evento Equipe Sem Fundo',
+        data_inicio=date(2030, 5, 1),
+        cert_template_json=None,
+        cert_bg_path=None,
+        cert_team_template_json=None,
+        cert_team_bg_path=None,
+        designer_mode=None,
+        is_institutional_certificate=False,
+    )
+
+    result = service.build_designer_bootstrap(event, designer_mode='team_event')
+
+    assert result['background'] == 'file/fundo_padrao.png'
+    assert result['template']['bg'] == 'file/fundo_padrao.png'
+    assert result['designer_mode'] == 'team_event'
+
+
+def test_certificate_service_build_designer_bootstrap_preserves_blank_background_for_configured_team_template():
+    service = CertificateService()
+    event = SimpleNamespace(
+        id=102,
+        nome='Evento Equipe Sem Fundo Intencional',
+        data_inicio=date(2030, 5, 1),
+        cert_template_json=None,
+        cert_bg_path=None,
+        cert_team_template_json=json.dumps({
+            'version': 2,
+            'document': {'gridSize': 2, 'snap': True, 'guides': True},
+            'bg': '',
+            'elements': [{'id': 'txt2', 'type': 'text', 'text': 'Sem fundo'}],
+        }),
+        cert_team_bg_path=None,
+        designer_mode=None,
+        is_institutional_certificate=False,
+    )
+
+    result = service.build_designer_bootstrap(event, designer_mode='team_event')
+
+    assert result['background'] == ''
+    assert result['template']['bg'] == ''
+    assert result['designer_mode'] == 'team_event'
 
 
 def test_event_team_certificate_service_persists_generated_hash(app, admin_user, monkeypatch):

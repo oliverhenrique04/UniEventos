@@ -356,6 +356,7 @@ class EventTeamCertificateService:
 
     def build_default_team_template(self, event):
         fixed_elements = self.certificate_service.get_fixed_validation_elements(designer_mode='team_event')
+        background = self.certificate_service._background_for_entity(event, designer_mode='team_event') or ''
         team_text_element = {
             'id': 'txt2',
             'type': 'text',
@@ -380,7 +381,7 @@ class EventTeamCertificateService:
         return {
             'version': 2,
             'document': {'gridSize': 2, 'snap': True, 'guides': True},
-            'bg': str(getattr(event, 'cert_team_bg_path', '') or '').strip(),
+            'bg': str(background).strip(),
             'elements': [team_text_element] + json.loads(json.dumps(fixed_elements)),
         }
 
@@ -403,7 +404,7 @@ class EventTeamCertificateService:
             db.session.commit()
 
         team_template_json = getattr(event, 'cert_team_template_json', None)
-        team_bg_path = getattr(event, 'cert_team_bg_path', '') or ''
+        team_bg_path = self.certificate_service._background_for_entity(event, designer_mode='team_event') or ''
 
         issue_date = current_certificate_issue_date_label()
 
