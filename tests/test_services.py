@@ -1119,6 +1119,120 @@ def test_event_service_get_event_participants_paginated_returns_newest_first(app
         assert [item.id for item in pagination.items] == [enrollment_2.id, enrollment_1.id]
 
 
+def test_event_team_certificate_service_resolves_activity_and_responsible_recipients(app):
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+    from app.models import EventResponsible, ActivitySpeaker
+
+    with app.app_context():
+        owner = User(
+            username='resolve_owner_test',
+            role='professor',
+            nome='Proprietario Resolve',
+            cpf='80090010010',
+            email='owner_resolve@test.local',
+        )
+        owner.set_password('1234')
+        db.session.add(owner)
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Resolve Recipients',
+            descricao='Teste de resolucao de destinatarios',
+            tipo='PADRAO',
+            data_inicio=date(2030, 3, 1),
+            hora_inicio=time(19, 0),
+            data_fim=date(2030, 3, 1),
+            hora_fim=time(21, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        activity_a = Activity(
+            event_id=event.id,
+            nome='Atividade A',
+            local='Sala A',
+            descricao='Atividade A',
+            data_atv=date(2030, 3, 1),
+            hora_atv=time(19, 30),
+            carga_horaria=2,
+            vagas=30,
+        )
+        activity_b = Activity(
+            event_id=event.id,
+            nome='Atividade B',
+            local='Sala B',
+            descricao='Atividade B',
+            data_atv=date(2030, 3, 1),
+            hora_atv=time(20, 0),
+            carga_horaria=3,
+            vagas=30,
+        )
+        db.session.add_all([activity_a, activity_b])
+        db.session.flush()
+
+        speaker_a = ActivitySpeaker(
+            activity_id=activity_a.id,
+            nome='Palestrante A',
+            email='palestrante.a@example.com',
+            ordem=0,
+        )
+        speaker_b = ActivitySpeaker(
+            activity_id=activity_b.id,
+            nome='Palestrante B',
+            email='palestrante.b@example.com',
+            ordem=0,
+        )
+        repeated_speaker = ActivitySpeaker(
+            activity_id=activity_a.id,
+            nome='Palestrante Repetido',
+            email='repetido@example.com',
+            ordem=1,
+        )
+        db.session.add_all([speaker_a, speaker_b, repeated_speaker])
+        db.session.flush()
+
+        responsible = EventResponsible(
+            event_id=event.id,
+            user_username=owner.username,
+            is_primary=True,
+        )
+        db.session.add(responsible)
+        db.session.commit()
+
+        service = EventTeamCertificateService()
+        resolved = service.resolve_event_recipients(event)
+
+        assert len(resolved) >= 3
+
+        activity_rows = [r for r in resolved if r['source'] == 'activity']
+        responsible_rows = [r for r in resolved if r['source'] == 'responsible']
+
+        assert len(activity_rows) >= 2
+        assert len(responsible_rows) >= 1
+
+        speaker_a_row = next(r for r in activity_rows if r['nome'] == 'Palestrante A')
+        assert speaker_a_row['activity_id'] == activity_a.id
+        assert speaker_a_row['activity_name'] == 'Atividade A'
+        assert speaker_a_row['role_label'] == 'Palestrante'
+        assert speaker_a_row['workload_hours'] == '2'
+
+        primary_resp = next(r for r in responsible_rows if r['nome'] == 'Proprietario Resolve')
+        assert primary_resp['role_label'] == 'Responsavel pelo evento'
+        assert primary_resp['activity_id'] is None
+
+        for row in resolved:
+            assert 'resolved_key' in row
+            assert 'source' in row
+            assert 'event_id' in row
+            assert 'nome' in row
+
+        key_a = EventTeamCertificateService.build_resolved_key(speaker_a_row)
+        key_resp = EventTeamCertificateService.build_resolved_key(primary_resp)
+        assert isinstance(key_a, str) and len(key_a) > 0
+        assert key_a != key_resp
+
+
 def test_certificate_service_generates_pdf_with_bounded_overflow_text(app, admin_user):
     with app.app_context():
         output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')

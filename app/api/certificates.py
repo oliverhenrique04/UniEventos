@@ -739,14 +739,25 @@ def list_team_recipients(event_id):
     event = _get_or_404(Event, event_id)
     if not _can_view_certificates(event):
         return jsonify({'erro': 'Acesso negado para este evento'}), 403
-    recipients = EventTeamCertificateRecipient.query.filter_by(event_id=event_id).options(
-        joinedload(EventTeamCertificateRecipient.activity)
-    ).order_by(
-        EventTeamCertificateRecipient.role_label.asc(),
-        EventTeamCertificateRecipient.nome.asc(),
-        EventTeamCertificateRecipient.id.asc(),
-    ).all()
-    return jsonify({'items': [_team_recipient_payload(item) for item in recipients], 'total': len(recipients)})
+    resolved = team_cert_service.resolve_event_recipients(event)
+    items = []
+    for row in resolved:
+        items.append({
+            'id': row.get('id'),
+            'nome': row['nome'],
+            'email': row.get('email'),
+            'cpf': row.get('cpf'),
+            'role_label': row['role_label'],
+            'activity_id': row.get('activity_id'),
+            'activity_name': row.get('activity_name'),
+            'workload_hours': row.get('workload_hours'),
+            'source': row['source'],
+            'resolved_key': row['resolved_key'],
+            'cert_hash': row.get('cert_hash'),
+            'cert_entregue': row.get('cert_entregue', False),
+            'cert_data_envio': row.get('cert_data_envio'),
+        })
+    return jsonify({'items': items, 'total': len(items)})
 
 
 @bp.route('/team/event/<int:event_id>/sync', methods=['POST'])

@@ -3969,6 +3969,53 @@ def test_team_certificate_designer_bootstrap_returns_team_mode_payload(client, a
     assert '{{PAPEL}}' in json.dumps(payload['preview_data'])
 
 
+def test_team_certificate_delivery_list_returns_resolved_activity_and_responsible_rows(client, app, admin_user):
+    seeded = _seed_certificate_management_data(app)
+
+    with app.app_context():
+        from app.models import ActivitySpeaker, EventResponsible
+        speaker = ActivitySpeaker(
+            activity_id=seeded['activity_id'],
+            nome='Palestrante API Resolve',
+            email='palestrante.api.resolve@example.com',
+            ordem=0,
+        )
+        db.session.add(speaker)
+
+        owner_user = db.session.get(User, seeded['owner_username'])
+        responsible = EventResponsible(
+            event_id=seeded['event_id'],
+            user_username=owner_user.username,
+            is_primary=True,
+        )
+        db.session.add(responsible)
+        db.session.commit()
+
+    _login_user(client, seeded['owner_username'])
+
+    res = client.get(f"/api/certificates/team/event/{seeded['event_id']}/recipients")
+
+    assert res.status_code == 200
+    payload = res.get_json()
+    assert payload['total'] >= 2
+
+    activity_items = [item for item in payload['items'] if item['source'] == 'activity']
+    responsible_items = [item for item in payload['items'] if item['source'] == 'responsible']
+
+    assert len(activity_items) >= 1
+    assert len(responsible_items) >= 1
+
+    speaker_item = next(item for item in activity_items if item['nome'] == 'Palestrante API Resolve')
+    assert speaker_item['role_label'] == 'Palestrante'
+    assert speaker_item['resolved_key'] is not None
+
+    for item in payload['items']:
+        assert 'resolved_key' in item
+        assert 'source' in item
+        assert 'id' in item
+        assert 'nome' in item
+
+
 def test_prune_job_cache_removes_old_completed_entries(monkeypatch):
     jobs = {
         'old': {'completed': True, 'updated_at': 100},

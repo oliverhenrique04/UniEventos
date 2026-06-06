@@ -57,6 +57,97 @@ class EventTeamCertificateService:
     def _responsible_source_key(username):
         return f"responsible:{username}"
 
+    def resolve_event_recipients(self, event):
+        resolved = []
+
+        for activity in event.activities:
+            for speaker in activity.speakers:
+                speaker_name = (speaker.nome or '').strip()
+                if not speaker_name:
+                    continue
+                speaker_email = (speaker.email or '').strip() or None
+                hours = self.normalize_workload_hours(activity.carga_horaria)
+                resolved.append({
+                    'source': 'activity',
+                    'event_id': event.id,
+                    'activity_id': activity.id,
+                    'activity_name': activity.nome or '',
+                    'nome': speaker_name,
+                    'email': speaker_email,
+                    'cpf': None,
+                    'role_label': 'Palestrante',
+                    'workload_hours': hours,
+                    'source_key': self._speaker_source_key(activity.id, speaker_email, speaker_name),
+                    'cert_hash': None,
+                    'cert_entregue': False,
+                    'cert_data_envio': None,
+                    'id': None,
+                })
+
+        for responsible in event.responsibles:
+            user = responsible.user
+            user_name = user.nome if user and user.nome else ''
+            if not user_name:
+                continue
+            user_email = (user.email or '').strip() if user and user.email else None
+            role_label = 'Responsavel pelo evento' if responsible.is_primary else 'Equipe organizadora'
+            resolved.append({
+                'source': 'responsible',
+                'event_id': event.id,
+                'activity_id': None,
+                'activity_name': None,
+                'nome': user_name,
+                'email': user_email,
+                'cpf': user.cpf if user else None,
+                'role_label': role_label,
+                'workload_hours': None,
+                'source_key': self._responsible_source_key(responsible.user_username),
+                'cert_hash': None,
+                'cert_entregue': False,
+                'cert_data_envio': None,
+                'id': None,
+            })
+
+        for recipient in event.team_certificate_recipients:
+            if recipient.source != 'manual':
+                continue
+            activity = getattr(recipient, 'activity', None)
+            resolved.append({
+                'source': 'manual',
+                'event_id': recipient.event_id,
+                'activity_id': recipient.activity_id,
+                'activity_name': activity.nome if activity else None,
+                'nome': recipient.nome,
+                'email': recipient.email,
+                'cpf': recipient.cpf,
+                'role_label': recipient.role_label,
+                'workload_hours': recipient.workload_hours,
+                'source_key': None,
+                'cert_hash': recipient.cert_hash,
+                'cert_entregue': bool(recipient.cert_entregue),
+                'cert_data_envio': recipient.cert_data_envio.isoformat() if recipient.cert_data_envio else None,
+                'id': recipient.id,
+            })
+
+        for row in resolved:
+            row['resolved_key'] = self.build_resolved_key(row)
+
+        resolved.sort(key=lambda r: (r['role_label'] or '', r['nome'] or '', r['activity_name'] or ''))
+
+        return resolved
+
+    @staticmethod
+    def build_resolved_key(row):
+        parts = [
+            row.get('source') or '',
+            str(row.get('event_id') or ''),
+            str(row.get('activity_id') or ''),
+            (row.get('nome') or '').strip(),
+            (row.get('email') or '').strip(),
+            (row.get('role_label') or '').strip(),
+        ]
+        return hashlib.sha256('|'.join(parts).encode('utf-8')).hexdigest()[:16]
+
     def sync_event_recipients(self, event):
         max_retries = 1
         for attempt in range(max_retries + 1):

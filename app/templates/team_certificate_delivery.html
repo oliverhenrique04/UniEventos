@@ -123,7 +123,7 @@
             tbody.innerHTML = '';
 
             if (!data.items || data.items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Nenhum destinatário cadastrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Nenhum destinatario resolvido a partir de atividades, responsaveis ou complementos manuais.</td></tr>';
                 return;
             }
 
@@ -133,12 +133,36 @@
                     : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill"><i class="fa-solid fa-clock me-1"></i> Pendente</span>';
 
                 const emailDisplay = item.email || '-';
+                const isManual = item.source === 'manual' && item.id;
+
+                const sourceLabel = {
+                    'activity': 'Atividade',
+                    'responsible': 'Responsavel',
+                    'manual': 'Manual',
+                }[item.source] || item.source;
+
+                const previewUrl = item.id
+                    ? apiUrl('/api/certificates/team/recipients/' + item.id + '/preview')
+                    : apiUrl('/api/certificates/team/recipients_by_key/' + encodeURIComponent(item.resolved_key) + '/preview');
+                const downloadUrl = item.id
+                    ? apiUrl('/api/certificates/team/recipients/' + item.id + '/download')
+                    : apiUrl('/api/certificates/team/recipients_by_key/' + encodeURIComponent(item.resolved_key) + '/download');
+
+                const manualActions = CAN_MANAGE_CERTIFICATES && isManual
+                    ? `<button onclick="abrirModalEditar(${item.id}, ${jsArg(item.nome)}, ${jsArg(item.role_label)}, ${jsArg(item.email)}, ${jsArg(item.cpf)}, ${jsArg(String(item.activity_id || ''))}, ${jsArg(String(item.workload_hours || ''))})" class="btn btn-sm btn-light border" title="Editar">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button onclick="confirmarExcluir(${item.id})" class="btn btn-sm btn-light border text-danger" title="Excluir">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>`
+                    : '';
 
                 tbody.innerHTML += `
                     <tr class="animate__animated animate__fadeIn">
                         <td class="ps-4">
                             <div class="fw-bold text-dark">${escapeHtml(item.nome)}</div>
                             <div class="text-muted x-small">${escapeHtml(emailDisplay)}</div>
+                            <div class="x-small text-muted">Origem: ${sourceLabel}</div>
                         </td>
                         <td><span class="fw-semibold">${escapeHtml(item.role_label)}</span></td>
                         <td><small class="text-muted">${escapeHtml(item.activity_name || '-')}</small></td>
@@ -146,20 +170,15 @@
                         <td>${statusBadge}</td>
                         <td class="text-end pe-4">
                             <div class="btn-group shadow-sm">
-                                <button onclick="abrirPreviewEquipe(${item.id})" class="btn btn-sm btn-light border" title="Visualizar">
+                                <button onclick="abrirPreviewEquipe('${escapeHtml(item.resolved_key)}', ${item.id || 0})" class="btn btn-sm btn-light border" title="Visualizar">
                                     <i class="fa-solid fa-eye text-primary"></i>
                                 </button>
-                                <a href="${apiUrl('/api/certificates/team/recipients/' + item.id + '/download')}" class="btn btn-sm btn-light border" title="Baixar PDF">
+                                <a href="${downloadUrl}" class="btn btn-sm btn-light border" title="Baixar PDF">
                                     <i class="fa-solid fa-file-pdf text-danger"></i>
                                 </a>
+                                ${manualActions}
                                 ${CAN_MANAGE_CERTIFICATES
-                                    ? `<button onclick="abrirModalEditar(${item.id}, ${jsArg(item.nome)}, ${jsArg(item.role_label)}, ${jsArg(item.email)}, ${jsArg(item.cpf)}, ${jsArg(String(item.activity_id || ''))}, ${jsArg(String(item.workload_hours || ''))})" class="btn btn-sm btn-light border" title="Editar">
-                                        <i class="fa-solid fa-pen"></i>
-                                    </button>
-                                    <button onclick="confirmarExcluir(${item.id})" class="btn btn-sm btn-light border text-danger" title="Excluir">
-                                        <i class="fa-solid fa-trash-can"></i>
-                                    </button>
-                                    <button onclick="enviarIndividual(${item.id})" class="btn btn-sm btn-outline-primary rounded-end px-3">
+                                    ? `<button onclick="enviarIndividualByKey('${escapeHtml(item.resolved_key)}', ${item.id || 0})" class="btn btn-sm btn-outline-primary rounded-end px-3">
                                         <i class="fa-solid fa-paper-plane me-1"></i> ${item.cert_entregue ? 'Reenviar' : 'Enviar'}
                                     </button>`
                                     : ''}
@@ -182,10 +201,13 @@
             .replace(/'/g, '&#39;');
     }
 
-    function abrirPreviewEquipe(recipientId) {
+    function abrirPreviewEquipe(resolvedKey, recipientId) {
         const frame = document.getElementById('framePreviewEquipe');
         frame.src = '';
-        frame.src = apiUrl(`/api/certificates/team/recipients/${recipientId}/preview?t=${Date.now()}`);
+        const previewPath = recipientId
+            ? `/api/certificates/team/recipients/${recipientId}/preview`
+            : `/api/certificates/team/recipients_by_key/${encodeURIComponent(resolvedKey)}/preview`;
+        frame.src = apiUrl(previewPath + '?t=' + Date.now());
         new bootstrap.Modal(document.getElementById('modalPreviewEquipe')).show();
     }
 
@@ -285,6 +307,24 @@
         Toast.fire({ icon: 'info', title: 'Enviando certificado...' });
         try {
             const res = await fetch(apiUrl(`/api/certificates/team/recipients/${id}/resend`), { method: 'POST' });
+            const json = await res.json();
+            if (res.ok) {
+                carregarDestinatarios();
+                Swal.fire('Sucesso!', json.mensagem, 'success');
+            } else {
+                Swal.fire('Erro', json.erro || 'Falha no envio.', 'error');
+            }
+        } catch (e) {
+            Toast.fire({ icon: 'error', title: 'Erro ao enviar.' });
+        }
+    }
+
+    async function enviarIndividualByKey(resolvedKey, recipientId) {
+        if (!CAN_MANAGE_CERTIFICATES) return;
+        if (recipientId) return enviarIndividual(recipientId);
+        Toast.fire({ icon: 'info', title: 'Enviando certificado...' });
+        try {
+            const res = await fetch(apiUrl(`/api/certificates/team/recipients_by_key/${encodeURIComponent(resolvedKey)}/resend`), { method: 'POST' });
             const json = await res.json();
             if (res.ok) {
                 carregarDestinatarios();
