@@ -1312,6 +1312,57 @@ def test_event_team_certificate_service_reuses_persisted_automatic_rows(app):
         assert row['cert_data_envio'] == persisted.cert_data_envio.isoformat()
 
 
+def test_event_team_certificate_service_keeps_orphaned_automatic_rows_visible(app):
+    from app.services.event_team_certificate_service import EventTeamCertificateService
+
+    with app.app_context():
+        owner = User(
+            username='owner_orphan_auto',
+            role='admin',
+            nome='Owner Orfao',
+            cpf='32132132132',
+            email='owner.orfao@test.local',
+        )
+        db.session.add(owner)
+        db.session.flush()
+
+        event = Event(
+            owner_username=owner.username,
+            nome='Evento Orfaos Equipe',
+            descricao='Desc',
+            tipo='PADRAO',
+            data_inicio=date(2030, 4, 3),
+            hora_inicio=time(9, 0),
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        orphan = EventTeamCertificateRecipient(
+            event_id=event.id,
+            activity_id=None,
+            nome='Pessoa Removida',
+            email='removida@test.local',
+            role_label='Palestrante',
+            workload_hours='4',
+            source='automatico',
+            source_key='speaker:999:removida@test.local',
+            cert_hash='ORPHANHASH123456',
+            cert_entregue=True,
+            cert_data_envio=datetime(2030, 4, 4, 10, 0),
+        )
+        db.session.add(orphan)
+        db.session.commit()
+
+        service = EventTeamCertificateService()
+        resolved = service.resolve_event_recipients(event)
+
+        row = next(item for item in resolved if item['id'] == orphan.id)
+        assert row['source'] == 'automatico'
+        assert row['nome'] == 'Pessoa Removida'
+        assert row['cert_hash'] == 'ORPHANHASH123456'
+        assert row['cert_entregue'] is True
+
+
 def test_certificate_service_generates_pdf_with_bounded_overflow_text(app, admin_user):
     with app.app_context():
         output_dir = os.path.join(app.root_path, 'static', 'certificates', 'generated')

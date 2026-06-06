@@ -64,6 +64,7 @@ class EventTeamCertificateService:
             for item in event.team_certificate_recipients
             if item.source == 'automatico' and item.source_key
         }
+        consumed_automatic_keys = set()
 
         for activity in event.activities:
             for speaker in activity.speakers:
@@ -73,6 +74,7 @@ class EventTeamCertificateService:
                 speaker_email = (speaker.email or '').strip() or None
                 source_key = self._speaker_source_key(activity.id, speaker_email, speaker_name)
                 persisted = automatic_rows.get(source_key)
+                consumed_automatic_keys.add(source_key)
                 hours = self.normalize_workload_hours(activity.carga_horaria)
                 resolved.append({
                     'source': 'activity',
@@ -99,6 +101,7 @@ class EventTeamCertificateService:
             user_email = (user.email or '').strip() if user and user.email else None
             source_key = self._responsible_source_key(responsible.user_username)
             persisted = automatic_rows.get(source_key)
+            consumed_automatic_keys.add(source_key)
             role_label = 'Responsavel pelo evento' if responsible.is_primary else 'Equipe organizadora'
             resolved.append({
                 'source': 'responsible',
@@ -132,6 +135,27 @@ class EventTeamCertificateService:
                 'role_label': recipient.role_label,
                 'workload_hours': recipient.workload_hours,
                 'source_key': None,
+                'cert_hash': recipient.cert_hash,
+                'cert_entregue': bool(recipient.cert_entregue),
+                'cert_data_envio': recipient.cert_data_envio.isoformat() if recipient.cert_data_envio else None,
+                'id': recipient.id,
+            })
+
+        for source_key, recipient in automatic_rows.items():
+            if source_key in consumed_automatic_keys:
+                continue
+            activity = getattr(recipient, 'activity', None)
+            resolved.append({
+                'source': 'automatico',
+                'event_id': recipient.event_id,
+                'activity_id': recipient.activity_id,
+                'activity_name': activity.nome if activity else None,
+                'nome': recipient.nome,
+                'email': recipient.email,
+                'cpf': recipient.cpf,
+                'role_label': recipient.role_label,
+                'workload_hours': recipient.workload_hours,
+                'source_key': recipient.source_key,
                 'cert_hash': recipient.cert_hash,
                 'cert_entregue': bool(recipient.cert_entregue),
                 'cert_data_envio': recipient.cert_data_envio.isoformat() if recipient.cert_data_envio else None,
