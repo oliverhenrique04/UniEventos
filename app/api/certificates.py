@@ -14,8 +14,6 @@ import re
 import time
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
-
 from app.models import Event, Enrollment, User, Activity, EventTeamCertificateRecipient
 from app.extensions import db
 from app.utils import build_absolute_app_url, normalize_cpf
@@ -875,13 +873,6 @@ def resend_team_recipient(recipient_id):
     return jsonify({'mensagem': 'Reenvio solicitado.'})
 
 
-def _resolved_team_row_or_404(event, resolved_key):
-    for row in team_cert_service.resolve_event_recipients(event):
-        if row.get('resolved_key') == resolved_key:
-            return row
-    abort(404, jsonify({'erro': 'Destinatario resolvido nao encontrado para esta chave.'}))
-
-
 @bp.route('/team/resolved/<path:resolved_key>/preview', methods=['GET'])
 @login_required
 def preview_team_resolved(resolved_key):
@@ -900,25 +891,28 @@ def resend_team_resolved(resolved_key):
     return _handle_team_resolved_action(resolved_key, 'resend')
 
 
+def _event_id_from_resolved_key(resolved_key):
+    try:
+        _, event_id, _ = str(resolved_key or '').split('|', 2)
+        return int(event_id)
+    except (TypeError, ValueError):
+        abort(404, description='Destinatario resolvido nao encontrado para esta chave.')
+
+
 def _handle_team_resolved_action(resolved_key, action):
-    from app.models import Event as EventModel
-    event = None
+    event_id = _event_id_from_resolved_key(resolved_key)
+    event = db.session.get(Event, event_id)
     row = None
-    for candidate in db.session.query(EventModel).all():
-        for r in team_cert_service.resolve_event_recipients(candidate):
-            if r.get('resolved_key') == resolved_key:
-                row = r
-                event = candidate
+    if event:
+        for candidate in team_cert_service.resolve_event_recipients(event):
+            if candidate.get('resolved_key') == resolved_key:
+                row = candidate
                 break
-        if row:
-            break
 
     if not event or not row:
-        abort(404, jsonify({'erro': 'Destinatario resolvido nao encontrado para esta chave.'}))
+        abort(404, description='Destinatario resolvido nao encontrado para esta chave.')
 
     if not _can_view_certificates(event):
-        if action in ('preview', 'download'):
-            return jsonify({'erro': 'Acesso negado para este evento'}), 403
         return jsonify({'erro': 'Acesso negado para este evento'}), 403
 
     recipient = team_cert_service.build_virtual_recipient(event, row)
@@ -947,10 +941,6 @@ def _handle_team_resolved_action(resolved_key, action):
         return jsonify({'mensagem': 'Reenvio solicitado.'})
     else:
         abort(400)
-
-
-def _event_id_from_resolved_key(resolved_key):
-    return None
 
 
 def _run_send_team_batch_job(job_id, event_id, app_obj):

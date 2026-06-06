@@ -1231,6 +1231,8 @@ def test_event_team_certificate_service_resolves_activity_and_responsible_recipi
         key_resp = EventTeamCertificateService.build_resolved_key(primary_resp)
         assert isinstance(key_a, str) and len(key_a) > 0
         assert key_a != key_resp
+        assert key_a.split('|', 2)[0] == 'activity'
+        assert key_a.split('|', 2)[1] == str(event.id)
 
 
 def test_certificate_service_generates_pdf_with_bounded_overflow_text(app, admin_user):

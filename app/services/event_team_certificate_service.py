@@ -146,7 +146,8 @@ class EventTeamCertificateService:
             (row.get('email') or '').strip(),
             (row.get('role_label') or '').strip(),
         ]
-        return hashlib.sha256('|'.join(parts).encode('utf-8')).hexdigest()[:16]
+        digest = hashlib.sha256('|'.join(parts).encode('utf-8')).hexdigest()[:16]
+        return f"{parts[0]}|{parts[1]}|{digest}"
 
     def sync_event_recipients(self, event):
         max_retries = 1
