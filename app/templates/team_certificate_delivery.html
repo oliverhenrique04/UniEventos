@@ -15,6 +15,7 @@
             <p class="text-muted mb-0">Gerencie os certificados da equipe do evento: <strong>{{ event.nome }}</strong></p>
         </div>
         <div class="d-flex gap-2">
+            <a href="{{ url_for('main.designer_certificado_equipe', event_id=event.id) }}" class="btn btn-outline-primary"><i class="fa-solid fa-pen-ruler me-1"></i> Layout</a>
             <button onclick="carregarDestinatarios()" class="btn btn-light border"><i class="fa-solid fa-sync me-1"></i> Atualizar</button>
             {% if can_manage_certificates %}
             <button onclick="sincronizarEquipe()" class="btn btn-outline-secondary"><i class="fa-solid fa-arrows-rotate me-1"></i> Sincronizar</button>

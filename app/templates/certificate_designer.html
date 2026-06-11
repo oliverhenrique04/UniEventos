@@ -384,7 +384,15 @@
 <div class="container-fluid px-4 fade-in-up">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
+            {% if designer_mode == 'team_event' %}
+            <h3 class="fw-bold m-0 text-slate-900"><i class="fa-solid fa-users text-primary me-2"></i>Editor de Certificado da Equipe</h3>
+            <p class="text-muted mb-0">Layout do certificado para a equipe do evento: <strong>{{ event.nome }}</strong></p>
+            {% elif designer_mode == 'institutional' %}
+            <h3 class="fw-bold m-0 text-slate-900"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Editor de Certificado Institucional</h3>
+            {% else %}
             <h3 class="fw-bold m-0 text-slate-900"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Editor de Certificado</h3>
+            <p class="text-muted mb-0">Layout do certificado para participantes do evento: <strong>{{ event.nome }}</strong></p>
+            {% endif %}
         </div>
         <div class="d-flex gap-2">
             {% if designer_mode == 'institutional' %}
