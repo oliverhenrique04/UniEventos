@@ -65,6 +65,21 @@ class AdminService:
         }
         return aliases.get(normalized, normalized)
 
+    @staticmethod
+    def _normalize_optional_text(value):
+        normalized = str(value or '').strip()
+        return normalized or None
+
+    def _find_ra_owner(self, ra, exclude_username=None):
+        normalized_ra = self._normalize_optional_text(ra)
+        if not normalized_ra:
+            return None
+
+        query = User.query.filter(User.ra == normalized_ra)
+        if exclude_username:
+            query = query.filter(User.username != exclude_username)
+        return query.first()
+
     def list_users_paginated(self, page=1, per_page=10, filters=None):
         """Retrieves a paginated list of users with optional filtering.
         
@@ -128,6 +143,7 @@ class AdminService:
     def create_user(self, data):
         """Creates a new user manually."""
         cpf = normalize_cpf(data.get('cpf'))
+        normalized_ra = self._normalize_optional_text(data.get('ra'))
         if not cpf or len(cpf) != 11:
             return None, "CPF inválido. Informe 11 dígitos."
 
@@ -135,13 +151,15 @@ class AdminService:
 
         if db.session.get(User, username) or User.query.filter_by(cpf=cpf).first():
             return None, "Usuário ou CPF já cadastrado."
+        if normalized_ra and self._find_ra_owner(normalized_ra):
+            return None, f"RA {normalized_ra} já pertence a outro usuário."
             
         user = User(
             username=username,
             nome=data.get('nome'),
             email=data.get('email'),
             cpf=cpf,
-            ra=data.get('ra'),
+            ra=normalized_ra,
             curso=data.get('curso'),
             role=data.get('role', 'participante'),
             can_create_events=self._coerce_bool(data.get('can_create_events')),
@@ -155,12 +173,18 @@ class AdminService:
         """Updates an existing user's profile details."""
         user = self.user_repo.get_by_username(target_username)
         if not user:
-            return False
+            return False, "Usuário não encontrado."
+
+        if 'ra' in data:
+            normalized_ra = self._normalize_optional_text(data.get('ra'))
+            ra_owner = self._find_ra_owner(normalized_ra, exclude_username=user.username)
+            if ra_owner:
+                return False, f"RA {normalized_ra} já pertence a outro usuário."
+            user.ra = normalized_ra
             
         user.nome = data.get('nome', user.nome)
         user.cpf = data.get('cpf', user.cpf)
         user.email = data.get('email', user.email)
-        user.ra = data.get('ra', user.ra)
         user.curso = data.get('curso', user.curso)
         user.role = data.get('role', user.role)
         if 'can_create_events' in data:
@@ -170,7 +194,7 @@ class AdminService:
             user.set_password(data['password'])
             
         self.user_repo.update()
-        return True
+        return True, "Atualizado!"
 
     def delete_user(self, username):
         """Deletes a user and their associations."""

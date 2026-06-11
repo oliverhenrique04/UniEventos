@@ -820,6 +820,13 @@ def test_login_fail(client):
     assert res.status_code == 401
 
 
+def test_login_with_invalid_cpf_returns_401_instead_of_500(client):
+    res = client.post('/api/login', json={'cpf': '123', 'password': '1234'})
+
+    assert res.status_code == 401
+    assert res.get_json()['status'] == 'error'
+
+
 def test_login_marks_session_as_permanent(client, admin_user):
     res = client.post('/api/login', json={'username': 'admin_test', 'password': '1234'})
 
@@ -1706,6 +1713,185 @@ def test_user_crud_persists_can_create_events_flag(client, app, admin_user):
     with app.app_context():
         updated = db.session.get(User, '12345678901')
         assert updated.can_create_events is False
+
+
+def test_create_user_allows_blank_ra_for_multiple_users(client, app, admin_user):
+    _login_admin(client)
+
+    first_res = client.post('/api/criar_usuario', json={
+        'password': '1234',
+        'nome': 'Usuario Sem RA 1',
+        'email': 'semra1@test.local',
+        'cpf': '12345678911',
+        'ra': '',
+        'curso': '',
+        'role': 'participante',
+        'can_create_events': False,
+    })
+    second_res = client.post('/api/criar_usuario', json={
+        'password': '1234',
+        'nome': 'Usuario Sem RA 2',
+        'email': 'semra2@test.local',
+        'cpf': '12345678912',
+        'ra': '   ',
+        'curso': '',
+        'role': 'participante',
+        'can_create_events': False,
+    })
+
+    assert first_res.status_code == 200
+    assert second_res.status_code == 200
+
+    with app.app_context():
+        first_user = db.session.get(User, '12345678911')
+        second_user = db.session.get(User, '12345678912')
+        assert first_user.ra is None
+        assert second_user.ra is None
+
+
+def test_edit_user_allows_blank_ra_for_multiple_users(client, app, admin_user):
+    with app.app_context():
+        first_user = User(
+            username='blank_ra_user_1',
+            role='participante',
+            nome='Blank RA User 1',
+            cpf='12345678921',
+            email='blankra1@test.local',
+            ra='RA-BLANK-1',
+        )
+        first_user.set_password('1234')
+
+        second_user = User(
+            username='blank_ra_user_2',
+            role='participante',
+            nome='Blank RA User 2',
+            cpf='12345678922',
+            email='blankra2@test.local',
+            ra='RA-BLANK-2',
+        )
+        second_user.set_password('1234')
+
+        db.session.add_all([first_user, second_user])
+        db.session.commit()
+
+    _login_admin(client)
+
+    first_res = client.post('/api/editar_usuario', json={
+        'username_alvo': 'blank_ra_user_1',
+        'nome': 'Blank RA User 1',
+        'email': 'blankra1@test.local',
+        'cpf': '12345678921',
+        'ra': '',
+        'curso': '',
+        'role': 'participante',
+        'can_create_events': False,
+    })
+    second_res = client.post('/api/editar_usuario', json={
+        'username_alvo': 'blank_ra_user_2',
+        'nome': 'Blank RA User 2',
+        'email': 'blankra2@test.local',
+        'cpf': '12345678922',
+        'ra': '   ',
+        'curso': '',
+        'role': 'participante',
+        'can_create_events': False,
+    })
+
+    assert first_res.status_code == 200
+    assert second_res.status_code == 200
+
+    with app.app_context():
+        assert db.session.get(User, 'blank_ra_user_1').ra is None
+        assert db.session.get(User, 'blank_ra_user_2').ra is None
+
+
+def test_edit_user_rejects_duplicate_ra_with_400(client, app, admin_user):
+    with app.app_context():
+        first_user = User(
+            username='dup_ra_user_1',
+            role='participante',
+            nome='Dup RA User 1',
+            cpf='12345678931',
+            email='dupra1@test.local',
+            ra='RA-DUPLICADO',
+        )
+        first_user.set_password('1234')
+
+        second_user = User(
+            username='dup_ra_user_2',
+            role='participante',
+            nome='Dup RA User 2',
+            cpf='12345678932',
+            email='dupra2@test.local',
+            ra='RA-UNICO',
+        )
+        second_user.set_password('1234')
+
+        db.session.add_all([first_user, second_user])
+        db.session.commit()
+
+    _login_admin(client)
+    res = client.post('/api/editar_usuario', json={
+        'username_alvo': 'dup_ra_user_2',
+        'nome': 'Dup RA User 2',
+        'email': 'dupra2@test.local',
+        'cpf': '12345678932',
+        'ra': 'RA-DUPLICADO',
+        'curso': '',
+        'role': 'participante',
+        'can_create_events': False,
+    })
+
+    assert res.status_code == 400
+    assert 'RA RA-DUPLICADO já pertence a outro usuário.' == res.get_json()['erro']
+
+    with app.app_context():
+        assert db.session.get(User, 'dup_ra_user_2').ra == 'RA-UNICO'
+
+
+def test_bulk_permissions_accepts_numeric_string_course_id(client, app, admin_user):
+    with app.app_context():
+        course = Course(nome='Curso Permissao Lote')
+        db.session.add(course)
+        db.session.flush()
+
+        professor = User(
+            username='bulk_permission_prof',
+            role='professor',
+            nome='Professor Permissao Lote',
+            cpf='12345678941',
+            email='bulkpermission@test.local',
+            course_id=course.id,
+            can_create_events=False,
+        )
+        professor.set_password('1234')
+        db.session.add(professor)
+        db.session.commit()
+        course_id = course.id
+
+    _login_admin(client)
+    res = client.post('/api/permissoes_curso_lote', json={
+        'course_id': str(course_id),
+        'can_create_events': True,
+    })
+
+    assert res.status_code == 200
+    assert res.get_json()['count'] == 1
+
+    with app.app_context():
+        assert db.session.get(User, 'bulk_permission_prof').can_create_events is True
+
+
+def test_bulk_permissions_rejects_invalid_course_id(client, admin_user):
+    _login_admin(client)
+
+    res = client.post('/api/permissoes_curso_lote', json={
+        'course_id': 'abc',
+        'can_create_events': True,
+    })
+
+    assert res.status_code == 400
+    assert res.get_json()['erro'] == 'Curso inválido.'
 
 
 def test_import_users_csv_accepts_model_compatible_headers(client, app, admin_user):

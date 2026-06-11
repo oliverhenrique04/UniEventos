@@ -373,12 +373,13 @@ def editar_usuario():
     data = request.json
     target_username = data.get('username_alvo')
     
-    updated = admin_service.update_user_details(target_username, data)
+    updated, msg = admin_service.update_user_details(target_username, data)
     
     if updated:
-        return jsonify({"mensagem": "Atualizado!"})
+        return jsonify({"mensagem": msg})
         
-    return jsonify({"erro": "Usuário não encontrado"}), 404
+    status_code = 404 if msg == "Usuário não encontrado." else 400
+    return jsonify({"erro": msg}), status_code
 
 @bp.route('/importar_usuarios_csv', methods=['POST'])
 @login_required
@@ -584,8 +585,16 @@ def permissoes_curso_lote():
         return jsonify({"erro": "Negado"}), 403
         
     data = request.json
+    try:
+        course_id = int(data.get('course_id'))
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Curso inválido."}), 400
+
+    if course_id <= 0:
+        return jsonify({"erro": "Curso inválido."}), 400
+
     count, msg = admin_service.bulk_update_permissions_by_course(
-        data.get('course_id'), 
+        course_id,
         data.get('can_create_events')
     )
     return jsonify({"mensagem": msg, "count": count})

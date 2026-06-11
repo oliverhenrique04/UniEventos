@@ -33,6 +33,6 @@ class UserRepository(BaseRepository[User]):
             User: The user object or None.
         """
         normalized = normalize_cpf(cpf)
-        if not normalized:
+        if not normalized or len(normalized) != 11:
             return None
         return self.find_one_by(cpf=normalized)
