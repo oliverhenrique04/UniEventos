@@ -323,7 +323,7 @@ class EventTeamCertificateService:
 
         persisted.activity_id = resolved_row.get('activity_id')
         persisted.nome = resolved_row.get('nome') or persisted.nome
-        persisted.email = resolved_row.get('email')
+        persisted.email = resolved_row.get('email') or persisted.email
         persisted.cpf = resolved_row.get('cpf')
         persisted.role_label = resolved_row.get('role_label') or persisted.role_label
         persisted.workload_hours = resolved_row.get('workload_hours')
@@ -356,7 +356,11 @@ class EventTeamCertificateService:
 
     def build_default_team_template(self, event):
         fixed_elements = self.certificate_service.get_fixed_validation_elements(designer_mode='team_event')
-        background = self.certificate_service._background_for_entity(event, designer_mode='team_event') or ''
+        background = (
+            getattr(event, 'cert_team_bg_path', None) or
+            getattr(event, 'cert_bg_path', None) or
+            self.certificate_service.DEFAULT_BACKGROUND_PATH
+        )
         team_text_element = {
             'id': 'txt2',
             'type': 'text',

@@ -267,53 +267,30 @@ class CertificateService:
         template_json = self._template_json_for_entity(event, designer_mode=resolved_mode)
 
         default_template = self.build_default_template(designer_mode=resolved_mode, bg=bg)
+        background = bg
+
         if not template_json:
             normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
-            return {
-                'designer_mode': resolved_mode,
-                'entity_id': entity_id,
-                'template': normalized,
-                'background': bg,
-                'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
-                'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
-                'warnings': warnings,
-            }
+        else:
+            try:
+                template = json.loads(template_json)
+            except Exception:
+                template = None
 
-        try:
-            template = json.loads(template_json)
-        except Exception:
-            warnings.append({'code': 'fallback_invalid_json', 'message': 'Template armazenado invalido. Usando template padrao.'})
-            normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
-            return {
-                'designer_mode': resolved_mode,
-                'entity_id': entity_id,
-                'template': normalized,
-                'background': bg,
-                'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
-                'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
-                'warnings': warnings,
-            }
+            if isinstance(template, dict) and isinstance(template.get('elements'), list):
+                template.setdefault('bg', bg)
+                normalized = self.normalize_template_payload(template, designer_mode=resolved_mode)
+                background = normalized.get('bg') or bg
+            else:
+                if template is not None:
+                    warnings.append({'code': 'fallback_invalid_json', 'message': 'Template armazenado invalido. Usando template padrao.'})
+                normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
 
-        if isinstance(template, dict) and isinstance(template.get('elements'), list):
-            template.setdefault('bg', bg)
-            normalized = self.normalize_template_payload(template, designer_mode=resolved_mode)
-            return {
-                'designer_mode': resolved_mode,
-                'entity_id': entity_id,
-                'template': normalized,
-                'background': normalized.get('bg') or bg,
-                'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
-                'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
-                'warnings': warnings,
-            }
-
-        warnings.append({'code': 'fallback_invalid_json', 'message': 'Template armazenado invalido. Usando template padrao.'})
-        normalized = self.normalize_template_payload(default_template, designer_mode=resolved_mode)
         return {
             'designer_mode': resolved_mode,
             'entity_id': entity_id,
             'template': normalized,
-            'background': bg,
+            'background': background,
             'fixed_validation_elements': self.get_fixed_validation_elements(designer_mode=resolved_mode),
             'preview_data': self.build_preview_data(event, designer_mode=resolved_mode),
             'warnings': warnings,

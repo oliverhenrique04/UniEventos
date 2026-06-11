@@ -742,6 +742,7 @@ def list_team_recipients(event_id):
     for row in resolved:
         items.append({
             'id': row.get('id'),
+            'event_id': row.get('event_id'),
             'nome': row['nome'],
             'email': row.get('email'),
             'cpf': row.get('cpf'),
@@ -902,18 +903,20 @@ def _event_id_from_resolved_key(resolved_key):
 def _handle_team_resolved_action(resolved_key, action):
     event_id = _event_id_from_resolved_key(resolved_key)
     event = db.session.get(Event, event_id)
-    row = None
-    if event:
-        for candidate in team_cert_service.resolve_event_recipients(event):
-            if candidate.get('resolved_key') == resolved_key:
-                row = candidate
-                break
-
-    if not event or not row:
+    if not event:
         abort(404, description='Destinatario resolvido nao encontrado para esta chave.')
 
     if not _can_view_certificates(event):
         return jsonify({'erro': 'Acesso negado para este evento'}), 403
+
+    row = None
+    for candidate in team_cert_service.resolve_event_recipients(event):
+        if candidate.get('resolved_key') == resolved_key:
+            row = candidate
+            break
+
+    if not row:
+        abort(404, description='Destinatario resolvido nao encontrado para esta chave.')
 
     recipient = team_cert_service.build_virtual_recipient(event, row)
 
@@ -933,7 +936,8 @@ def _handle_team_resolved_action(resolved_key, action):
         team_cert_service.ensure_recipient_hash(event.id, row)
         recipient = team_cert_service.build_virtual_recipient(event, row)
         pdf_path = team_cert_service.generate_recipient_pdf(event, recipient)
-        team_cert_service.queue_email(event, recipient, pdf_path)
+        if not team_cert_service.queue_email(event, recipient, pdf_path):
+            return jsonify({'erro': 'Falha ao enfileirar e-mail. Tente novamente.'}), 500
         resolved_id = row.get('id')
         if resolved_id is not None:
             persisted = db.session.get(EventTeamCertificateRecipient, resolved_id)
